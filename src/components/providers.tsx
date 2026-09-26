@@ -35,11 +35,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
       persistOptions={{
         persister,
         maxAge: WEEK,
-        buster: "v1",
+        buster: "v2",
         dehydrateOptions: {
           // Cache the Google-backed data (for instant start-up); demo data already lives in localStorage.
+          // A cached "signed out" answer must never be trusted after an OAuth round-trip, so only
+          // a signed-in session is persisted.
           shouldDehydrateQuery: (q) =>
-            q.state.status === "success" && (q.queryKey[0] === "session" || (q.queryKey[0] === "dataset" && q.queryKey[1] === "google")),
+            q.state.status === "success" &&
+            ((q.queryKey[0] === "session" && !!(q.state.data as { user?: unknown } | undefined)?.user) ||
+              (q.queryKey[0] === "dataset" && q.queryKey[1] === "google")),
         },
       }}
     >

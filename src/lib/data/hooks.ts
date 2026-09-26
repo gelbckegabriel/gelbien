@@ -12,15 +12,17 @@ import { ApiError, demoSource, fetchSession, googleSource } from "./sources";
 export type AppMode = "loading" | "google" | "demo" | "signedOut";
 
 export function useSession() {
-  return useQuery({ queryKey: ["session"], queryFn: fetchSession, staleTime: 5 * 60_000, retry: 1 });
+  // Always re-check on mount: the cookie may have changed behind our back (e.g. right after the OAuth redirect).
+  return useQuery({ queryKey: ["session"], queryFn: fetchSession, staleTime: 5 * 60_000, retry: 1, refetchOnMount: "always" });
 }
 
 export function useMode(): { mode: AppMode; session: SessionInfo | undefined } {
-  const { data, isPending } = useSession();
+  const { data, isFetchedAfterMount } = useSession();
   const demo = useUi((s) => s.demo);
   if (data?.user) return { mode: "google", session: data };
   if (demo) return { mode: "demo", session: data };
-  if (isPending) return { mode: "loading", session: data };
+  // Never redirect to /login on a cached answer — wait for the server to confirm.
+  if (!isFetchedAfterMount) return { mode: "loading", session: data };
   return { mode: "signedOut", session: data };
 }
 
