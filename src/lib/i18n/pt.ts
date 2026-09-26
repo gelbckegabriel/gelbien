@@ -78,6 +78,7 @@ const pt: Messages = {
   "login.error.scope": "O Gelbien precisa de permissão para criar a planilha no seu Drive. Entre de novo e mantenha a opção do Google Drive marcada.",
   "login.error.generic": "Não foi possível entrar. Tente novamente.",
   "login.error.api": "O Google bloqueou o acesso ao Sheets/Drive. No Google Cloud Console, ative a Google Sheets API e a Google Drive API e tente de novo.",
+  "login.error.storage": "Seu armazenamento do Google está cheio, então o Gelbien não consegue criar a planilha no seu Drive. Libere espaço (ou aumente o armazenamento) em one.google.com/storage e tente de novo.",
   "login.error.cookie": "O login demorou demais ou começou em outro endereço. Abra o app no mesmo endereço do redirect URI (ex.: http://localhost:3000) e tente de novo.",
   "login.error.denied": "O login foi cancelado.",
   "login.f1.title": "Cada gasto em segundos",
@@ -530,6 +531,7 @@ const pt: Messages = {
   "err.load": "Não foi possível carregar seus dados",
   "err.save": "Não foi possível salvar: {error}",
   "err.session": "Sua sessão do Google expirou. Entre novamente.",
+  "err.storage": "Seu armazenamento do Google está cheio, então as alterações não podem ser salvas na planilha. Libere espaço em one.google.com/storage e tente de novo.",
   "paste.hint": "Recibo detectado — abrindo um novo gasto",
 };
 

@@ -66,6 +66,8 @@ export function useMutate() {
       if (err instanceof ApiError && err.status === 401) {
         toast.error(t("err.session"));
         qc.invalidateQueries({ queryKey: ["session"] });
+      } else if (err instanceof ApiError && err.code === "storage") {
+        toast.error(t("err.storage"));
       } else {
         toast.error(t("err.save", { error: err.message }));
       }

@@ -9,9 +9,21 @@ export class GoogleApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Google's machine-readable cause, e.g. "storageQuotaExceeded" or "SERVICE_DISABLED". */
+    public reason?: string,
   ) {
     super(message);
   }
+}
+
+/** The user's Google storage is full: Drive refuses to create (or edit) files until they free space. */
+export function isStorageFull(err: unknown): boolean {
+  return err instanceof GoogleApiError && (err.reason === "storageQuotaExceeded" || /storage quota/i.test(err.message));
+}
+
+/** The Sheets or Drive API is switched off in the Cloud project — a deployment problem, not the user's. */
+export function isApiDisabled(err: unknown): boolean {
+  return err instanceof GoogleApiError && (err.reason === "SERVICE_DISABLED" || err.reason === "accessNotConfigured");
 }
 
 function base64url(bytes: Uint8Array): string {
@@ -119,7 +131,9 @@ export async function gfetch<T>(accessToken: string, url: string, init: RequestI
   });
   if (!res.ok) {
     const json = await res.json().catch(() => ({}));
-    throw new GoogleApiError(res.status, json?.error?.message || `Google API error ${res.status}`);
+    // Drive v3 puts the cause in errors[].reason; Sheets v4 in an ErrorInfo entry of details[].
+    const reason = json?.error?.errors?.[0]?.reason ?? json?.error?.details?.find((d: { reason?: string }) => d?.reason)?.reason;
+    throw new GoogleApiError(res.status, json?.error?.message || `Google API error ${res.status}`, reason);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;

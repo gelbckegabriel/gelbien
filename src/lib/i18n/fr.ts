@@ -78,6 +78,7 @@ const fr: Messages = {
   "login.error.scope": "Gelbien a besoin de l'autorisation de créer sa feuille dans votre Drive. Reconnectez-vous en laissant la case Google Drive cochée.",
   "login.error.generic": "La connexion a échoué. Veuillez réessayer.",
   "login.error.api": "Google a bloqué l'accès à Sheets/Drive. Dans Google Cloud Console, activez la Google Sheets API et la Google Drive API, puis réessayez.",
+  "login.error.storage": "Votre stockage Google est plein : Gelbien ne peut pas créer sa feuille dans votre Drive. Libérez de l'espace (ou augmentez votre stockage) sur one.google.com/storage, puis réessayez.",
   "login.error.cookie": "La connexion a pris trop de temps ou a commencé à une autre adresse. Ouvrez l'app à la même adresse que l'URI de redirection (ex. http://localhost:3000) et réessayez.",
   "login.error.denied": "La connexion a été annulée.",
   "login.f1.title": "Chaque dépense en quelques secondes",
@@ -530,6 +531,7 @@ const fr: Messages = {
   "err.load": "Impossible de charger vos données",
   "err.save": "Impossible d'enregistrer : {error}",
   "err.session": "Votre session Google a expiré. Veuillez vous reconnecter.",
+  "err.storage": "Votre stockage Google est plein : les modifications ne peuvent pas être enregistrées dans votre feuille. Libérez de l'espace sur one.google.com/storage et réessayez.",
   "paste.hint": "Reçu détecté — ouverture d'une nouvelle dépense",
 };
 

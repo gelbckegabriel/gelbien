@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { friendlyAiError, parseReceipt, RECEIPT_FIELDS, type ReceiptField } from "@/lib/ai/client";
 import { useActiveAi } from "@/lib/ai/config";
 import { useDataset, useMode, useMutate } from "@/lib/data/hooks";
-import { uploadReceiptFile } from "@/lib/data/sources";
+import { ApiError, uploadReceiptFile } from "@/lib/data/sources";
 import { knownMerchants, suggestFromHistory } from "@/lib/finance";
 import { prepareReceipt, receiptFromTransfer, type PreparedReceipt } from "@/lib/files";
 import { useI18n } from "@/lib/i18n";
@@ -302,7 +302,7 @@ function ExpenseForm({
         toast.dismiss("receipt-upload");
       } catch (err) {
         toast.dismiss("receipt-upload");
-        toast.error(t("err.save", { error: (err as Error).message }));
+        toast.error(err instanceof ApiError && err.code === "storage" ? t("err.storage") : t("err.save", { error: (err as Error).message }));
       }
     }
 

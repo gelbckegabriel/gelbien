@@ -87,7 +87,9 @@ function LoginInner() {
         ? t("login.notConfigured")
         : error === "api"
           ? t("login.error.api")
-          : error === "cookie"
+          : error === "storage"
+            ? t("login.error.storage")
+            : error === "cookie"
             ? t("login.error.cookie")
             : error === "denied"
               ? t("login.error.denied")

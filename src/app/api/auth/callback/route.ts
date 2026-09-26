@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import type { Locale } from "@/lib/types";
 import { appOrigin, googleConfig, OAUTH_COOKIE } from "@/server/config";
-import { decodeIdToken, exchangeCode, GoogleApiError } from "@/server/google";
+import { decodeIdToken, exchangeCode, isApiDisabled, isStorageFull } from "@/server/google";
 import { unseal, writeSession } from "@/server/session";
 import { ensureSpreadsheet } from "@/server/sheets";
 
@@ -53,8 +53,9 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}${flow.returnTo}`);
   } catch (err) {
     console.error("OAuth callback failed:", err instanceof Error ? err.message : err);
-    // 403 from Drive/Sheets almost always means the APIs aren't enabled in the Cloud project.
-    if (err instanceof GoogleApiError && err.status === 403) return fail("api");
+    // Creating the spreadsheet is the first write to a new user's Drive, so a full account fails here.
+    if (isStorageFull(err)) return fail("storage");
+    if (isApiDisabled(err)) return fail("api");
     return fail("generic");
   }
 }

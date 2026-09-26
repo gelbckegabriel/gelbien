@@ -1,6 +1,6 @@
 import "server-only";
 import type { Locale } from "@/lib/types";
-import { GoogleApiError, refreshAccessToken } from "./google";
+import { GoogleApiError, isStorageFull, refreshAccessToken } from "./google";
 import { readSession, writeSession, type Session } from "./session";
 import { ensureSpreadsheet } from "./sheets";
 
@@ -59,7 +59,10 @@ export async function withGoogle<T>(locale: Locale, fn: (ctx: GoogleContext) => 
 
 export function errorResponse(err: unknown): Response {
   if (err instanceof AuthError) return Response.json({ error: err.message, code: "auth" }, { status: 401 });
-  if (err instanceof GoogleApiError) return Response.json({ error: err.message, code: "google" }, { status: err.status >= 500 ? 502 : err.status });
+  if (err instanceof GoogleApiError) {
+    const code = isStorageFull(err) ? "storage" : "google";
+    return Response.json({ error: err.message, code }, { status: err.status >= 500 ? 502 : err.status });
+  }
   console.error(err);
   return Response.json({ error: "Unexpected server error" }, { status: 500 });
 }

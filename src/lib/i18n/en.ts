@@ -76,6 +76,7 @@ const en = {
   "login.error.scope": "Gelbien needs permission to create its spreadsheet in your Drive. Sign in again and keep the Google Drive box checked.",
   "login.error.generic": "Sign-in failed. Please try again.",
   "login.error.api": "Google blocked access to Sheets/Drive. In Google Cloud Console, enable both the Google Sheets API and the Google Drive API, then try again.",
+  "login.error.storage": "Your Google storage is full, so Gelbien can't create its spreadsheet in your Drive. Free up some space (or add storage) at one.google.com/storage, then try again.",
   "login.error.cookie": "Sign-in took too long or started on a different address. Open the app at the same address as your redirect URI (e.g. http://localhost:3000) and try again.",
   "login.error.denied": "Sign-in was cancelled.",
   "login.f1.title": "Every expense, in seconds",
@@ -528,6 +529,7 @@ const en = {
   "err.load": "Couldn't load your data",
   "err.save": "Couldn't save: {error}",
   "err.session": "Your Google session expired. Please sign in again.",
+  "err.storage": "Your Google storage is full, so changes can't be saved to your spreadsheet. Free up space at one.google.com/storage and try again.",
   "paste.hint": "Receipt detected — opening a new expense",
 } as const;
 
