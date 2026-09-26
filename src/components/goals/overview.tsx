@@ -234,7 +234,7 @@ export function AccountsCard({
               aria-label={t("ci.day")}
               value={ds.settings.checkInDay}
               onChange={(e) => mutate.mutate({ op: "saveSettings", settings: { ...ds.settings, checkInDay: Number(e.target.value) } })}
-              className="h-9 text-sm"
+              className="h-9 text-base sm:text-sm"
             >
               {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
                 <option key={d} value={d}>

@@ -38,6 +38,11 @@ const en = {
   "common.chartView": "Chart view",
   "common.none": "None",
   "common.days": "{n} days",
+  "unsaved.title": "Save your changes?",
+  "unsaved.body": "You made changes that haven't been saved yet. Save them before moving on, or discard them.",
+  "unsaved.save": "Save and continue",
+  "unsaved.discard": "Discard changes",
+  "unsaved.stay": "Keep editing",
 
   "month.prev": "Previous month",
   "month.next": "Next month",

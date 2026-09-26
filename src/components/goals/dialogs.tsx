@@ -232,8 +232,9 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
             </p>
           </Field>
           <Field label={t("goals.f.return")}>
-            <div className="flex gap-2">
-              <div className="relative w-24 shrink-0">
+            {/* Phones: the % field gets its own row so the presets aren't squeezed into narrow pills */}
+            <div className="grid grid-cols-3 gap-2 sm:flex">
+              <div className="relative col-span-3 sm:w-24 sm:shrink-0">
                 <Input inputMode="decimal" value={annualReturn} onChange={(e) => setAnnualReturn(e.target.value.replace(/[^\d.,-]/g, ""))} className="pr-7 text-right" />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-3">%</span>
               </div>
@@ -247,7 +248,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
                   type="button"
                   onClick={() => setAnnualReturn(String(p.v))}
                   className={cn(
-                    "flex-1 rounded-xl border px-2 text-xs transition-colors",
+                    "min-h-11 flex-1 rounded-xl border px-2 py-1.5 text-xs transition-colors",
                     parseAmount(annualReturn) === p.v ? "border-gold/50 bg-gold-soft text-gold-bright" : "border-line text-ink-3 hover:text-ink",
                   )}
                 >

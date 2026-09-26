@@ -40,6 +40,11 @@ const fr: Messages = {
   "common.chartView": "Vue graphique",
   "common.none": "Aucun",
   "common.days": "{n} jours",
+  "unsaved.title": "Enregistrer les modifications ?",
+  "unsaved.body": "Vos modifications ne sont pas encore enregistrées. Enregistrez-les avant de continuer, ou abandonnez-les.",
+  "unsaved.save": "Enregistrer et continuer",
+  "unsaved.discard": "Abandonner les modifications",
+  "unsaved.stay": "Continuer à modifier",
 
   "month.prev": "Mois précédent",
   "month.next": "Mois suivant",

@@ -242,7 +242,7 @@ export default function ChatPage() {
             }}
             rows={1}
             placeholder={t("chat.placeholder")}
-            className="max-h-40 min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-[15px] text-ink placeholder:text-ink-3 focus:outline-none"
+            className="max-h-40 min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-base text-ink placeholder:text-ink-3 focus:outline-none"
           />
           {streaming ? (
             <Button type="button" size="icon" variant="secondary" onClick={() => abort.current?.abort()} aria-label={t("chat.stop")}>

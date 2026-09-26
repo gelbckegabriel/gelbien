@@ -2,7 +2,6 @@
 
 import { CloudCheck, FileUp, MessageCircle, RefreshCw } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -19,6 +18,7 @@ import { Button } from "../ui/button";
 import { EmptyState, Skeleton } from "../ui/misc";
 import { MonthPicker } from "./month-picker";
 import { BottomNav, DesktopFab, Sidebar } from "./nav";
+import { GuardedLink, UnsavedDialog } from "./unsaved";
 import { UserChip } from "./user-chip";
 
 function SyncIndicator() {
@@ -45,20 +45,20 @@ function TopBar() {
   return (
     <header className="sticky top-0 z-20 border-b border-line/60 bg-bg/70 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
-        <Link href="/dashboard" className="lg:hidden" aria-label="Gelbien">
+        <GuardedLink href="/dashboard" className="lg:hidden" aria-label="Gelbien">
           <LogoMark />
-        </Link>
+        </GuardedLink>
         <MonthPicker className="mx-auto lg:mx-0" />
         <div className="ml-auto flex items-center gap-1 lg:ml-auto">
           {mode === "demo" && (
-            <Link href="/profile" className="hidden rounded-full border border-gold/30 bg-gold-soft px-2.5 py-1 text-[11px] font-medium text-gold-bright sm:inline">
+            <GuardedLink href="/profile" className="hidden rounded-full border border-gold/30 bg-gold-soft px-2.5 py-1 text-[11px] font-medium text-gold-bright sm:inline">
               {t("common.demo")}
-            </Link>
+            </GuardedLink>
           )}
           <SyncIndicator />
-          <Link href="/chat" className="grid h-9 w-9 place-items-center rounded-xl text-ink-3 transition hover:bg-white/5 hover:text-ink lg:hidden" aria-label={t("nav.chat")}>
+          <GuardedLink href="/chat" className="grid h-9 w-9 place-items-center rounded-xl text-ink-3 transition hover:bg-white/5 hover:text-ink lg:hidden" aria-label={t("nav.chat")}>
             <MessageCircle className="h-[18px] w-[18px]" />
-          </Link>
+          </GuardedLink>
           <div className="lg:hidden">
             <UserChip compact />
           </div>
@@ -249,6 +249,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <GlobalReceiptCapture />
           <ExpenseDialog />
           <SubscriptionDialog />
+          <UnsavedDialog />
         </>
       )}
     </div>

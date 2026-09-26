@@ -5,8 +5,9 @@ import { motion } from "motion/react";
 import { forwardRef, useId } from "react";
 import { cn } from "@/lib/utils";
 
+// 16px text: iOS Safari zooms the page into any focused field smaller than that.
 const control =
-  "w-full rounded-xl border border-line bg-surface-2/80 px-3.5 text-[15px] text-ink placeholder:text-ink-3 transition-colors " +
+  "w-full rounded-xl border border-line bg-surface-2/80 px-3.5 text-base text-ink placeholder:text-ink-3 transition-colors " +
   "hover:border-line-strong focus:border-gold/60 focus:outline-none focus:ring-2 focus:ring-gold/20 disabled:opacity-50";
 
 export function Label({ children, htmlFor, hint, className }: { children: React.ReactNode; htmlFor?: string; hint?: React.ReactNode; className?: string }) {

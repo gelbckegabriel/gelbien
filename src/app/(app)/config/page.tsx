@@ -15,6 +15,7 @@ import { useDataset, useMutate } from "@/lib/data/hooks";
 import { CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/defaults";
 import { useI18n } from "@/lib/i18n";
 import type { Category, Dataset } from "@/lib/types";
+import { useUnsavedChanges } from "@/lib/unsaved";
 import { cn, normalize, uid } from "@/lib/utils";
 
 interface Draft extends Category {
@@ -85,7 +86,7 @@ function ConfigEditor({ ds }: { ds: Dataset }) {
     const names = clean.map((c) => normalize(c.name));
     if (new Set(names).size !== names.length) {
       toast.error(t("cfg.duplicate"));
-      return;
+      return false;
     }
     const renames = clean.filter((c) => c.original && c.original !== c.name).map((c) => ({ from: c.original!, to: c.name }));
     const categories: Category[] = clean.map((c, i) => ({ name: c.name, color: c.color, icon: c.icon, order: i, subcategories: c.subcategories, archived: c.archived }));
@@ -95,6 +96,7 @@ function ConfigEditor({ ds }: { ds: Dataset }) {
     }
     toast.success(t("cfg.saved"));
   };
+  useUnsavedChanges(dirty, { save });
 
   const addPayment = () => {
     const v = newPayment.trim();
@@ -129,7 +131,7 @@ function ConfigEditor({ ds }: { ds: Dataset }) {
                         value={c.name}
                         onChange={(e) => update(c.key, { name: e.target.value })}
                         className={cn(
-                          "w-full rounded-lg bg-transparent px-2 py-1 text-[15px] font-medium text-ink outline-none transition focus:bg-white/5",
+                          "w-full rounded-lg bg-transparent px-2 py-1 text-base font-medium text-ink outline-none transition focus:bg-white/5",
                           duplicate(c.name, c.key) && "text-bad",
                         )}
                         aria-label={t("cfg.namePh")}

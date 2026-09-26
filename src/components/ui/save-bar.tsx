@@ -1,5 +1,6 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "./button";
@@ -18,9 +19,11 @@ export function SaveBar({ show, label, onSave, onReset }: { show: boolean; label
           className="fixed inset-x-4 bottom-24 z-30 mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-gold/30 bg-[#1a1812]/95 px-4 py-3 shadow-2xl shadow-black/60 backdrop-blur lg:bottom-8 lg:left-64"
         >
           <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-gold" />
-          <span className="flex-1 text-sm text-ink-2">{label}</span>
-          <Button size="sm" variant="ghost" onClick={onReset}>
-            {t("common.reset")}
+          <span className="min-w-0 flex-1 text-sm text-ink-2">{label}</span>
+          {/* Icon-only on phones so the label keeps one line */}
+          <Button size="sm" variant="ghost" onClick={onReset} aria-label={t("common.reset")} title={t("common.reset")} className="px-2.5 sm:px-3">
+            <RotateCcw className="h-4 w-4 sm:hidden" />
+            <span className="hidden sm:inline">{t("common.reset")}</span>
           </Button>
           <Button size="sm" variant="primary" onClick={onSave} className="px-5">
             {t("common.save")}

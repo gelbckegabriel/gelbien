@@ -2,7 +2,6 @@
 
 import { AlertTriangle, Camera, ExternalLink, FileText, Loader2, Paperclip, Sparkles, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { friendlyAiError, parseReceipt, RECEIPT_FIELDS, type ReceiptField } from "@/lib/ai/client";
@@ -16,6 +15,7 @@ import { EXPENSE_TYPES, PRIORITIES, type Dataset, type ExpenseType, type Priorit
 import { useUi } from "@/lib/ui-store";
 import { cn, isValidISODate, normalize, parseAmount, round2, todayISO, uid } from "@/lib/utils";
 import { CategoryIcon } from "./icons";
+import { GuardedLink } from "./shell/unsaved";
 import { Button } from "./ui/button";
 import { Field, Input, MoneyInput, Segmented, Select, Switch, Textarea } from "./ui/form";
 import { Sheet } from "./ui/sheet";
@@ -417,9 +417,9 @@ function ExpenseForm({
               <span>
                 {aiNote.text}{" "}
                 {aiNote.tone === "muted" && (
-                  <Link href="/profile" onClick={onClose} className="underline underline-offset-2">
+                  <GuardedLink href="/profile" onClick={onClose} className="underline underline-offset-2">
                     {t("nav.profile")}
-                  </Link>
+                  </GuardedLink>
                 )}
               </span>
             </motion.p>

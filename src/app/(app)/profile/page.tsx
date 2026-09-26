@@ -6,11 +6,11 @@ import {
   Loader2, LogIn, LogOut, RefreshCw, RotateCcw, Sparkles, Tags, Trash2, Upload, XCircle,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CACHE_KEY } from "@/components/providers";
+import { GuardedLink } from "@/components/shell/unsaved";
 import { Avatar } from "@/components/shell/user-chip";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card, CardHeader, PageHeader, Stagger } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import { CURRENCIES, LOCALES, useI18n, usePrefs } from "@/lib/i18n";
 import { importMoneySheet, mergeImport, type ImportResult } from "@/lib/import-xlsx";
 import type { Dataset, Locale } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
+import { useUnsavedChanges } from "@/lib/unsaved";
 import { datasetSchema } from "@/lib/validation";
 import { cn, parseAmount, round2 } from "@/lib/utils";
 
@@ -83,9 +84,9 @@ function AccountCard() {
             <LogIn className="h-4 w-4" /> {t("prof.signIn")}
           </a>
         )}
-        <Link href="/config" className={buttonClasses("secondary", "md")}>
+        <GuardedLink href="/config" className={buttonClasses("secondary", "md")}>
           <Tags className="h-4 w-4" /> {t("nav.config")}
-        </Link>
+        </GuardedLink>
         <Button variant="ghost" onClick={leave} className="ml-auto sm:ml-0">
           <LogOut className="h-4 w-4" /> {t("prof.signOut")}
         </Button>
@@ -108,6 +109,8 @@ function PreferencesCard() {
     mutate.mutate({ op: "saveSettings", settings: { ...ds.settings, ...patch } });
     if (!silent) toast.success(t("prof.savedPrefs"));
   };
+  const saveAmounts = () => saveSettings({ reserve: round2(parseAmount(reserve)), savingsGoal: round2(parseAmount(goal)) });
+  useUnsavedChanges(dirty, { save: saveAmounts });
 
   return (
     <Card>
@@ -169,7 +172,7 @@ function PreferencesCard() {
         <AnimatePresence>
           {dirty && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex justify-end lg:self-end">
-              <Button variant="primary" onClick={() => saveSettings({ reserve: round2(parseAmount(reserve)), savingsGoal: round2(parseAmount(goal)) })}>
+              <Button variant="primary" onClick={saveAmounts}>
                 {t("common.save")}
               </Button>
             </motion.div>
@@ -274,7 +277,7 @@ function AiCard() {
                       placeholder={isAnthropic ? "sk-ant-…" : "AIza…"}
                       autoComplete="off"
                       spellCheck={false}
-                      className="pl-10 pr-10 font-mono text-sm"
+                      className="pl-10 pr-10 font-mono text-base sm:text-sm"
                     />
                     <button
                       type="button"

@@ -15,6 +15,7 @@ import { budgetStatus, effectiveBudget, effectiveIncome, monthlyCost, subscripti
 import { useI18n } from "@/lib/i18n";
 import type { Dataset, Subscription } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
+import { useUnsavedChanges } from "@/lib/unsaved";
 import { addMonths, cn, parseAmount, round2 } from "@/lib/utils";
 
 type Scope = "month" | "default";
@@ -85,6 +86,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
     }
     toast.success(t("budget.saved"));
   };
+  useUnsavedChanges(dirty, { save, monthScoped: true });
 
   const useDefault = () => {
     mutate.mutate({ op: "saveBudget", month, lines: [], income: null, clearIncome: true });
@@ -139,11 +141,12 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
               </Field>
             </div>
             {gross > 0 && net > 0 && (
-              <div className="flex items-baseline justify-between gap-3 rounded-xl border border-line bg-surface-2/60 px-3 py-2.5 text-sm">
-                <span className="text-ink-2">
-                  {t("budget.income.tax")} <span className="text-xs text-ink-3">· {t("budget.income.taxRate", { pct: f.pct1(taxRate) })}</span>
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-2/60 px-3 py-2.5 text-sm">
+                <span className="min-w-0 text-ink-2">
+                  {t("budget.income.tax")}
+                  <span className="block text-xs text-ink-3">{t("budget.income.taxRate", { pct: f.pct1(taxRate) })}</span>
                 </span>
-                <span className="tabular text-bad">−{f.money(gross - net)}</span>
+                <span className="tabular shrink-0 whitespace-nowrap text-bad">−{f.money(gross - net)}</span>
               </div>
             )}
           </div>
@@ -222,7 +225,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
           title={t("budget.plan.title")}
           subtitle={`${t("budget.plan.planned")}: ${f.money0(planned)} · ${unallocated >= 0 ? t("budget.plan.unallocated") : t("budget.plan.overAllocated")}: ${f.money0(Math.abs(unallocated))}`}
         />
-        <ul className="grid gap-x-10 xl:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-x-10 xl:grid-cols-2">
           {categories.map((c, i) => {
             const limit = parseAmount(draft.lines[c.name]);
             const spent = spentBy.get(c.name) ?? 0;
@@ -240,7 +243,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
                     <span className="tabular w-24 shrink-0 text-right text-[11px] text-ink-3">{t("budget.plan.spent", { amount: f.money0(spent) })}</span>
                   </div>
                 </div>
-                <div className="w-28 shrink-0 sm:w-32">
+                <div className="w-24 shrink-0 sm:w-32">
                   <MoneyInput value={draft.lines[c.name] ?? ""} onChange={(v) => setLine(c.name, v)} placeholder="0" className="h-10 text-right" aria-label={c.name} />
                 </div>
               </li>
@@ -273,15 +276,15 @@ function Subscriptions({ ds }: { ds: Dataset }) {
           </Button>
         }
       />
-      <div className="mb-5 grid grid-cols-3 gap-3">
+      <div className="mb-5 grid gap-2 sm:grid-cols-3 sm:gap-3">
         {[
           { label: `${t("budget.subs.active")} · ${t("budget.subs.monthly")}`, value: totals.activeMonthly, cls: "text-ink" },
           { label: `${t("budget.subs.active")} · ${t("budget.subs.yearly")}`, value: totals.activeYearly, cls: "text-gold-bright" },
           { label: t("budget.subs.inTrial"), value: totals.trialMonthly, cls: totals.trialCount ? "text-warn" : "text-ink-3" },
         ].map((k) => (
-          <div key={k.label} className="rounded-xl border border-line bg-surface-2/50 p-3">
-            <p className="text-[11px] text-ink-3">{k.label}</p>
-            <AnimatedNumber value={k.value} format={f.money} className={cn("mt-1 block text-lg font-semibold", k.cls)} />
+          <div key={k.label} className="flex items-baseline justify-between gap-3 rounded-xl border border-line bg-surface-2/50 px-3 py-2.5 sm:block sm:p-3">
+            <p className="text-xs text-ink-3 sm:text-[11px]">{k.label}</p>
+            <AnimatedNumber value={k.value} format={f.money} className={cn("block whitespace-nowrap text-lg font-semibold sm:mt-1", k.cls)} />
           </div>
         ))}
       </div>

@@ -2,13 +2,13 @@
 
 import { LayoutDashboard, ListOrdered, MessageCircle, PiggyBank, Plus, Tags, Target, UserRound } from "lucide-react";
 import { motion } from "motion/react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { useUi } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 import { Logo } from "../logo";
 import { Button } from "../ui/button";
+import { GuardedLink } from "./unsaved";
 import { UserChip } from "./user-chip";
 
 export const NAV: { href: string; label: MessageKey; icon: typeof LayoutDashboard }[] = [
@@ -27,9 +27,9 @@ export function Sidebar() {
   const openExpense = useUi((s) => s.openExpense);
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-line bg-[#0c0c0f]/80 px-4 py-6 backdrop-blur-xl lg:flex">
-      <Link href="/dashboard" className="px-2">
+      <GuardedLink href="/dashboard" className="px-2">
         <Logo />
-      </Link>
+      </GuardedLink>
       <Button variant="primary" size="lg" className="mt-8 w-full" onClick={() => openExpense()}>
         <Plus className="h-5 w-5" strokeWidth={2.5} /> {t("nav.add")}
         <kbd className="ml-auto rounded-md bg-black/15 px-1.5 text-[11px] font-medium">N</kbd>
@@ -38,7 +38,7 @@ export function Sidebar() {
         {NAV.map((item) => {
           const active = path.startsWith(item.href);
           return (
-            <Link
+            <GuardedLink
               key={item.href}
               href={item.href}
               className={cn(
@@ -55,7 +55,7 @@ export function Sidebar() {
               )}
               <item.icon className={cn("relative h-[18px] w-[18px]", active && "text-gold")} />
               <span className="relative">{t(item.label)}</span>
-            </Link>
+            </GuardedLink>
           );
         })}
       </nav>
@@ -94,13 +94,13 @@ export function BottomNav() {
           }
           const active = path.startsWith(item.href);
           return (
-            <Link key={item.href} href={item.href} className="relative flex flex-col items-center gap-1 py-1.5">
+            <GuardedLink key={item.href} href={item.href} className="relative flex flex-col items-center gap-1 py-1.5">
               {active && (
                 <motion.span layoutId="bottom-active" className="absolute -top-px h-0.5 w-8 rounded-full bg-gold" transition={{ type: "spring", stiffness: 500, damping: 40 }} />
               )}
               <item.icon className={cn("h-5 w-5 transition-colors", active ? "text-gold" : "text-ink-3")} />
               <span className={cn("text-[10px] font-medium transition-colors", active ? "text-ink" : "text-ink-3")}>{t(item.label)}</span>
-            </Link>
+            </GuardedLink>
           );
         })}
       </div>

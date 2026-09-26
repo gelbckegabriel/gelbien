@@ -68,6 +68,11 @@ body {
   color: var(--color-ink);
 }
 
+/* No double-tap zoom on phones (pinch zoom still works). */
+html {
+  touch-action: manipulation;
+}
+
 body {
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;

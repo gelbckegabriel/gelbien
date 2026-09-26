@@ -33,8 +33,8 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-4 flex items-start justify-between gap-3", className)}>
-      <div className="min-w-0">
+    <div className={cn("mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2", className)}>
+      <div className="min-w-0 flex-[1_1_12rem]">
         <h2 className="text-[15px] font-semibold tracking-tight text-ink">{title}</h2>
         {subtitle && <p className="mt-0.5 text-[13px] text-ink-3">{subtitle}</p>}
       </div>

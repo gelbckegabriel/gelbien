@@ -7,11 +7,12 @@ import { useMemo, useState } from "react";
 import { useDataset } from "@/lib/data/hooks";
 import { useI18n } from "@/lib/i18n";
 import { useUi } from "@/lib/ui-store";
+import { askToLeave, hasUnsaved } from "@/lib/unsaved";
 import { addMonths, cn, currentMonth, monthOf } from "@/lib/utils";
 
 export function MonthPicker({ className }: { className?: string }) {
   const month = useUi((s) => s.month);
-  const setMonth = useUi((s) => s.setMonth);
+  const setMonthNow = useUi((s) => s.setMonth);
   const { t, f } = useI18n();
   const { data } = useDataset();
   const [open, setOpen] = useState(false);
@@ -19,6 +20,8 @@ export function MonthPicker({ className }: { className?: string }) {
   const [dir, setDir] = useState(0);
 
   const withData = useMemo(() => new Set((data?.transactions ?? []).map((tx) => monthOf(tx.date))), [data?.transactions]);
+  // A month-scoped draft (the budget editor) would be dropped by switching months.
+  const setMonth = (m: string) => (hasUnsaved(true) ? askToLeave(() => setMonthNow(m)) : setMonthNow(m));
   const go = (delta: number) => {
     setDir(delta);
     setMonth(addMonths(month, delta));

@@ -1,10 +1,10 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
-import Link from "next/link";
 import { useMode } from "@/lib/data/hooks";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { GuardedLink } from "./unsaved";
 
 export function Avatar({ name, picture, className }: { name: string; picture?: string; className?: string }) {
   const initials = name
@@ -30,7 +30,7 @@ export function UserChip({ compact }: { compact?: boolean }) {
   const user = session?.user;
   const name = user?.name ?? t("common.demo");
   return (
-    <Link
+    <GuardedLink
       href="/profile"
       className={cn("flex items-center gap-3 rounded-xl transition-colors hover:bg-white/[0.04]", compact ? "p-0.5" : "border border-line p-2.5")}
       aria-label={t("nav.profile")}
@@ -42,6 +42,6 @@ export function UserChip({ compact }: { compact?: boolean }) {
           <span className="block truncate text-xs text-ink-3">{mode === "demo" ? t("prof.demoMode").split("—")[0].trim() : user?.email}</span>
         </span>
       )}
-    </Link>
+    </GuardedLink>
   );
 }

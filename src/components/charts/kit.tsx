@@ -2,7 +2,7 @@
 
 import { BarChart3, Table2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader } from "../ui/card";
@@ -213,14 +213,22 @@ export function StatTile({
           tone === "good" ? "text-good" : tone === "bad" ? "text-bad" : tone === "warn" ? "text-warn" : "text-ink",
         )}
       />
-      <div className="mt-1 flex min-h-4 min-w-0 flex-wrap items-center gap-x-2 text-xs text-ink-3">
+      <div className="mt-1 flex min-h-4 min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-ink-3">
         {delta && (
           <span className="flex min-w-0 max-w-full items-center gap-1 whitespace-nowrap">
             <Delta value={delta.value} goodWhenUp={delta.goodWhenUp} format={delta.format} />
             {delta.label && <span className="hidden truncate sm:inline">{delta.label}</span>}
           </span>
         )}
-        {sub}
+        {/* Narrow tiles wrap between the " · " parts, never inside one (e.g. "Reserve" / "$18,000"). */}
+        {typeof sub === "string"
+          ? sub.split(" · ").map((part, i) => (
+              <Fragment key={i}>
+                {i > 0 && <span aria-hidden>·</span>}
+                <span className="whitespace-nowrap">{part}</span>
+              </Fragment>
+            ))
+          : sub}
       </div>
     </Card>
   );

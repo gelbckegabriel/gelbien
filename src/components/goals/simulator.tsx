@@ -106,9 +106,9 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
         </div>
       }
     >
-      {/* Outcome */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-gold/25 bg-gold-soft/60 p-3">
+      {/* Outcome — on phones the headline date gets its own row so no tile is squeezed */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="col-span-2 rounded-2xl border border-gold/25 bg-gold-soft/60 p-3 sm:col-span-1">
           <p className="text-[11px] text-ink-3">{t("sim.reached")}</p>
           <p className="mt-1 text-lg font-semibold text-gold-bright">{scenario.achieved ? "✓" : scenario.eta ? f.monthLong(scenario.eta) : "—"}</p>
         </div>

@@ -40,6 +40,11 @@ const pt: Messages = {
   "common.chartView": "Ver gráfico",
   "common.none": "Nenhum",
   "common.days": "{n} dias",
+  "unsaved.title": "Salvar as alterações?",
+  "unsaved.body": "Você fez alterações que ainda não foram salvas. Salve antes de continuar ou descarte-as.",
+  "unsaved.save": "Salvar e continuar",
+  "unsaved.discard": "Descartar alterações",
+  "unsaved.stay": "Continuar editando",
 
   "month.prev": "Mês anterior",
   "month.next": "Próximo mês",
