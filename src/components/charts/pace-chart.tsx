@@ -5,9 +5,9 @@ import type { Dataset } from "@/lib/types";
 import { paceSeries } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
 import { addMonths } from "@/lib/utils";
-import { axisProps, ChartCard, DataTable, GOLD, INK, Legend, TooltipBox } from "./kit";
+import { axisProps, ChartArea, ChartCard, DataTable, GOLD, INK, Legend, TooltipBox } from "./kit";
 
-export function PaceChart({ ds, month }: { ds: Dataset; month: string }) {
+export function PaceChart({ ds, month, className }: { ds: Dataset; month: string; className?: string }) {
   const { t, f } = useI18n();
   const data = paceSeries(ds, month);
   const hasPace = data.some((d) => d.pace !== null);
@@ -15,6 +15,7 @@ export function PaceChart({ ds, month }: { ds: Dataset; month: string }) {
 
   return (
     <ChartCard
+      className={className}
       title={t("dash.pace.title")}
       subtitle={t("dash.pace.subtitle")}
       legend={
@@ -33,7 +34,7 @@ export function PaceChart({ ds, month }: { ds: Dataset; month: string }) {
         />
       }
     >
-      <div className="h-64 w-full">
+      <ChartArea min="min-h-60">
         <ResponsiveContainer>
           <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs>
@@ -77,7 +78,7 @@ export function PaceChart({ ds, month }: { ds: Dataset; month: string }) {
             />
           </AreaChart>
         </ResponsiveContainer>
-      </div>
+      </ChartArea>
     </ChartCard>
   );
 }

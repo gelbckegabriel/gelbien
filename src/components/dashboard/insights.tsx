@@ -61,7 +61,7 @@ function InsightRow({ tone, title, body, index }: { tone: keyof typeof TONE; tit
 const cacheKey = (month: string, provider: string, ds: Dataset) =>
   `gelbien.insights.${provider}.${month}.${ds.transactions.length}.${ds.transactions.reduce((a, t) => a + t.amount, 0).toFixed(2)}`;
 
-export function Insights({ ds, month }: { ds: Dataset; month: string }) {
+export function Insights({ ds, month, className }: { ds: Dataset; month: string; className?: string }) {
   const { t, f, locale } = useI18n();
   const ai = useActiveAi();
   const local = localInsights(ds, month);
@@ -101,7 +101,7 @@ export function Insights({ ds, month }: { ds: Dataset; month: string }) {
   };
 
   return (
-    <Card>
+    <Card className={cn("flex flex-col", className)}>
       <CardHeader
         title={
           <span className="inline-flex items-center gap-2">
@@ -119,7 +119,7 @@ export function Insights({ ds, month }: { ds: Dataset; month: string }) {
       />
       <AnimatePresence mode="wait">
         {loading ? (
-          <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+          <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 space-y-4">
             <p className="text-xs text-gold">{t("dash.ins.thinking")}</p>
             {[0, 1, 2].map((i) => (
               <div key={i} className="flex gap-3">
@@ -132,7 +132,14 @@ export function Insights({ ds, month }: { ds: Dataset; month: string }) {
             ))}
           </motion.div>
         ) : (
-          <motion.ul key={aiItems ? "ai" : "local"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+          <motion.ul
+            key={aiItems ? "ai" : "local"}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            // Scrolls inside the card when the card is height-bound (desktop), instead of stretching the row.
+            className="-mr-2 min-h-0 flex-1 space-y-4 overflow-y-auto pr-2 [scrollbar-color:#ffffff26_transparent] [scrollbar-width:thin]"
+          >
             {aiItems
               ? aiItems.map((i, n) => <InsightRow key={n} index={n} tone={i.tone} title={i.title} body={i.body} />)
               : local.map((i, n) => <InsightRow key={i.id} index={n} tone={i.tone} {...formatInsight(i, t, f)} />)}
@@ -140,9 +147,9 @@ export function Insights({ ds, month }: { ds: Dataset; month: string }) {
           </motion.ul>
         )}
       </AnimatePresence>
-      {errorText && <p className="mt-4 rounded-xl border border-bad/25 bg-bad-soft px-3 py-2 text-xs text-bad">{t("chat.error", { error: errorText })}</p>}
+      {errorText && <p className="mt-4 shrink-0 rounded-xl border border-bad/25 bg-bad-soft px-3 py-2 text-xs text-bad">{t("chat.error", { error: errorText })}</p>}
       {!ai && (
-        <Link href="/profile#ai" className="mt-5 flex items-center gap-2 rounded-xl border border-dashed border-gold/30 px-3 py-2.5 text-xs text-gold hover:bg-gold-soft">
+        <Link href="/profile#ai" className="mt-4 flex shrink-0 items-center gap-2 rounded-xl border border-dashed border-gold/30 px-3 py-2.5 text-xs text-gold hover:bg-gold-soft">
           <Sparkles className="h-3.5 w-3.5 shrink-0" /> {t("dash.ins.connect")}
         </Link>
       )}

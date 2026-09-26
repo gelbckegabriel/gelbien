@@ -14,6 +14,7 @@ A personal-finance web app that grew out of a spreadsheet: log expenses in secon
 | --- | --- |
 | **Dashboard** | Spent vs. budget ring, per-day allowance, 8 KPIs (saved, daily average, superfluous %, runway…), insights (free rule-based ones + optional AI), spending-pace chart, category donut, budget bars, daily heat-calendar, 12-month income vs. spending, money-flow Sankey, priority split, payment methods, top 10 expenses, savings projection, weekday pattern, and the year-at-a-glance matrix (the old *Resumo Anual*). Every chart has a table view. |
 | **Budget** | Net & gross income (effective tax rate), a limit per category with live progress, planned savings, "this month only" vs "every month", suggest-from-history, copy last month, and subscriptions/recurring charges (the old *Assinaturas*). |
+| **Goals** | Savings goals (a car, a down payment, a trip) with progress, the month you'll reach them, whether you're on track for the deadline and what you'd need per month. A simulator lets you play with contribution, expected return, a one-time deposit, target amount/date and "cut superfluous spending by X%". Also: your accounts, net worth over time and the monthly check-in. |
 | **Expenses** | Grouped by day, search, filters (month/all time, category, priority, payment), sort, CSV export. Tap any row to edit. |
 | **Chat** | Ask questions about your money; answers are streamed and grounded in your own data. |
 | **Categories** | Rename (renames every expense/budget that uses it), recolor, pick icons, reorder, hide, edit subcategories and payment methods. |
@@ -49,6 +50,18 @@ Why `drive.file`? It only grants access to files **this app creates** (or you op
 
 > **Testing vs. production:** Google expires refresh tokens after 7 days for apps left in *Testing*, so you'd have to sign in weekly. When you're happy, click **Publish app** on the Audience page — with only non-sensitive scopes no verification is needed.
 
+## Accounts, check-ins and why there's no automatic bank sync
+
+Goals are funded by real accounts (Neo, Scotiabank, Wealthsimple…) or tracked by hand. Account balances come from a **monthly check-in**: on the check-in day (default the 1st) Gelbien shows a reminder, you open your bank apps and type in each balance — about 2 minutes. That history gives you:
+
+- goal progress that follows your actual savings account balance,
+- how fast each account really grows (suggested as the goal's monthly contribution),
+- a net-worth chart (credit cards count as debt).
+
+"Add reminder to calendar" downloads an `.ics` file with a monthly event, so the reminder also works outside the app — no extra Google permission needed.
+
+Automatic sync was considered and left out on purpose: aggregators such as Plaid or Flinks require a business agreement, compliance review and per-connection fees; Canada's consumer-driven banking framework isn't something an individual app can plug into; and asking for bank passwords would be unsafe and against the banks' terms. If you later want transactions imported automatically, the next step would be CSV/OFX statement import (most Canadian banks export these), not credentials.
+
 ## AI (optional, bring your own key)
 
 Insights, chat and receipt scanning run **directly from your browser to the provider**; the key is stored only in your browser's local storage and never reaches Gelbien's server.
@@ -79,7 +92,7 @@ Browser ──(React Query cache, optimistic updates)──▶ /api/data ──�
 ```
 
 - **Auth** (`src/server/*`, `src/app/api/auth/*`): Google OAuth code flow with PKCE. The session (including the Google refresh token) lives in an **encrypted** (JWE, A256GCM) httpOnly cookie, so no database is needed. Access tokens refresh automatically.
-- **Storage** (`src/lib/sheet-schema.ts`, `src/server/sheets.ts`): tabs `Transactions`, `Categories`, `Subcategories`, `Budgets`, `Income`, `Subscriptions`, `Settings`. Values are written RAW (a description starting with `=` stays text). The sheet stays human-readable — you can edit it in Google Sheets and Gelbien picks it up on the next sync.
+- **Storage** (`src/lib/sheet-schema.ts`, `src/server/sheets.ts`): tabs `Transactions`, `Categories`, `Subcategories`, `Budgets`, `Income`, `Subscriptions`, `Settings`, `Accounts`, `Balances`, `Goals` (tabs added in newer versions are created automatically in existing sheets). Values are written RAW (a description starting with `=` stays text). The sheet stays human-readable — you can edit it in Google Sheets and Gelbien picks it up on the next sync.
 - **Analytics** (`src/lib/finance.ts`): pure, unit-tested functions reproducing the spreadsheet's formulas (budget status at 85%, runway = reserve ÷ net burn, monthly average over months with spending) plus the new charts.
 - **Demo mode** (`src/lib/demo.ts`): deterministic synthetic data; nothing personal is shipped in the code.
 

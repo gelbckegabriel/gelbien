@@ -28,6 +28,16 @@ export const CATEGORY_ICONS = [
   "Music", "Gamepad2", "BookOpen", "Wrench", "PiggyBank", "CreditCard", "Globe", "Sparkles",
 ] as const;
 
+export const GOAL_ICONS = [
+  "Target", "Car", "Home", "Plane", "Umbrella", "GraduationCap", "Baby", "Gem", "Laptop", "Bike", "Gift", "PiggyBank",
+] as const;
+
+/** Suggestions for the institution field — free text, these are just shortcuts. */
+export const INSTITUTIONS = [
+  "Neo Financial", "Scotiabank", "RBC", "TD", "BMO", "CIBC", "National Bank", "Desjardins", "Tangerine", "Simplii",
+  "EQ Bank", "KOHO", "Wealthsimple", "Questrade", "American Express", "Nubank", "Itaú", "Banco do Brasil",
+];
+
 type Tri = [pt: string, en: string, fr: string];
 
 interface CategoryTemplate {
@@ -264,6 +274,7 @@ export function defaultSettings(locale: Locale): Settings {
     savingsGoal: 0,
     paymentMethods: PAYMENTS[locale],
     warnAt: 0.85,
+    checkInDay: 1,
   };
 }
 

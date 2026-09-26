@@ -8,11 +8,16 @@
  */
 import { defaultSettings } from "./defaults";
 import type {
+  Account,
+  AccountType,
+  BalanceSnapshot,
   BudgetLine,
   Category,
   Cycle,
   Dataset,
   ExpenseType,
+  Goal,
+  GoalStatus,
   IncomeLine,
   Locale,
   Priority,
@@ -22,7 +27,7 @@ import type {
   Transaction,
   WorthIt,
 } from "./types";
-import { CYCLES, EXPENSE_TYPES, PRIORITIES, SUB_STATUSES, WORTH_IT } from "./types";
+import { ACCOUNT_TYPES, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PRIORITIES, SUB_STATUSES, WORTH_IT } from "./types";
 import { parseAmount, serialToISO } from "./utils";
 
 export const TABS = {
@@ -39,6 +44,12 @@ export const TABS = {
     headers: ["id", "name", "category", "amount", "cycle", "billingDay", "payment", "status", "trialEnd", "worthIt", "notes"],
   },
   settings: { title: "Settings", headers: ["key", "value"] },
+  accounts: { title: "Accounts", headers: ["id", "name", "institution", "type", "color", "archived", "notes"] },
+  balances: { title: "Balances", headers: ["accountId", "date", "balance"] },
+  goals: {
+    title: "Goals",
+    headers: ["id", "name", "icon", "color", "target", "targetDate", "accountIds", "saved", "monthlyContribution", "annualReturn", "status", "order", "notes", "createdAt"],
+  },
 } as const;
 
 export type TabKey = keyof typeof TABS;
@@ -177,6 +188,60 @@ export const subscriptionToRow = (s: Subscription): Row => [
   s.id, s.name, s.category, s.amount, s.cycle, s.billingDay ?? "", s.payment, s.status, s.trialEnd, s.worthIt, s.notes,
 ];
 
+export function rowToAccount(r: Row): Account | null {
+  const id = str(r[0]);
+  const name = str(r[1]);
+  if (!id || !name) return null;
+  return {
+    id,
+    name,
+    institution: str(r[2]),
+    type: oneOf<AccountType>(r[3], ACCOUNT_TYPES, "other"),
+    color: str(r[4]) || "#6b6a72",
+    archived: bool(r[5]),
+    notes: str(r[6]),
+  };
+}
+
+export const accountToRow = (a: Account): Row => [a.id, a.name, a.institution, a.type, a.color, a.archived, a.notes];
+
+export function rowToBalance(r: Row): BalanceSnapshot | null {
+  const accountId = str(r[0]);
+  const d = date(r[1]);
+  if (!accountId || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+  return { accountId, date: d, balance: num(r[2]) };
+}
+
+export const balanceToRow = (b: BalanceSnapshot): Row => [b.accountId, b.date, b.balance];
+
+export function rowToGoal(r: Row, index: number): Goal | null {
+  const id = str(r[0]);
+  const name = str(r[1]);
+  if (!id || !name) return null;
+  return {
+    id,
+    name,
+    icon: str(r[2]) || "PiggyBank",
+    color: str(r[3]) || "#d9b45f",
+    target: num(r[4]),
+    targetDate: date(r[5]),
+    // stored as "id1|id2" so the sheet stays readable
+    accountIds: str(r[6]).split("|").map((x) => x.trim()).filter(Boolean),
+    saved: num(r[7]),
+    monthlyContribution: num(r[8]),
+    annualReturn: num(r[9]),
+    status: oneOf<GoalStatus>(r[10], GOAL_STATUSES, "active"),
+    order: r[11] === "" || r[11] === undefined || r[11] === null ? index : num(r[11]),
+    notes: str(r[12]),
+    createdAt: str(r[13]),
+  };
+}
+
+export const goalToRow = (g: Goal): Row => [
+  g.id, g.name, g.icon, g.color, g.target, g.targetDate, g.accountIds.join("|"), g.saved, g.monthlyContribution, g.annualReturn,
+  g.status, g.order, g.notes, g.createdAt,
+];
+
 export function rowsToSettings(rows: Row[], fallbackLocale: Locale): Settings {
   const base = defaultSettings(fallbackLocale);
   const kv = new Map(rows.map((r) => [str(r[0]), r[1]]));
@@ -191,6 +256,10 @@ export function rowsToSettings(rows: Row[], fallbackLocale: Locale): Settings {
   if (kv.has("warnAt")) {
     const w = num(kv.get("warnAt"));
     if (w > 0 && w <= 1) parsed.warnAt = w;
+  }
+  if (kv.has("checkInDay")) {
+    const d = Math.round(num(kv.get("checkInDay")));
+    if (d >= 1 && d <= 28) parsed.checkInDay = d;
   }
   if (kv.has("paymentMethods")) {
     try {
@@ -210,6 +279,7 @@ export function settingsToRows(s: Settings): Row[] {
     ["reserve", s.reserve],
     ["savingsGoal", s.savingsGoal],
     ["warnAt", s.warnAt],
+    ["checkInDay", s.checkInDay],
     ["paymentMethods", JSON.stringify(s.paymentMethods)],
   ];
 }
@@ -223,6 +293,12 @@ export function datasetFromRanges(ranges: Record<TabKey, Row[]>, fallbackLocale:
     budgets: pick(ranges.budgets, rowToBudget),
     incomes: pick(ranges.income, rowToIncome),
     subscriptions: pick(ranges.subscriptions, rowToSubscription),
+    accounts: pick(ranges.accounts, rowToAccount),
+    balances: pick(ranges.balances, rowToBalance).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
+    goals: ranges.goals
+      .map((r, i) => rowToGoal(r, i))
+      .filter((g): g is Goal => g !== null)
+      .sort((a, b) => a.order - b.order),
     settings: rowsToSettings(ranges.settings, fallbackLocale),
   };
 }
@@ -238,5 +314,8 @@ export function datasetToRanges(data: Omit<Dataset, "meta">): Record<TabKey, Row
     income: data.incomes.map(incomeToRow),
     subscriptions: data.subscriptions.map(subscriptionToRow),
     settings: settingsToRows(data.settings),
+    accounts: data.accounts.map(accountToRow),
+    balances: data.balances.map(balanceToRow),
+    goals: data.goals.map(goalToRow),
   };
 }

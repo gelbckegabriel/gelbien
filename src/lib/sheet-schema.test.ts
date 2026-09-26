@@ -34,7 +34,25 @@ describe("sheet schema", () => {
       subscriptions: [
         { id: "s1", name: "Spotify", category: "Subscriptions", amount: 11.99, cycle: "monthly", billingDay: 5, payment: "Credit", status: "active", trialEnd: "", worthIt: "yes", notes: "" },
       ],
-      settings: { ...defaultSettings("en"), reserve: 15000 },
+      accounts: [
+        { id: "a1", name: "HISA", institution: "Neo Financial", type: "savings", color: "#199e70", archived: false, notes: "" },
+        { id: "a2", name: "Visa", institution: "Scotiabank", type: "credit", color: "#e0707a", archived: true, notes: "closed" },
+      ],
+      balances: [
+        { accountId: "a1", date: "2026-08-01", balance: 4200.5 },
+        { accountId: "a2", date: "2026-09-01", balance: 310 },
+      ],
+      goals: [
+        {
+          id: "g1", name: "Car", icon: "Car", color: "#3987e5", target: 18000, targetDate: "2027-12-01", accountIds: ["a1", "a2"], saved: 0,
+          monthlyContribution: 500, annualReturn: 3.5, status: "active", order: 0, notes: "", createdAt: "2026-09-26T00:00:00.000Z",
+        },
+        {
+          id: "g2", name: "Trip", icon: "Plane", color: "#d9b45f", target: 3500, targetDate: "", accountIds: [], saved: 1200,
+          monthlyContribution: 150, annualReturn: 0, status: "paused", order: 1, notes: "Brazil", createdAt: "",
+        },
+      ],
+      settings: { ...defaultSettings("en"), reserve: 15000, checkInDay: 5 },
     };
     const back = datasetFromRanges(datasetToRanges(data), "en");
     expect(back).toEqual(data);

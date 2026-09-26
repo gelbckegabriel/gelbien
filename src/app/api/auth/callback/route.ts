@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import type { Locale } from "@/lib/types";
 import { appOrigin, googleConfig, OAUTH_COOKIE } from "@/server/config";
-import { decodeIdToken, exchangeCode } from "@/server/google";
+import { decodeIdToken, exchangeCode, GoogleApiError } from "@/server/google";
 import { unseal, writeSession } from "@/server/session";
 import { ensureSpreadsheet } from "@/server/sheets";
 
@@ -24,9 +24,13 @@ export async function GET(request: Request) {
   store.delete({ name: OAUTH_COOKIE, path: "/api/auth" });
 
   const code = url.searchParams.get("code");
-  if (url.searchParams.get("error") || !code || !flow || flow.state !== url.searchParams.get("state")) {
-    return fail("generic");
+  if (url.searchParams.get("error")) return fail(url.searchParams.get("error") === "access_denied" ? "denied" : "generic");
+  if (!flow) {
+    // The 10-minute flow cookie is missing: flow expired, or the sign-in started on a different host (localhost vs 127.0.0.1).
+    console.error("OAuth callback: flow cookie missing — open the app at the same host as APP_URL / the redirect URI");
+    return fail("cookie");
   }
+  if (!code || flow.state !== url.searchParams.get("state")) return fail("generic");
 
   try {
     const tok = await exchangeCode(code, flow.verifier, `${origin}/api/auth/callback`);
@@ -48,7 +52,9 @@ export async function GET(request: Request) {
     });
     return NextResponse.redirect(`${origin}${flow.returnTo}`);
   } catch (err) {
-    console.error("OAuth callback failed", err);
+    console.error("OAuth callback failed:", err instanceof Error ? err.message : err);
+    // 403 from Drive/Sheets almost always means the APIs aren't enabled in the Cloud project.
+    if (err instanceof GoogleApiError && err.status === 403) return fail("api");
     return fail("generic");
   }
 }

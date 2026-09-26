@@ -81,7 +81,19 @@ function LoginInner() {
 
   const error = params.get("error");
   const errorText =
-    error === "scope" ? t("login.error.scope") : error === "config" ? t("login.notConfigured") : error ? t("login.error.generic") : null;
+    error === "scope"
+      ? t("login.error.scope")
+      : error === "config"
+        ? t("login.notConfigured")
+        : error === "api"
+          ? t("login.error.api")
+          : error === "cookie"
+            ? t("login.error.cookie")
+            : error === "denied"
+              ? t("login.error.denied")
+              : error
+                ? t("login.error.generic")
+                : null;
   const configured = session?.googleConfigured ?? true;
 
   const features = [

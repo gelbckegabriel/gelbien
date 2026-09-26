@@ -82,6 +82,19 @@ export function Legend({ items }: { items: { label: string; color: string; kind?
   );
 }
 
+/**
+ * Chart plot area that fills whatever height its card has, without ever making the card taller.
+ * The chart is absolutely positioned, so only `min` counts toward layout — neighbouring cards in a
+ * row decide the height and the chart stretches to match (no empty gaps between cards).
+ */
+export function ChartArea({ min = "min-h-56", className, children }: { min?: string; className?: string; children: React.ReactNode }) {
+  return (
+    <div className={cn("relative w-full flex-1", min, className)}>
+      <div className="absolute inset-0">{children}</div>
+    </div>
+  );
+}
+
 /** Card with a chart ⇄ table toggle — every chart has an accessible table twin. */
 export function ChartCard({
   title,
@@ -103,7 +116,7 @@ export function ChartCard({
   const { t } = useI18n();
   const [showTable, setShowTable] = useState(false);
   return (
-    <Card className={className}>
+    <Card className={cn("flex flex-col", className)}>
       <CardHeader
         title={title}
         subtitle={subtitle}
@@ -125,7 +138,14 @@ export function ChartCard({
       />
       {legend && !showTable && <div className="-mt-1 mb-3">{legend}</div>}
       <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={showTable ? "table" : "chart"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+        <motion.div
+          key={showTable ? "table" : "chart"}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="flex min-h-0 flex-1 flex-col"
+        >
           {showTable ? <div className="max-h-80 overflow-auto">{table}</div> : children}
         </motion.div>
       </AnimatePresence>

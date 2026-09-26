@@ -125,126 +125,129 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
         }
       />
 
+      {/* Income and the plan it funds share one card, so the two halves always line up. */}
       <Card className="p-6">
-        <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div>
-              <p className="text-xs text-ink-3">{t("budget.income.net")}</p>
-              <AnimatedNumber value={net} format={f.money0} className="mt-1 block text-2xl font-semibold text-good" />
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <div className="space-y-4 xl:border-r xl:border-line xl:pr-8">
+            <h2 className="text-[15px] font-semibold tracking-tight text-ink">{t("budget.income.title")}</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={t("budget.income.gross")}>
+                <MoneyInput value={draft.gross} onChange={(v) => setDraft((d) => ({ ...d, gross: v }))} placeholder="0.00" />
+              </Field>
+              <Field label={t("budget.income.net")}>
+                <MoneyInput value={draft.net} onChange={(v) => setDraft((d) => ({ ...d, net: v }))} placeholder="0.00" className="text-good" />
+              </Field>
             </div>
-            <div>
-              <p className="text-xs text-ink-3">{t("budget.plan.planned")}</p>
-              <AnimatedNumber value={planned} format={f.money0} className="mt-1 block text-2xl font-semibold text-ink" />
-            </div>
-            <div>
-              <p className="text-xs text-ink-3">{unallocated >= 0 ? t("budget.plan.savings") : t("budget.plan.overAllocated")}</p>
-              <AnimatedNumber value={Math.abs(unallocated)} format={f.money0} className={cn("mt-1 block text-2xl font-semibold", unallocated >= 0 ? "text-gold-bright" : "text-bad")} />
-            </div>
-            <div>
-              <p className="text-xs text-ink-3">{t("dash.kpi.savingsRate")}</p>
-              <AnimatedNumber value={net > 0 ? unallocated / net : 0} format={f.pct} className="mt-1 block text-2xl font-semibold text-ink" />
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 lg:items-end">
-            <span className="text-xs text-ink-3">{t("budget.scope.label")}</span>
-            <Segmented
-              value={draft.scope}
-              onChange={(scope) => setDraft((d) => ({ ...d, scope }))}
-              options={[
-                { value: "month" as Scope, label: t("budget.scope.month", { month: f.monthName(month) }) },
-                { value: "default" as Scope, label: t("budget.scope.default") },
-              ]}
-            />
-          </div>
-        </div>
-
-        <div className="mt-6 flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-white/5">
-          {segments.map((s, i) => (
-            <motion.div
-              key={s.name}
-              title={`${s.name}: ${f.money0(s.value)}`}
-              className="h-full first:rounded-l-full"
-              style={{ background: s.color }}
-              initial={{ width: 0 }}
-              animate={{ width: `${(s.value / base) * 100}%` }}
-              transition={{ type: "spring", stiffness: 90, damping: 20, delay: i * 0.03 }}
-            />
-          ))}
-          {unallocated > 0 && (
-            <motion.div
-              className="gold-fill h-full rounded-r-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${(unallocated / base) * 100}%` }}
-              transition={{ type: "spring", stiffness: 90, damping: 20 }}
-              title={`${t("budget.plan.savings")}: ${f.money0(unallocated)}`}
-            />
-          )}
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-3">
-          <CalendarClock className="h-3.5 w-3.5" />
-          {isOverride || hasIncomeOverride ? t("budget.hasOverride") : t("budget.usingDefault")}
-          {(isOverride || hasIncomeOverride) && (
-            <button onClick={useDefault} className="inline-flex items-center gap-1 text-gold hover:underline">
-              <RotateCcw className="h-3 w-3" /> {t("budget.resetDefault")}
-            </button>
-          )}
-        </div>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-12">
-        <Card className="lg:col-span-4">
-          <CardHeader title={t("budget.income.title")} />
-          <div className="space-y-4">
-            <Field label={t("budget.income.gross")}>
-              <MoneyInput value={draft.gross} onChange={(v) => setDraft((d) => ({ ...d, gross: v }))} placeholder="0.00" />
-            </Field>
-            <Field label={t("budget.income.net")}>
-              <MoneyInput value={draft.net} onChange={(v) => setDraft((d) => ({ ...d, net: v }))} placeholder="0.00" className="text-good" />
-            </Field>
             {gross > 0 && net > 0 && (
-              <div className="rounded-xl border border-line bg-surface-2/60 p-3 text-sm">
-                <div className="flex justify-between text-ink-2">
-                  <span>{t("budget.income.tax")}</span>
-                  <span className="tabular text-bad">−{f.money(gross - net)}</span>
-                </div>
-                <p className="mt-1 text-xs text-ink-3">{t("budget.income.taxRate", { pct: f.pct1(taxRate) })}</p>
+              <div className="flex items-baseline justify-between gap-3 rounded-xl border border-line bg-surface-2/60 px-3 py-2.5 text-sm">
+                <span className="text-ink-2">
+                  {t("budget.income.tax")} <span className="text-xs text-ink-3">· {t("budget.income.taxRate", { pct: f.pct1(taxRate) })}</span>
+                </span>
+                <span className="tabular text-bad">−{f.money(gross - net)}</span>
               </div>
             )}
           </div>
-        </Card>
 
-        <Card className="lg:col-span-8">
-          <CardHeader
-            title={t("budget.plan.title")}
-            subtitle={`${t("budget.plan.planned")}: ${f.money0(planned)} · ${unallocated >= 0 ? t("budget.plan.unallocated") : t("budget.plan.overAllocated")}: ${f.money0(Math.abs(unallocated))}`}
-          />
-          <ul className="divide-y divide-line/60">
-            {categories.map((c, i) => {
-              const limit = parseAmount(draft.lines[c.name]);
-              const spent = spentBy.get(c.name) ?? 0;
-              const status = budgetStatus(spent, limit, ds.settings.warnAt);
-              return (
-                <li key={c.name} className="flex items-center gap-3 py-3">
-                  <CategoryIcon icon={c.icon} color={c.color} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm text-ink">{c.name}</span>
-                      {limit > 0 && status !== "within" && <Badge tone={STATUS_TONE[status]}>{t(`budgetStatus.${status}`)}</Badge>}
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      {limit > 0 ? <Progress value={spent / limit} tone={STATUS_TONE[status]} className="h-1.5" delay={i * 0.03} /> : <div className="h-1.5 flex-1 rounded-full bg-white/5" />}
-                      <span className="tabular w-24 shrink-0 text-right text-[11px] text-ink-3">{t("budget.plan.spent", { amount: f.money0(spent) })}</span>
-                    </div>
+          <div className="flex flex-col gap-5">
+            <div className="grid grid-cols-2 items-end gap-4 sm:grid-cols-4">
+              <div>
+                <p className="text-xs text-ink-3">{t("dash.kpi.income")}</p>
+                <AnimatedNumber value={net} format={f.money0} className="mt-1 block text-2xl font-semibold text-good" />
+              </div>
+              <div>
+                <p className="text-xs text-ink-3">{t("budget.plan.planned")}</p>
+                <AnimatedNumber value={planned} format={f.money0} className="mt-1 block text-2xl font-semibold text-ink" />
+              </div>
+              <div>
+                <p className="text-xs text-ink-3">{unallocated >= 0 ? t("budget.plan.savings") : t("budget.plan.overAllocated")}</p>
+                <AnimatedNumber value={Math.abs(unallocated)} format={f.money0} className={cn("mt-1 block text-2xl font-semibold", unallocated >= 0 ? "text-gold-bright" : "text-bad")} />
+              </div>
+              <div>
+                <p className="text-xs text-ink-3">{t("dash.kpi.savingsRate")}</p>
+                <AnimatedNumber value={net > 0 ? unallocated / net : 0} format={f.pct} className="mt-1 block text-2xl font-semibold text-ink" />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-white/5">
+                {segments.map((s, i) => (
+                  <motion.div
+                    key={s.name}
+                    title={`${s.name}: ${f.money0(s.value)}`}
+                    className="h-full first:rounded-l-full"
+                    style={{ background: s.color }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(s.value / base) * 100}%` }}
+                    transition={{ type: "spring", stiffness: 90, damping: 20, delay: i * 0.03 }}
+                  />
+                ))}
+                {unallocated > 0 && (
+                  <motion.div
+                    className="gold-fill h-full rounded-r-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(unallocated / base) * 100}%` }}
+                    transition={{ type: "spring", stiffness: 90, damping: 20 }}
+                    title={`${t("budget.plan.savings")}: ${f.money0(unallocated)}`}
+                  />
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-3">
+                <CalendarClock className="h-3.5 w-3.5" />
+                {isOverride || hasIncomeOverride ? t("budget.hasOverride") : t("budget.usingDefault")}
+                {(isOverride || hasIncomeOverride) && (
+                  <button onClick={useDefault} className="inline-flex items-center gap-1 text-gold hover:underline">
+                    <RotateCcw className="h-3 w-3" /> {t("budget.resetDefault")}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-auto flex flex-wrap items-center gap-3">
+              <span className="text-xs text-ink-3">{t("budget.scope.label")}</span>
+              <Segmented
+                value={draft.scope}
+                onChange={(scope) => setDraft((d) => ({ ...d, scope }))}
+                options={[
+                  { value: "month" as Scope, label: t("budget.scope.month", { month: f.monthName(month) }) },
+                  { value: "default" as Scope, label: t("budget.scope.default") },
+                ]}
+              />
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={t("budget.plan.title")}
+          subtitle={`${t("budget.plan.planned")}: ${f.money0(planned)} · ${unallocated >= 0 ? t("budget.plan.unallocated") : t("budget.plan.overAllocated")}: ${f.money0(Math.abs(unallocated))}`}
+        />
+        <ul className="grid gap-x-10 xl:grid-cols-2">
+          {categories.map((c, i) => {
+            const limit = parseAmount(draft.lines[c.name]);
+            const spent = spentBy.get(c.name) ?? 0;
+            const status = budgetStatus(spent, limit, ds.settings.warnAt);
+            return (
+              <li key={c.name} className="flex items-center gap-3 border-b border-line/50 py-3">
+                <CategoryIcon icon={c.icon} color={c.color} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm text-ink">{c.name}</span>
+                    {limit > 0 && status !== "within" && <Badge tone={STATUS_TONE[status]}>{t(`budgetStatus.${status}`)}</Badge>}
                   </div>
-                  <div className="w-28 shrink-0 sm:w-32">
-                    <MoneyInput value={draft.lines[c.name] ?? ""} onChange={(v) => setLine(c.name, v)} placeholder="0" className="h-10 text-right" aria-label={c.name} />
+                  <div className="mt-1.5 flex items-center gap-2">
+                    {limit > 0 ? <Progress value={spent / limit} tone={STATUS_TONE[status]} className="h-1.5" delay={i * 0.03} /> : <div className="h-1.5 flex-1 rounded-full bg-white/5" />}
+                    <span className="tabular w-24 shrink-0 text-right text-[11px] text-ink-3">{t("budget.plan.spent", { amount: f.money0(spent) })}</span>
                   </div>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      </div>
+                </div>
+                <div className="w-28 shrink-0 sm:w-32">
+                  <MoneyInput value={draft.lines[c.name] ?? ""} onChange={(v) => setLine(c.name, v)} placeholder="0" className="h-10 text-right" aria-label={c.name} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
 
       <SaveBar show={dirty} label={t("budget.unsaved")} onSave={save} onReset={() => setDraft(initial)} />
     </>

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { AnimatedNumber } from "../ui/misc";
 import { ChartCard, DataTable, INK, TooltipBox } from "./kit";
 
-export function CategoryDonut({ summary }: { summary: MonthSummary }) {
+export function CategoryDonut({ summary, className }: { summary: MonthSummary; className?: string }) {
   const { t, f } = useI18n();
   const [hover, setHover] = useState<number | null>(null);
   const data = foldCategories(summary.byCategory, 6).map((d) => ({ ...d, label: d.name === "__other__" ? t("common.rest") : d.name }));
@@ -17,6 +17,7 @@ export function CategoryDonut({ summary }: { summary: MonthSummary }) {
 
   return (
     <ChartCard
+      className={className}
       title={t("dash.cat.title")}
       subtitle={t("dash.cat.subtitle")}
       table={
@@ -26,7 +27,7 @@ export function CategoryDonut({ summary }: { summary: MonthSummary }) {
         />
       }
     >
-      <div className="@container">
+      <div className="@container flex flex-1 flex-col justify-center">
       <div className="flex flex-col items-center gap-5 @md:flex-row">
         <div className="relative h-52 w-52 shrink-0">
           <ResponsiveContainer>

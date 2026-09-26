@@ -6,6 +6,11 @@ import {
   dataRange,
   datasetFromRanges,
   datasetToRanges,
+  accountToRow,
+  balanceToRow,
+  goalToRow,
+  rowToBalance,
+  rowToGoal,
   rowToTransaction,
   settingsToRows,
   subscriptionToRow,
@@ -103,6 +108,9 @@ export async function createSpreadsheet(at: string, locale: Locale, ownerName: s
     income: [],
     subscriptions: [],
     settings: settingsToRows(defaultSettings(locale)),
+    accounts: [],
+    balances: [],
+    goals: [],
   };
   await writeValues(at, id, [
     ...TAB_KEYS.map((k) => ({ range: `${TABS[k].title}!A1`, values: [[...TABS[k].headers] as Row, ...seed[k]] })),
@@ -191,15 +199,39 @@ async function deleteRow(at: string, id: string, tab: TabKey, recordId: string) 
   });
 }
 
+/**
+ * Sheets created by an older version of Gelbien lack tabs added later (e.g. Goals).
+ * Add any missing tab with its header row. Memoized per server instance.
+ */
+const ensured = new Set<string>();
+export async function ensureTabs(at: string, id: string): Promise<void> {
+  if (ensured.has(id)) return;
+  const meta = await gfetch<{ sheets: { properties: { title: string } }[] }>(at, `${SHEETS}/${id}?fields=sheets.properties.title`);
+  const have = new Set(meta.sheets.map((s) => s.properties.title));
+  const missing = TAB_KEYS.filter((k) => !have.has(TABS[k].title));
+  if (missing.length) {
+    await gfetch(at, `${SHEETS}/${id}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({
+        requests: missing.map((k) => ({ addSheet: { properties: { title: TABS[k].title, gridProperties: { frozenRowCount: 1 } } } })),
+      }),
+    });
+    await writeValues(at, id, missing.map((k) => ({ range: `${TABS[k].title}!A1`, values: [[...TABS[k].headers] as Row] })));
+  }
+  ensured.add(id);
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 export async function readDataset(at: string, id: string, locale: Locale): Promise<Omit<Dataset, "meta">> {
+  await ensureTabs(at, id);
   return datasetFromRanges(await readRanges(at, id, TAB_KEYS), locale);
 }
 
 export async function applyMutation(at: string, id: string, m: Mutation): Promise<void> {
+  await ensureTabs(at, id);
   switch (m.op) {
     case "addTransaction":
     case "updateTransaction":
@@ -247,6 +279,32 @@ export async function applyMutation(at: string, id: string, m: Mutation): Promis
       }
       return replaceTabs(at, id, updates);
     }
+    case "upsertAccount":
+      return upsertRow(at, id, "accounts", m.account.id, accountToRow(m.account));
+    case "deleteAccount": {
+      // Drop the account, its balance history, and any goal links to it.
+      const current = await readRanges(at, id, ["balances", "goals"]);
+      await replaceTabs(at, id, {
+        balances: current.balances.filter((r) => String(r[0] ?? "") !== m.id),
+        goals: current.goals
+          .map((r, i) => rowToGoal(r, i))
+          .filter((g) => g !== null)
+          .map((g) => goalToRow({ ...g, accountIds: g.accountIds.filter((a) => a !== m.id) })),
+      });
+      return deleteRow(at, id, "accounts", m.id);
+    }
+    case "saveBalances": {
+      const key = (b: { accountId: string; date: string }) => `${b.accountId}|${b.date}`;
+      const incoming = new Set(m.balances.map(key));
+      const current = await readRanges(at, id, ["balances"]);
+      const kept = current.balances.map(rowToBalance).filter((b) => b !== null && !incoming.has(key(b)));
+      const all = [...kept, ...m.balances].filter((b) => b !== null).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      return replaceTabs(at, id, { balances: all.map(balanceToRow) });
+    }
+    case "upsertGoal":
+      return upsertRow(at, id, "goals", m.goal.id, goalToRow(m.goal));
+    case "deleteGoal":
+      return deleteRow(at, id, "goals", m.id);
     case "replaceAll":
       return replaceTabs(at, id, datasetToRanges(m.data));
     default: {

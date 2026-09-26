@@ -12,6 +12,11 @@ export const CYCLES: Cycle[] = ["weekly", "monthly", "bimonthly", "quarterly", "
 export const SUB_STATUSES: SubStatus[] = ["active", "trial", "paused", "cancelled"];
 export const WORTH_IT: WorthIt[] = ["yes", "maybe", "no"];
 
+export type AccountType = "chequing" | "savings" | "investment" | "credit" | "cash" | "other";
+export type GoalStatus = "active" | "paused" | "achieved";
+export const ACCOUNT_TYPES: AccountType[] = ["chequing", "savings", "investment", "credit", "cash", "other"];
+export const GOAL_STATUSES: GoalStatus[] = ["active", "paused", "achieved"];
+
 export interface Transaction {
   id: string;
   /** ISO date, YYYY-MM-DD */
@@ -79,6 +84,48 @@ export interface Settings {
   paymentMethods: string[];
   /** Fraction of a budget at which a category flips to "attention" */
   warnAt: number;
+  /** Day of the month (1-28) when balances should be checked in */
+  checkInDay: number;
+}
+
+/** A bank account, card, investment or cash pot whose balance is checked in monthly. */
+export interface Account {
+  id: string;
+  name: string;
+  /** e.g. "Neo Financial", "Scotiabank" */
+  institution: string;
+  type: AccountType;
+  color: string;
+  archived: boolean;
+  notes: string;
+}
+
+/** Balance of one account on one date. Credit accounts store what you owe as a positive number. */
+export interface BalanceSnapshot {
+  accountId: string;
+  /** ISO date, YYYY-MM-DD */
+  date: string;
+  balance: number;
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  target: number;
+  /** YYYY-MM-DD or "" when there is no deadline */
+  targetDate: string;
+  /** Accounts that hold this goal's money; when empty, `saved` is tracked by hand */
+  accountIds: string[];
+  saved: number;
+  monthlyContribution: number;
+  /** Expected yearly return in %, e.g. 3 for a high-interest savings account */
+  annualReturn: number;
+  status: GoalStatus;
+  order: number;
+  notes: string;
+  createdAt: string;
 }
 
 export interface DatasetMeta {
@@ -94,6 +141,9 @@ export interface Dataset {
   budgets: BudgetLine[];
   incomes: IncomeLine[];
   subscriptions: Subscription[];
+  accounts: Account[];
+  balances: BalanceSnapshot[];
+  goals: Goal[];
   settings: Settings;
   meta: DatasetMeta;
 }
@@ -109,6 +159,12 @@ export type Mutation =
   | { op: "upsertSubscription"; sub: Subscription }
   | { op: "deleteSubscription"; id: string }
   | { op: "saveSettings"; settings: Settings }
+  | { op: "upsertAccount"; account: Account }
+  | { op: "deleteAccount"; id: string }
+  /** Upserts snapshots by (accountId, date) */
+  | { op: "saveBalances"; balances: BalanceSnapshot[] }
+  | { op: "upsertGoal"; goal: Goal }
+  | { op: "deleteGoal"; id: string }
   | { op: "replaceAll"; data: Omit<Dataset, "meta"> };
 
 export interface SessionUser {

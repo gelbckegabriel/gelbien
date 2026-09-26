@@ -3,7 +3,7 @@
 import { Layer, Rectangle, ResponsiveContainer, Sankey, Tooltip, type SankeyLinkProps, type SankeyNodeProps } from "recharts";
 import { moneyFlow, type MonthSummary } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
-import { BAD, ChartCard, DataTable, GOLD, GOOD, INK, TooltipBox } from "./kit";
+import { BAD, ChartArea, ChartCard, DataTable, GOLD, GOOD, INK, TooltipBox } from "./kit";
 
 interface FlowNode {
   name: string;
@@ -11,14 +11,14 @@ interface FlowNode {
   value?: number;
 }
 
-export function FlowSankey({ summary }: { summary: MonthSummary }) {
+export function FlowSankey({ summary, className }: { summary: MonthSummary; className?: string }) {
   const { t, f } = useI18n();
   const flow = moneyFlow(summary, 7);
 
   if (!flow) {
     return (
-      <ChartCard title={t("dash.flow.title")} subtitle={t("dash.flow.subtitle")}>
-        <p className="py-10 text-center text-sm text-ink-3">{t("dash.flow.noIncome")}</p>
+      <ChartCard className={className} title={t("dash.flow.title")} subtitle={t("dash.flow.subtitle")}>
+        <p className="flex flex-1 items-center justify-center py-10 text-center text-sm text-ink-3">{t("dash.flow.noIncome")}</p>
       </ChartCard>
     );
   }
@@ -46,11 +46,12 @@ export function FlowSankey({ summary }: { summary: MonthSummary }) {
 
   return (
     <ChartCard
+      className={className}
       title={t("dash.flow.title")}
       subtitle={t("dash.flow.subtitle")}
       table={<DataTable head={["", t("exp.col.amount")]} rows={tableRows} />}
     >
-      <div className="h-80 w-full">
+      <ChartArea min="min-h-72">
         <ResponsiveContainer>
           <Sankey
             data={{ nodes, links }}
@@ -103,7 +104,7 @@ export function FlowSankey({ summary }: { summary: MonthSummary }) {
             />
           </Sankey>
         </ResponsiveContainer>
-      </div>
+      </ChartArea>
     </ChartCard>
   );
 }

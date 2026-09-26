@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CYCLES, EXPENSE_TYPES, PRIORITIES, SUB_STATUSES, WORTH_IT, type Mutation } from "./types";
+import { ACCOUNT_TYPES, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PRIORITIES, SUB_STATUSES, WORTH_IT, type Mutation } from "./types";
 
 const text = (max = 500) => z.string().max(max);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -57,6 +57,37 @@ export const settingsSchema = z.object({
   savingsGoal: money,
   paymentMethods: z.array(text(120)).max(50),
   warnAt: z.number().gt(0).lte(1),
+  // optional so backups made before Goals existed still restore
+  checkInDay: z.number().int().min(1).max(28).default(1),
+});
+
+export const accountSchema = z.object({
+  id: text(64).min(1),
+  name: text(120).min(1),
+  institution: text(120),
+  type: z.enum(ACCOUNT_TYPES),
+  color: text(20),
+  archived: z.boolean(),
+  notes: text(1000),
+});
+
+export const balanceSchema = z.object({ accountId: text(64).min(1), date: isoDate, balance: money });
+
+export const goalSchema = z.object({
+  id: text(64).min(1),
+  name: text(120).min(1),
+  icon: text(40),
+  color: text(20),
+  target: money,
+  targetDate: z.union([isoDate, z.literal("")]),
+  accountIds: z.array(text(64)).max(20),
+  saved: money,
+  monthlyContribution: money,
+  annualReturn: z.number().finite().gte(-50).lte(50),
+  status: z.enum(GOAL_STATUSES),
+  order: z.number().finite(),
+  notes: text(2000),
+  createdAt: text(40),
 });
 
 /** A full dataset (also the JSON backup format). */
@@ -66,6 +97,9 @@ export const datasetSchema = z.object({
   budgets: z.array(budgetLine).max(5000),
   incomes: z.array(incomeLine).max(1000),
   subscriptions: z.array(subscriptionSchema).max(500),
+  accounts: z.array(accountSchema).max(200).default([]),
+  balances: z.array(balanceSchema).max(20000).default([]),
+  goals: z.array(goalSchema).max(200).default([]),
   settings: settingsSchema,
 });
 
@@ -82,6 +116,11 @@ export const mutationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("upsertSubscription"), sub: subscriptionSchema }),
   z.object({ op: z.literal("deleteSubscription"), id: text(64).min(1) }),
   z.object({ op: z.literal("saveSettings"), settings: settingsSchema }),
+  z.object({ op: z.literal("upsertAccount"), account: accountSchema }),
+  z.object({ op: z.literal("deleteAccount"), id: text(64).min(1) }),
+  z.object({ op: z.literal("saveBalances"), balances: z.array(balanceSchema).min(1).max(200) }),
+  z.object({ op: z.literal("upsertGoal"), goal: goalSchema }),
+  z.object({ op: z.literal("deleteGoal"), id: text(64).min(1) }),
   z.object({ op: z.literal("replaceAll"), data: datasetSchema }),
 ]);
 
