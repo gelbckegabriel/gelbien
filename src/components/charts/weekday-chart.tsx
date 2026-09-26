@@ -4,20 +4,21 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import { weekdayPattern } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
 import type { Dataset } from "@/lib/types";
-import { axisProps, ChartCard, DataTable, GOLD, INK, TooltipBox } from "./kit";
+import { axisProps, ChartArea, ChartCard, DataTable, GOLD, INK, TooltipBox } from "./kit";
 
-export function WeekdayChart({ ds }: { ds: Dataset }) {
+export function WeekdayChart({ ds, className }: { ds: Dataset; className?: string }) {
   const { t, f } = useI18n();
   const data = weekdayPattern(ds).map((d) => ({ ...d, label: f.weekday(d.weekday) }));
   const max = Math.max(...data.map((d) => d.avg));
 
   return (
     <ChartCard
+      className={className}
       title={t("dash.weekday.title")}
       subtitle={t("dash.weekday.subtitle")}
       table={<DataTable head={["", t("exp.col.amount")]} rows={data.map((d) => [d.label, f.money(d.avg)])} />}
     >
-      <div className="h-44 w-full">
+      <ChartArea min="min-h-40">
         <ResponsiveContainer>
           <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="28%">
             <CartesianGrid vertical={false} stroke={INK.grid} />
@@ -36,7 +37,7 @@ export function WeekdayChart({ ds }: { ds: Dataset }) {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </ChartArea>
     </ChartCard>
   );
 }

@@ -13,11 +13,12 @@ import { CategoryIcon } from "../icons";
 import { Card, CardHeader } from "../ui/card";
 import { Badge, Progress, STATUS_TONE } from "../ui/misc";
 
-export function BudgetBars({ summary }: { summary: MonthSummary }) {
+export function BudgetBars({ summary, className }: { summary: MonthSummary; className?: string }) {
   const { t, f } = useI18n();
   const rows = summary.byCategory.filter((c) => c.budget > 0 || c.spent > 0);
   return (
     <ChartCard
+      className={className}
       title={t("dash.budgets.title")}
       subtitle={t("dash.budgets.subtitle")}
       action={
@@ -32,7 +33,7 @@ export function BudgetBars({ summary }: { summary: MonthSummary }) {
         />
       }
     >
-      <ul className="space-y-3.5">
+      <ul className="grid gap-x-10 gap-y-3.5 xl:grid-cols-2">
         {rows.map((c, i) => (
           <li key={c.name} className="flex items-center gap-3">
             <CategoryIcon icon={c.icon} color={c.color} size="sm" />
@@ -60,11 +61,12 @@ export function BudgetBars({ summary }: { summary: MonthSummary }) {
   );
 }
 
-export function PrioritySplit({ summary }: { summary: MonthSummary }) {
+export function PrioritySplit({ summary, className }: { summary: MonthSummary; className?: string }) {
   const { t, f } = useI18n();
   const total = PRIORITIES.reduce((a, p) => a + Math.max(0, summary.byPriority[p]), 0);
   return (
     <ChartCard
+      className={className}
       title={t("dash.priority.title")}
       subtitle={t("dash.priority.subtitle")}
       table={<DataTable head={["", t("exp.col.amount"), "%"]} rows={PRIORITIES.map((p) => [t(`priority.${p}`), f.money(summary.byPriority[p]), f.pct(total ? summary.byPriority[p] / total : 0)])} />}
@@ -99,11 +101,11 @@ export function PrioritySplit({ summary }: { summary: MonthSummary }) {
   );
 }
 
-export function PaymentBreakdown({ summary }: { summary: MonthSummary }) {
+export function PaymentBreakdown({ summary, className }: { summary: MonthSummary; className?: string }) {
   const { t, f } = useI18n();
   const max = Math.max(...summary.byPayment.map((p) => p.amount), 1);
   return (
-    <ChartCard title={t("dash.payment.title")} table={<DataTable head={["", t("exp.col.amount")]} rows={summary.byPayment.map((p) => [p.name, f.money(p.amount)])} />}>
+    <ChartCard className={className} title={t("dash.payment.title")} table={<DataTable head={["", t("exp.col.amount")]} rows={summary.byPayment.map((p) => [p.name, f.money(p.amount)])} />}>
       <ul className="space-y-3">
         {summary.byPayment.map((p, i) => (
           <li key={p.name}>
@@ -127,12 +129,12 @@ export function PaymentBreakdown({ summary }: { summary: MonthSummary }) {
   );
 }
 
-export function TopExpenses({ summary, ds }: { summary: MonthSummary; ds: Dataset }) {
+export function TopExpenses({ summary, ds, className }: { summary: MonthSummary; ds: Dataset; className?: string }) {
   const { t, f } = useI18n();
   const openExpense = useUi((s) => s.openExpense);
   const cats = new Map(ds.categories.map((c) => [c.name, c]));
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader
         title={t("dash.top.title")}
         subtitle={t("dash.top.subtitle")}

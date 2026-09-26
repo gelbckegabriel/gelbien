@@ -5,9 +5,9 @@ import { projection, recentAverages } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
 import type { Dataset } from "@/lib/types";
 import { AnimatedNumber } from "../ui/misc";
-import { axisProps, BAD, ChartCard, DataTable, GOOD, INK, TooltipBox } from "./kit";
+import { axisProps, BAD, ChartArea, ChartCard, DataTable, GOOD, INK, TooltipBox } from "./kit";
 
-export function ProjectionChart({ ds, month }: { ds: Dataset; month: string }) {
+export function ProjectionChart({ ds, month, className }: { ds: Dataset; month: string; className?: string }) {
   const { t, f } = useI18n();
   const data = projection(ds, month, 12);
   const avg = recentAverages(ds, month);
@@ -17,6 +17,7 @@ export function ProjectionChart({ ds, month }: { ds: Dataset; month: string }) {
 
   return (
     <ChartCard
+      className={className}
       title={t("dash.proj.title")}
       subtitle={t("dash.proj.subtitle")}
       table={<DataTable head={["", t("dash.proj.reserve")]} rows={data.map((d) => [f.monthLong(d.month), f.money(d.value)])} />}
@@ -27,7 +28,7 @@ export function ProjectionChart({ ds, month }: { ds: Dataset; month: string }) {
           {t("dash.proj.in12")} · {f.moneySigned(avg.saved)}/{t("cycle.monthly").toLowerCase()}
         </span>
       </div>
-      <div className="h-44 w-full">
+      <ChartArea min="min-h-40">
         <ResponsiveContainer>
           <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <defs>
@@ -51,7 +52,7 @@ export function ProjectionChart({ ds, month }: { ds: Dataset; month: string }) {
             <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill="url(#proj-fill)" dot={false} activeDot={{ r: 4, stroke: INK.surface, strokeWidth: 2 }} animationDuration={1100} />
           </AreaChart>
         </ResponsiveContainer>
-      </div>
+      </ChartArea>
     </ChartCard>
   );
 }

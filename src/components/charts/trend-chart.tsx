@@ -5,9 +5,9 @@ import { trend } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
 import type { Dataset } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
-import { axisProps, BAD, ChartCard, DataTable, GOLD, GOOD, INK, Legend, TooltipBox } from "./kit";
+import { axisProps, BAD, ChartArea, ChartCard, DataTable, GOLD, GOOD, INK, Legend, TooltipBox } from "./kit";
 
-export function TrendChart({ ds, month }: { ds: Dataset; month: string }) {
+export function TrendChart({ ds, month, className }: { ds: Dataset; month: string; className?: string }) {
   const { t, f } = useI18n();
   const setMonth = useUi((s) => s.setMonth);
   // Start at the first month with any spending, so months before you began tracking don't read as "saved everything".
@@ -18,6 +18,7 @@ export function TrendChart({ ds, month }: { ds: Dataset; month: string }) {
 
   return (
     <ChartCard
+      className={className}
       title={t("dash.trend.title")}
       subtitle={t("dash.trend.subtitle")}
       legend={
@@ -36,7 +37,7 @@ export function TrendChart({ ds, month }: { ds: Dataset; month: string }) {
         />
       }
     >
-      <div className="h-64 w-full">
+      <ChartArea min="min-h-56">
         <ResponsiveContainer>
           <ComposedChart
             data={data}
@@ -75,7 +76,7 @@ export function TrendChart({ ds, month }: { ds: Dataset; month: string }) {
             )}
           </ComposedChart>
         </ResponsiveContainer>
-      </div>
+      </ChartArea>
     </ChartCard>
   );
 }

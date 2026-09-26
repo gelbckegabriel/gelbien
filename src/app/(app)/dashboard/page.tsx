@@ -39,8 +39,10 @@ export default function DashboardPage() {
   const change = (a: number, b: number) => (b ? (a - b) / Math.abs(b) : NaN);
 
   return (
+    // Every row is one grid row whose height comes from a "natural" block (text, lists, tiles);
+    // the cards beside it stretch to that height and their charts grow to fill it — no gaps.
     <Stagger className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-      <div className="grid gap-4 lg:col-span-8">
+      <div className="flex flex-col gap-4 lg:col-span-8">
         <Hero s={s} prevTotal={prev.total} name={session?.user?.name} />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatTile
@@ -98,8 +100,9 @@ export default function DashboardPage() {
           />
         </div>
       </div>
-      <div className="lg:col-span-4">
-        <Insights ds={ds} month={month} />
+      {/* Height-bound to the hero + KPI column on desktop; the insight list scrolls inside. */}
+      <div className="relative lg:col-span-4">
+        <Insights ds={ds} month={month} className="h-full lg:absolute lg:inset-0" />
       </div>
 
       {s.count === 0 ? (
@@ -118,37 +121,37 @@ export default function DashboardPage() {
       ) : null}
 
       <div className="lg:col-span-8">
-        <PaceChart ds={ds} month={month} />
+        <PaceChart ds={ds} month={month} className="h-full" />
       </div>
       <div className="lg:col-span-4">
-        <CategoryDonut summary={s} />
-      </div>
-
-      <div className="lg:col-span-7">
-        <BudgetBars summary={s} />
-      </div>
-      <div className="grid content-start gap-4 lg:col-span-5">
-        <CalendarHeatmap summary={s} />
-        <PrioritySplit summary={s} />
+        <CategoryDonut summary={s} className="h-full" />
       </div>
 
       <div className="lg:col-span-12">
-        <TrendChart ds={ds} month={month} />
+        <BudgetBars summary={s} />
       </div>
 
-      <div className="lg:col-span-7">
-        <FlowSankey summary={s} />
+      <div className="lg:col-span-8">
+        <TrendChart ds={ds} month={month} className="h-full" />
       </div>
-      <div className="grid content-start gap-4 lg:col-span-5">
-        <PaymentBreakdown summary={s} />
-        <WeekdayChart ds={ds} />
+      <div className="lg:col-span-4">
+        <CalendarHeatmap summary={s} className="h-full" />
+      </div>
+
+      <div className="lg:col-span-8">
+        <FlowSankey summary={s} className="h-full" />
+      </div>
+      <div className="flex flex-col gap-4 lg:col-span-4">
+        <PrioritySplit summary={s} />
+        <PaymentBreakdown summary={s} className="flex-1" />
       </div>
 
       <div className="lg:col-span-5">
-        <TopExpenses summary={s} ds={ds} />
+        <TopExpenses summary={s} ds={ds} className="h-full" />
       </div>
-      <div className="lg:col-span-7">
-        <ProjectionChart ds={ds} month={month} />
+      <div className="flex flex-col gap-4 lg:col-span-7">
+        <ProjectionChart ds={ds} month={month} className="flex-1" />
+        <WeekdayChart ds={ds} className="flex-1" />
       </div>
 
       <div className="lg:col-span-12">

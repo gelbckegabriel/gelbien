@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn, todayISO } from "@/lib/utils";
 import { ChartCard, DataTable, GOLD_RAMP, rampColor, rampInk } from "./kit";
 
-export function CalendarHeatmap({ summary }: { summary: MonthSummary }) {
+export function CalendarHeatmap({ summary, className }: { summary: MonthSummary; className?: string }) {
   const { t, f } = useI18n();
   const [hover, setHover] = useState<number | null>(null);
   const [y, m] = summary.month.split("-").map(Number);
@@ -19,6 +19,7 @@ export function CalendarHeatmap({ summary }: { summary: MonthSummary }) {
 
   return (
     <ChartCard
+      className={className}
       title={t("dash.cal.title")}
       subtitle={t("dash.cal.subtitle")}
       table={

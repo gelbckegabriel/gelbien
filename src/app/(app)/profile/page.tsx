@@ -34,7 +34,7 @@ export default function ProfilePage() {
   return (
     <div>
       <PageHeader title={t("prof.title")} />
-      <Stagger className="grid items-start gap-4 lg:grid-cols-2">
+      <Stagger className="space-y-4">
         <AccountCard />
         <PreferencesCard />
         <AiCard />
@@ -66,17 +66,18 @@ function AccountCard() {
   };
 
   return (
-    <Card>
-      <CardHeader title={t("prof.account")} />
-      <div className="flex items-center gap-4">
+    <Card className="flex flex-col gap-5 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
         <Avatar name={user?.name ?? t("common.demo")} picture={user?.picture} className="h-14 w-14" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-medium text-ink">{user?.name ?? t("common.demo")}</p>
+        <div className="min-w-0">
+          <p className="flex items-center gap-2">
+            <span className="truncate text-base font-medium text-ink">{user?.name ?? t("common.demo")}</span>
+            {mode === "google" ? <Badge tone="good">{t("common.connected")}</Badge> : <Badge tone="gold">{t("common.demo")}</Badge>}
+          </p>
           <p className="truncate text-sm text-ink-3">{user?.email ?? t("prof.demoMode")}</p>
         </div>
-        {mode === "google" ? <Badge tone="good">{t("common.connected")}</Badge> : <Badge tone="gold">{t("common.demo")}</Badge>}
       </div>
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {mode === "demo" && session?.googleConfigured && (
           <a href="/api/auth/login?returnTo=/profile" className={buttonClasses("primary", "md")}>
             <LogIn className="h-4 w-4" /> {t("prof.signIn")}
@@ -85,7 +86,7 @@ function AccountCard() {
         <Link href="/config" className={buttonClasses("secondary", "md")}>
           <Tags className="h-4 w-4" /> {t("nav.config")}
         </Link>
-        <Button variant="ghost" onClick={leave} className="ml-auto">
+        <Button variant="ghost" onClick={leave} className="ml-auto sm:ml-0">
           <LogOut className="h-4 w-4" /> {t("prof.signOut")}
         </Button>
       </div>
@@ -111,7 +112,8 @@ function PreferencesCard() {
   return (
     <Card>
       <CardHeader title={t("prof.prefs")} />
-      <div className="space-y-5">
+      {/* One grid of individual fields: every row lines up across both columns. */}
+      <div className="grid items-start gap-x-8 gap-y-5 lg:grid-cols-2">
         <Field label={t("prof.language")}>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(LOCALES) as Locale[]).map((l) => (
@@ -131,44 +133,42 @@ function PreferencesCard() {
             ))}
           </div>
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("prof.currency")}>
-            <Select
-              value={ds.settings.currency}
-              onChange={(e) => {
-                setCurrency(e.target.value);
-                saveSettings({ currency: e.target.value }, true);
-              }}
-            >
-              {[...new Set([ds.settings.currency, ...CURRENCIES])].map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t("prof.warnAt")} hint={`${Math.round(ds.settings.warnAt * 100)}%`}>
-            <input
-              type="range"
-              min={50}
-              max={100}
-              step={5}
-              value={Math.round(ds.settings.warnAt * 100)}
-              onChange={(e) => saveSettings({ warnAt: Number(e.target.value) / 100 }, true)}
-              className="h-11 w-full accent-[#d9b45f]"
-            />
-          </Field>
-          <Field label={t("prof.reserve")} className="sm:col-span-2">
-            <MoneyInput value={reserve} onChange={setReserve} placeholder="0.00" />
-            <p className="mt-1.5 text-xs text-ink-3">{t("prof.reserveHint")}</p>
-          </Field>
-          <Field label={t("prof.goal")} className="sm:col-span-2">
-            <MoneyInput value={goal} onChange={setGoal} placeholder="0.00" />
-          </Field>
-        </div>
+        <Field label={t("prof.currency")}>
+          <Select
+            value={ds.settings.currency}
+            onChange={(e) => {
+              setCurrency(e.target.value);
+              saveSettings({ currency: e.target.value }, true);
+            }}
+          >
+            {[...new Set([ds.settings.currency, ...CURRENCIES])].map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={t("prof.reserve")}>
+          <MoneyInput value={reserve} onChange={setReserve} placeholder="0.00" />
+          <p className="mt-1.5 text-xs text-ink-3">{t("prof.reserveHint")}</p>
+        </Field>
+        <Field label={t("prof.goal")}>
+          <MoneyInput value={goal} onChange={setGoal} placeholder="0.00" />
+        </Field>
+        <Field label={t("prof.warnAt")} hint={`${Math.round(ds.settings.warnAt * 100)}%`}>
+          <input
+            type="range"
+            min={50}
+            max={100}
+            step={5}
+            value={Math.round(ds.settings.warnAt * 100)}
+            onChange={(e) => saveSettings({ warnAt: Number(e.target.value) / 100 }, true)}
+            className="h-11 w-full accent-[#d9b45f]"
+          />
+        </Field>
         <AnimatePresence>
           {dirty && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="flex justify-end">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex justify-end lg:self-end">
               <Button variant="primary" onClick={() => saveSettings({ reserve: round2(parseAmount(reserve)), savingsGoal: round2(parseAmount(goal)) })}>
                 {t("common.save")}
               </Button>
@@ -207,8 +207,8 @@ function AiCard() {
   const key = isAnthropic ? ai.anthropicKey : ai.geminiKey;
 
   return (
-    <div ref={ref} id="ai" className="lg:row-span-2">
-      <Card className="h-full">
+    <div ref={ref} id="ai">
+      <Card>
         <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-gold/10 blur-3xl" />
         <CardHeader
           title={
@@ -218,94 +218,107 @@ function AiCard() {
           }
           subtitle={t("prof.ai.subtitle")}
         />
-        <Field label={t("prof.ai.provider")}>
-          <Segmented
-            value={ai.provider}
-            onChange={(provider: AiProvider) => {
-              ai.set({ provider });
-              setTest({ state: "idle" });
-            }}
-            options={[
-              { value: "off" as AiProvider, label: t("prof.ai.off") },
-              { value: "anthropic" as AiProvider, label: t("prof.ai.anthropic") },
-              { value: "gemini" as AiProvider, label: t("prof.ai.gemini") },
-            ]}
-          />
-        </Field>
+        <div className="grid gap-x-8 gap-y-5 lg:grid-cols-2">
+          <div className="space-y-4">
+            <Field label={t("prof.ai.provider")}>
+              <Segmented
+                value={ai.provider}
+                onChange={(provider: AiProvider) => {
+                  ai.set({ provider });
+                  setTest({ state: "idle" });
+                }}
+                options={[
+                  { value: "off" as AiProvider, label: t("prof.ai.off") },
+                  { value: "anthropic" as AiProvider, label: t("prof.ai.anthropic") },
+                  { value: "gemini" as AiProvider, label: t("prof.ai.gemini") },
+                ]}
+              />
+            </Field>
 
-        <AnimatePresence mode="wait">
-          {ai.provider !== "off" && (
-            <motion.div key={ai.provider} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="mt-5 space-y-4">
-              <p className="text-[13px] leading-relaxed text-ink-3">{isAnthropic ? t("prof.ai.anthropicHint") : t("prof.ai.geminiHint")}</p>
-              {!isAnthropic && (
-                <p className="flex gap-2 rounded-xl border border-warn/25 bg-warn-soft px-3 py-2.5 text-[13px] text-warn">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {t("prof.ai.geminiWarning")}
-                </p>
-              )}
-              <Field
-                label={t("prof.ai.key")}
-                hint={
-                  <a
-                    href={isAnthropic ? "https://console.anthropic.com/settings/keys" : "https://aistudio.google.com/apikey"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-gold hover:underline"
-                  >
-                    {t("prof.ai.getKey")} <ExternalLink className="h-3 w-3" />
-                  </a>
-                }
-              >
-                <div className="relative">
-                  <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
-                  <Input
-                    type={show ? "text" : "password"}
-                    value={key}
-                    onChange={(e) => {
-                      ai.set(isAnthropic ? { anthropicKey: e.target.value } : { geminiKey: e.target.value });
-                      setTest({ state: "idle" });
-                    }}
-                    placeholder={isAnthropic ? "sk-ant-…" : "AIza…"}
-                    autoComplete="off"
-                    spellCheck={false}
-                    className="pl-10 pr-10 font-mono text-sm"
-                  />
-                  <button type="button" onClick={() => setShow((s) => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-3 hover:text-ink" aria-label="toggle">
-                    {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <p className="mt-1.5 text-xs text-ink-3">{t("prof.ai.keyLocal")}</p>
-              </Field>
-              <Field label={t("prof.ai.model")}>
-                <Select
-                  value={isAnthropic ? ai.anthropicModel : ai.geminiModel}
-                  onChange={(e) => ai.set(isAnthropic ? { anthropicModel: e.target.value } : { geminiModel: e.target.value })}
+            {ai.provider !== "off" && (
+              <motion.div key={`hint-${ai.provider}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                <p className="text-[13px] leading-relaxed text-ink-3">{isAnthropic ? t("prof.ai.anthropicHint") : t("prof.ai.geminiHint")}</p>
+                {!isAnthropic && (
+                  <p className="flex gap-2 rounded-xl border border-warn/25 bg-warn-soft px-3 py-2.5 text-[13px] text-warn">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {t("prof.ai.geminiWarning")}
+                  </p>
+                )}
+              </motion.div>
+            )}
+          </div>
+          <AnimatePresence mode="wait">
+            {ai.provider !== "off" && (
+              <motion.div key={ai.provider} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="space-y-4">
+                <Field
+                  label={t("prof.ai.key")}
+                  hint={
+                    <a
+                      href={isAnthropic ? "https://console.anthropic.com/settings/keys" : "https://aistudio.google.com/apikey"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-gold hover:underline"
+                    >
+                      {t("prof.ai.getKey")} <ExternalLink className="h-3 w-3" />
+                    </a>
+                  }
                 >
-                  {(isAnthropic ? ANTHROPIC_MODELS : GEMINI_MODELS).map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label} — {m.price}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <div className="flex items-center gap-3">
-                <Button onClick={runTest} disabled={!key.trim() || test.state === "testing"}>
-                  {test.state === "testing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  {test.state === "testing" ? t("prof.ai.testing") : t("prof.ai.test")}
-                </Button>
-                {test.state === "ok" && (
-                  <span className="inline-flex items-center gap-1.5 text-sm text-good">
-                    <CheckCircle2 className="h-4 w-4" /> {t("prof.ai.testOk")}
-                  </span>
-                )}
-                {test.state === "fail" && (
-                  <span className="inline-flex items-center gap-1.5 text-sm text-bad">
-                    <XCircle className="h-4 w-4 shrink-0" /> {t("prof.ai.testFail", { error: test.msg ?? "" })}
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                  <div className="relative">
+                    <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
+                    <Input
+                      type={show ? "text" : "password"}
+                      value={key}
+                      onChange={(e) => {
+                        ai.set(isAnthropic ? { anthropicKey: e.target.value } : { geminiKey: e.target.value });
+                        setTest({ state: "idle" });
+                      }}
+                      placeholder={isAnthropic ? "sk-ant-…" : "AIza…"}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="pl-10 pr-10 font-mono text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShow((s) => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-3 hover:text-ink"
+                      aria-label="toggle"
+                    >
+                      {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-xs text-ink-3">{t("prof.ai.keyLocal")}</p>
+                </Field>
+                <Field label={t("prof.ai.model")}>
+                  <Select
+                    value={isAnthropic ? ai.anthropicModel : ai.geminiModel}
+                    onChange={(e) => ai.set(isAnthropic ? { anthropicModel: e.target.value } : { geminiModel: e.target.value })}
+                  >
+                    {(isAnthropic ? ANTHROPIC_MODELS : GEMINI_MODELS).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label} — {m.price}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <div className="flex items-center gap-3">
+                  <Button onClick={runTest} disabled={!key.trim() || test.state === "testing"}>
+                    {test.state === "testing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    {test.state === "testing" ? t("prof.ai.testing") : t("prof.ai.test")}
+                  </Button>
+                  {test.state === "ok" && (
+                    <span className="inline-flex items-center gap-1.5 text-sm text-good">
+                      <CheckCircle2 className="h-4 w-4" /> {t("prof.ai.testOk")}
+                    </span>
+                  )}
+                  {test.state === "fail" && (
+                    <span className="inline-flex items-center gap-1.5 text-sm text-bad">
+                      <XCircle className="h-4 w-4 shrink-0" /> {t("prof.ai.testFail", { error: test.msg ?? "" })}
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </Card>
     </div>
   );
@@ -372,24 +385,66 @@ function DataCard() {
           </span>
         }
       />
-      {mode === "google" && ds.meta.spreadsheetUrl && (
-        <div className="mb-4 flex items-center gap-3 rounded-xl border border-good/20 bg-good-soft/50 p-3">
-          <FileSpreadsheet className="h-8 w-8 shrink-0 text-good" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-ink">{t("prof.data.sheet")}</p>
-            <p className="text-xs text-ink-3">{t("prof.data.lastSync", { time: f.relative(ds.meta.syncedAt) })}</p>
-          </div>
-          <Button size="icon-sm" variant="ghost" onClick={() => refresh()} aria-label={t("prof.data.sync")}>
-            <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin text-gold")} />
-          </Button>
-          <a href={ds.meta.spreadsheetUrl} target="_blank" rel="noreferrer" className={buttonClasses("secondary", "sm")}>
-            <ExternalLink className="h-4 w-4" /> {t("common.open")}
-          </a>
-        </div>
-      )}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-3">
+          {mode === "google" && ds.meta.spreadsheetUrl && (
+            <div className="flex items-center gap-3 rounded-xl border border-good/20 bg-good-soft/50 p-3">
+              <FileSpreadsheet className="h-8 w-8 shrink-0 text-good" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-ink">{t("prof.data.sheet")}</p>
+                <p className="text-xs text-ink-3">{t("prof.data.lastSync", { time: f.relative(ds.meta.syncedAt) })}</p>
+              </div>
+              <Button size="icon-sm" variant="ghost" onClick={() => refresh()} aria-label={t("prof.data.sync")}>
+                <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin text-gold")} />
+              </Button>
+              <a href={ds.meta.spreadsheetUrl} target="_blank" rel="noreferrer" className={buttonClasses("secondary", "sm")}>
+                <ExternalLink className="h-4 w-4" /> {t("common.open")}
+              </a>
+            </div>
+          )}
 
-      <div className="space-y-3">
-        <div className="rounded-xl border border-dashed border-line-strong p-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                const data: Omit<Dataset, "meta"> = {
+                  transactions: ds.transactions,
+                  categories: ds.categories,
+                  budgets: ds.budgets,
+                  incomes: ds.incomes,
+                  subscriptions: ds.subscriptions,
+                  settings: ds.settings,
+                };
+                downloadFile(`gelbien-backup-${stamp}.json`, JSON.stringify(data, null, 2), "application/json");
+              }}
+            >
+              <Download className="h-4 w-4" /> {t("prof.data.exportJson")}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => downloadFile(`gelbien-expenses-${stamp}.csv`, toCsv(ds.transactions), "text/csv;charset=utf-8")}
+            >
+              <Download className="h-4 w-4" /> {t("prof.data.exportCsv")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => jsonInput.current?.click()}>
+              <RotateCcw className="h-4 w-4" /> {t("prof.data.restore")}
+            </Button>
+            <input
+              ref={jsonInput}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void restore(file);
+              }}
+            />
+          </div>
+        </div>
+        <div className="h-full rounded-xl border border-dashed border-line-strong p-4">
           <p className="text-sm font-medium text-ink">{t("prof.data.import")}</p>
           <p className="mt-0.5 text-xs text-ink-3">{t("prof.data.importHint")}</p>
           <AnimatePresence mode="wait">
@@ -427,43 +482,6 @@ function DataCard() {
               const file = e.target.files?.[0];
               e.target.value = "";
               if (file) void readXlsx(file);
-            }}
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              const data: Omit<Dataset, "meta"> = {
-                transactions: ds.transactions,
-                categories: ds.categories,
-                budgets: ds.budgets,
-                incomes: ds.incomes,
-                subscriptions: ds.subscriptions,
-                settings: ds.settings,
-              };
-              downloadFile(`gelbien-backup-${stamp}.json`, JSON.stringify(data, null, 2), "application/json");
-            }}
-          >
-            <Download className="h-4 w-4" /> {t("prof.data.exportJson")}
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => downloadFile(`gelbien-expenses-${stamp}.csv`, toCsv(ds.transactions), "text/csv;charset=utf-8")}>
-            <Download className="h-4 w-4" /> {t("prof.data.exportCsv")}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => jsonInput.current?.click()}>
-            <RotateCcw className="h-4 w-4" /> {t("prof.data.restore")}
-          </Button>
-          <input
-            ref={jsonInput}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) void restore(file);
             }}
           />
         </div>
@@ -515,8 +533,9 @@ function CacheCard() {
   };
 
   return (
-    <Card>
+    <Card className="flex flex-col gap-4 xl:flex-row xl:items-center">
       <CardHeader
+        className="mb-0 min-w-0 flex-1"
         title={
           <span className="inline-flex items-center gap-2">
             <HardDrive className="h-4 w-4 text-gold" /> {t("prof.cache.title")}
@@ -526,7 +545,7 @@ function CacheCard() {
       />
       <div className="flex flex-wrap items-center gap-2">
         <Badge>{t("prof.cache.size", { size })}</Badge>
-        <Button size="sm" variant="secondary" onClick={clear} className="ml-auto">
+        <Button size="sm" variant="secondary" onClick={clear}>
           <Trash2 className="h-4 w-4" /> {t("prof.cache.clear")}
         </Button>
         {mode === "demo" && (
