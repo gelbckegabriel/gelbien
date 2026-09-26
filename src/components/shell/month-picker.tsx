@@ -37,7 +37,7 @@ export function MonthPicker({ className }: { className?: string }) {
           if (o) setYear(Number(month.slice(0, 4)));
         }}
       >
-        <Popover.Trigger className="relative flex h-8 min-w-[9.5rem] items-center justify-center gap-2 overflow-hidden rounded-lg px-2 text-sm font-medium text-ink hover:bg-white/5">
+        <Popover.Trigger className="relative flex h-8 min-w-[7.5rem] items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg px-2 text-sm font-medium text-ink hover:bg-white/5 sm:min-w-[9.5rem]">
           <CalendarDays className="h-4 w-4 text-gold" />
           <AnimatePresence mode="popLayout" initial={false} custom={dir}>
             <motion.span
@@ -48,7 +48,11 @@ export function MonthPicker({ className }: { className?: string }) {
               exit={{ y: dir >= 0 ? -14 : 14, opacity: 0 }}
               transition={{ type: "spring", stiffness: 500, damping: 36 }}
             >
-              {f.monthLong(month)}
+              {/* short label on phones so the top bar never wraps */}
+              <span className="sm:hidden">
+                {f.monthShort(month)} {month.slice(0, 4)}
+              </span>
+              <span className="hidden sm:inline">{f.monthLong(month)}</span>
             </motion.span>
           </AnimatePresence>
         </Popover.Trigger>

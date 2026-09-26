@@ -49,6 +49,33 @@ export function applyMutationToDataset(ds: Dataset, m: Mutation): Dataset {
       return { ...ds, subscriptions: ds.subscriptions.filter((s) => s.id !== m.id) };
     case "saveSettings":
       return { ...ds, settings: m.settings };
+    case "upsertAccount":
+      return {
+        ...ds,
+        accounts: ds.accounts.some((a) => a.id === m.account.id) ? ds.accounts.map((a) => (a.id === m.account.id ? m.account : a)) : [...ds.accounts, m.account],
+      };
+    case "deleteAccount":
+      return {
+        ...ds,
+        accounts: ds.accounts.filter((a) => a.id !== m.id),
+        balances: ds.balances.filter((b) => b.accountId !== m.id),
+        goals: ds.goals.map((g) => (g.accountIds.includes(m.id) ? { ...g, accountIds: g.accountIds.filter((id) => id !== m.id) } : g)),
+      };
+    case "saveBalances": {
+      const key = (b: { accountId: string; date: string }) => `${b.accountId}|${b.date}`;
+      const incoming = new Set(m.balances.map(key));
+      return {
+        ...ds,
+        balances: [...ds.balances.filter((b) => !incoming.has(key(b))), ...m.balances].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)),
+      };
+    }
+    case "upsertGoal":
+      return {
+        ...ds,
+        goals: ds.goals.some((g) => g.id === m.goal.id) ? ds.goals.map((g) => (g.id === m.goal.id ? m.goal : g)) : [...ds.goals, m.goal],
+      };
+    case "deleteGoal":
+      return { ...ds, goals: ds.goals.filter((g) => g.id !== m.id) };
     case "replaceAll":
       return { ...m.data, transactions: [...m.data.transactions].sort(byDateDesc), meta: ds.meta };
   }

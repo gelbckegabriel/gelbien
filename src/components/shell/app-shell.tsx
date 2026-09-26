@@ -1,6 +1,6 @@
 "use client";
 
-import { CloudCheck, FileUp, RefreshCw } from "lucide-react";
+import { CloudCheck, FileUp, MessageCircle, RefreshCw } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -56,6 +56,9 @@ function TopBar() {
             </Link>
           )}
           <SyncIndicator />
+          <Link href="/chat" className="grid h-9 w-9 place-items-center rounded-xl text-ink-3 transition hover:bg-white/5 hover:text-ink lg:hidden" aria-label={t("nav.chat")}>
+            <MessageCircle className="h-[18px] w-[18px]" />
+          </Link>
           <div className="lg:hidden">
             <UserChip compact />
           </div>

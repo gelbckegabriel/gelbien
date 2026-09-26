@@ -1,4 +1,5 @@
 import { effectiveBudget, effectiveIncome, monthlyCost, trend } from "../finance";
+import { goalPlanFor, latestBalances, netWorth } from "../goals";
 import type { Dataset, Locale } from "../types";
 import { addMonths, currentMonth, monthOf, monthRange } from "../utils";
 
@@ -67,6 +68,31 @@ export function buildFinanceContext(ds: Dataset, anchorMonth = currentMonth()): 
     for (const s of ds.subscriptions) {
       lines.push(
         [s.name, s.category, s.amount.toFixed(2), s.cycle, monthlyCost(s).toFixed(2), s.status, s.worthIt, s.trialEnd || "-"].map(csv).join(", "),
+      );
+    }
+    lines.push("");
+  }
+
+  if (ds.accounts.length) {
+    const latest = latestBalances(ds.balances);
+    const nw = netWorth(ds);
+    lines.push(`## Accounts — latest monthly check-in (net worth ${nw.total.toFixed(2)}: assets ${nw.assets.toFixed(2)}, debts ${nw.debts.toFixed(2)})`);
+    lines.push("name, institution, type, balance (credit = amount owed), as of, state");
+    for (const a of ds.accounts) {
+      const b = latest.get(a.id);
+      lines.push([a.name, a.institution, a.type, b ? b.balance.toFixed(2) : "-", b?.date ?? "-", a.archived ? "closed" : "open"].map(csv).join(", "));
+    }
+    lines.push("");
+  }
+
+  if (ds.goals.length) {
+    lines.push("## Savings goals (name, target, saved now, monthly contribution, expected yearly return %, deadline, projected month reached at this pace, status)");
+    for (const g of ds.goals) {
+      const p = goalPlanFor(ds, g);
+      lines.push(
+        [g.name, g.target.toFixed(2), p.current.toFixed(2), g.monthlyContribution.toFixed(2), g.annualReturn, g.targetDate || "none", p.achieved ? "reached" : p.eta ?? "never", g.status]
+          .map(csv)
+          .join(", "),
       );
     }
     lines.push("");

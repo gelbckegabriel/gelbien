@@ -35,7 +35,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       persistOptions={{
         persister,
         maxAge: WEEK,
-        buster: "v2",
+        buster: "v3",
         dehydrateOptions: {
           // Cache the Google-backed data (for instant start-up); demo data already lives in localStorage.
           // A cached "signed out" answer must never be trusted after an OAuth round-trip, so only

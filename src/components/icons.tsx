@@ -1,17 +1,27 @@
 "use client";
 
 import {
-  Baby, BookOpen, Briefcase, Bus, Car, Coffee, CreditCard, Dumbbell, FileText, Gamepad2, Gift, Globe, GraduationCap,
-  HeartPulse, Home, Landmark, Music, Package, PawPrint, PiggyBank, Plane, Repeat, ShoppingCart, Shirt, Smartphone,
-  Sofa, Sparkles, Ticket, UtensilsCrossed, Wallet, Wrench, Zap, type LucideIcon,
+  Baby, Banknote, Bike, BookOpen, Briefcase, Bus, Car, Coffee, CreditCard, Dumbbell, FileText, Gamepad2, Gem, Gift, Globe,
+  GraduationCap, HeartPulse, Home, Landmark, Laptop, Music, Package, PawPrint, PiggyBank, Plane, Repeat, ShoppingCart, Shirt,
+  Smartphone, Sofa, Sparkles, Target, Ticket, TrendingUp, Umbrella, UtensilsCrossed, Wallet, Wrench, Zap, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const ICONS: Record<string, LucideIcon> = {
   Home, Zap, ShoppingCart, UtensilsCrossed, Bus, HeartPulse, Shirt, Sofa, Repeat, Ticket, GraduationCap, Landmark,
   Package, PawPrint, Plane, Gift, Baby, Car, Dumbbell, Coffee, Smartphone, Wallet, Briefcase, FileText, Music,
-  Gamepad2, BookOpen, Wrench, PiggyBank, CreditCard, Globe, Sparkles,
+  Gamepad2, BookOpen, Wrench, PiggyBank, CreditCard, Globe, Sparkles, Target, Umbrella, Laptop, Gem, Bike, TrendingUp,
+  Banknote,
 };
+
+export const ACCOUNT_TYPE_ICON = {
+  chequing: "Wallet",
+  savings: "PiggyBank",
+  investment: "TrendingUp",
+  credit: "CreditCard",
+  cash: "Banknote",
+  other: "Landmark",
+} as const;
 
 export function CategoryIcon({ icon, color, size = "md", className }: { icon: string; color: string; size?: "sm" | "md" | "lg"; className?: string }) {
   const Icon = ICONS[icon] ?? Package;

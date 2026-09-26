@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, ListOrdered, MessageCircle, PiggyBank, Plus, Tags, UserRound } from "lucide-react";
+import { LayoutDashboard, ListOrdered, MessageCircle, PiggyBank, Plus, Tags, Target, UserRound } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,7 @@ import { UserChip } from "./user-chip";
 export const NAV: { href: string; label: MessageKey; icon: typeof LayoutDashboard }[] = [
   { href: "/dashboard", label: "nav.dashboard", icon: LayoutDashboard },
   { href: "/budget", label: "nav.budget", icon: PiggyBank },
+  { href: "/goals", label: "nav.goals", icon: Target },
   { href: "/expenses", label: "nav.expenses", icon: ListOrdered },
   { href: "/chat", label: "nav.chat", icon: MessageCircle },
   { href: "/config", label: "nav.config", icon: Tags },
@@ -65,7 +66,8 @@ export function Sidebar() {
   );
 }
 
-const MOBILE = [NAV[0], NAV[1], null, NAV[2], NAV[3]] as const;
+// Phones: Dashboard, Budget, +, Expenses, Goals — Chat moves to the top bar.
+const MOBILE = [NAV[0], NAV[1], null, NAV[3], NAV[2]] as const;
 
 export function BottomNav() {
   const path = usePathname();

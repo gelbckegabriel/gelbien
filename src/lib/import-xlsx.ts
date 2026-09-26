@@ -275,7 +275,8 @@ export function importMoneySheet(sheets: SheetData[], locale: Locale, now = new 
   transactions.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
   return {
-    data: { transactions, categories, budgets, incomes, subscriptions, settings },
+    // The workbook has no accounts or goals; callers keep the ones already in the app.
+    data: { transactions, categories, budgets, incomes, subscriptions, accounts: [], balances: [], goals: [], settings },
     stats: { transactions: transactions.length, categories: categories.length, subscriptions: subscriptions.length, skipped },
   };
 }

@@ -3,8 +3,8 @@
  * Nothing here comes from a real person's records.
  */
 import { defaultCategories, defaultSettings } from "./defaults";
-import type { BudgetLine, Dataset, ExpenseType, IncomeLine, Locale, Priority, Subscription, Transaction } from "./types";
-import { addMonths, currentMonth, round2, todayISO } from "./utils";
+import type { Account, BalanceSnapshot, BudgetLine, Dataset, ExpenseType, Goal, IncomeLine, Locale, Priority, Subscription, Transaction } from "./types";
+import { addMonths, currentMonth, monthOf, round2, todayISO } from "./utils";
 
 type Tri = [string, string, string];
 const L: Record<Locale, 0 | 1 | 2> = { pt: 0, en: 1, fr: 2 };
@@ -171,12 +171,54 @@ export function buildDemoDataset(locale: Locale, today = todayISO()): Dataset {
     { id: "sub_6", name: "Amazon Prime", category: subsCat, amount: 99, cycle: "annual", billingDay: 14, payment: pays[0], status: "paused", trialEnd: "", worthIt: "maybe", notes: "" },
   ];
 
+  // Accounts with a check-in on the 1st of each previous month. This month's check-in is
+  // deliberately missing so the demo shows the monthly reminder.
+  const tri = (x: Tri) => x[li];
+  const accounts: Account[] = [
+    { id: "acc_neo", name: tri(["Poupança (HISA)", "Savings (HISA)", "Épargne (CÉIE)"]), institution: "Neo Financial", type: "savings", color: "#199e70", archived: false, notes: "" },
+    { id: "acc_chq", name: tri(["Conta corrente", "Chequing", "Compte chèques"]), institution: "Scotiabank", type: "chequing", color: "#3987e5", archived: false, notes: "" },
+    { id: "acc_visa", name: "Visa", institution: "Scotiabank", type: "credit", color: "#e0707a", archived: false, notes: "" },
+    { id: "acc_tfsa", name: tri(["TFSA", "TFSA", "CELI"]), institution: "Wealthsimple", type: "investment", color: "#9085e9", archived: false, notes: "" },
+  ];
+  const balances: BalanceSnapshot[] = [];
+  for (let i = 0; i < 6; i++) {
+    const date = `${addMonths(startMonth, i)}-01`;
+    if (monthOf(date) >= nowMonth) break;
+    balances.push(
+      { accountId: "acc_neo", date, balance: round2(6200 + i * 560 + rand() * 90) },
+      { accountId: "acc_chq", date, balance: round2(2800 + rand() * 1300) },
+      { accountId: "acc_visa", date, balance: round2(550 + rand() * 700) },
+      { accountId: "acc_tfsa", date, balance: round2(4000 * Math.pow(1.004, i) + i * 330 + rand() * 60) },
+    );
+  }
+  const created = new Date(`${startMonth}-01T12:00:00`).toISOString();
+  const goals: Goal[] = [
+    {
+      id: "goal_car", name: tri(["Carro", "Car", "Voiture"]), icon: "Car", color: "#3987e5", target: 18000,
+      targetDate: `${addMonths(nowMonth, 15)}-01`, accountIds: ["acc_neo"], saved: 0, monthlyContribution: 700, annualReturn: 3,
+      status: "active", order: 0, notes: "", createdAt: created,
+    },
+    {
+      id: "goal_home", name: tri(["Entrada do apartamento", "Home down payment", "Mise de fonds"]), icon: "Home", color: "#d9b45f", target: 60000,
+      targetDate: `${addMonths(nowMonth, 54)}-01`, accountIds: ["acc_tfsa"], saved: 0, monthlyContribution: 350, annualReturn: 5,
+      status: "active", order: 1, notes: "", createdAt: created,
+    },
+    {
+      id: "goal_trip", name: tri(["Viagem ao Brasil", "Trip to Brazil", "Voyage au Brésil"]), icon: "Plane", color: "#d55181", target: 3500,
+      targetDate: `${addMonths(nowMonth, 9)}-01`, accountIds: [], saved: 1200, monthlyContribution: 300, annualReturn: 0,
+      status: "active", order: 2, notes: "", createdAt: created,
+    },
+  ];
+
   return {
     transactions: txs,
     categories,
     budgets,
     incomes,
     subscriptions,
+    accounts,
+    balances,
+    goals,
     settings,
     meta: { source: "demo", syncedAt: new Date().toISOString() },
   };

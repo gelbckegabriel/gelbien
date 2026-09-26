@@ -50,10 +50,21 @@ export function googleSource(locale: Locale): DataSource {
 const DEMO_KEY = "gelbien.demo.v1";
 export const MODE_KEY = "gelbien.mode";
 
+/** Fill in fields added after a dataset was stored (e.g. accounts/goals), so older copies keep working. */
+export function normalizeDataset(ds: Dataset): Dataset {
+  return {
+    ...ds,
+    accounts: ds.accounts ?? [],
+    balances: ds.balances ?? [],
+    goals: ds.goals ?? [],
+    settings: { ...ds.settings, checkInDay: ds.settings?.checkInDay ?? 1 },
+  };
+}
+
 export function readDemo(): Dataset | null {
   try {
     const raw = localStorage.getItem(DEMO_KEY);
-    return raw ? (JSON.parse(raw) as Dataset) : null;
+    return raw ? normalizeDataset(JSON.parse(raw) as Dataset) : null;
   } catch {
     return null;
   }

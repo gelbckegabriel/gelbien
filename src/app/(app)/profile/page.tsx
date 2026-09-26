@@ -356,7 +356,14 @@ function DataCard() {
     const current: Omit<Dataset, "meta"> = { ...ds };
     const data =
       how === "replace"
-        ? { ...pending.data, settings: { ...pending.data.settings, locale: ds.settings.locale, currency: ds.settings.currency } }
+        ? {
+            ...pending.data,
+            // The workbook has no accounts/goals — never wipe the ones set up in the app.
+            accounts: ds.accounts,
+            balances: ds.balances,
+            goals: ds.goals,
+            settings: { ...pending.data.settings, locale: ds.settings.locale, currency: ds.settings.currency, checkInDay: ds.settings.checkInDay },
+          }
         : mergeImport(current, pending.data);
     mutate.mutate({ op: "replaceAll", data });
     setPending(null);
@@ -414,6 +421,9 @@ function DataCard() {
                   budgets: ds.budgets,
                   incomes: ds.incomes,
                   subscriptions: ds.subscriptions,
+                  accounts: ds.accounts,
+                  balances: ds.balances,
+                  goals: ds.goals,
                   settings: ds.settings,
                 };
                 downloadFile(`gelbien-backup-${stamp}.json`, JSON.stringify(data, null, 2), "application/json");
