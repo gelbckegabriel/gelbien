@@ -56,7 +56,7 @@ export function Field({
   highlight?: boolean;
 }) {
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative min-w-0", className)}>
       <Label htmlFor={htmlFor} hint={hint}>
         {label}
       </Label>

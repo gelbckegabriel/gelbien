@@ -45,7 +45,22 @@ export function Sheet({
                 transition={{ duration: 0.2 }}
               />
             </Dialog.Overlay>
-            <Dialog.Content asChild forceMount aria-describedby={description ? undefined : undefined}>
+            <Dialog.Content
+              asChild
+              forceMount
+              aria-describedby={description ? undefined : undefined}
+              onOpenAutoFocus={(e) => {
+                // React's autoFocus scrolls, and fires while the sheet is still sliding in from off-screen:
+                // iOS then scrolls the body to the bottom and pops the keyboard mid-animation.
+                // Focus without scrolling instead; on phones focus the sheet itself so the keyboard
+                // only opens when a field is tapped. Fields opt in with data-autofocus.
+                const content = e.target as HTMLElement;
+                const target = mobile ? content : content.querySelector<HTMLElement>("[data-autofocus]");
+                if (!target) return;
+                e.preventDefault();
+                target.focus({ preventScroll: true });
+              }}
+            >
               <motion.div
                 className={cn(
                   "fixed z-50 flex flex-col border border-line-strong bg-[#141418] shadow-2xl shadow-black/60 focus:outline-none",
@@ -86,7 +101,7 @@ export function Sheet({
                     <X className="h-5 w-5" />
                   </Dialog.Close>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-2 sm:px-6">{children}</div>
+                <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-5 pt-2 sm:px-6">{children}</div>
                 {footer && <div className="border-t border-line px-5 py-4 sm:px-6">{footer}</div>}
               </motion.div>
             </Dialog.Content>

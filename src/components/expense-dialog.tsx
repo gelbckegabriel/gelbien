@@ -427,27 +427,30 @@ function ExpenseForm({
         </AnimatePresence>
 
         {/* Amount + date */}
-        <div className="grid grid-cols-[1fr_auto] gap-3 sm:grid-cols-2">
-          <Field label={t("form.amount")} hint={flag("amount")} highlight={aiFields.has("amount")} htmlFor="amount">
-            <MoneyInput
-              ref={amountRef}
-              id="amount"
-              prefix={currencySymbol}
-              value={form.amount}
-              onChange={(v) => {
-                set({ amount: v });
-                setErrors((e) => ({ ...e, amount: undefined }));
-              }}
-              placeholder="0.00"
-              autoFocus={!initialFile && !editing}
-              className={cn("h-14 text-2xl font-semibold", form.refund && "text-good")}
-            />
-          </Field>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="min-w-0">
+            <Field label={t("form.amount")} hint={flag("amount")} highlight={aiFields.has("amount")} htmlFor="amount">
+              <MoneyInput
+                ref={amountRef}
+                id="amount"
+                prefix={currencySymbol}
+                value={form.amount}
+                onChange={(v) => {
+                  set({ amount: v });
+                  setErrors((e) => ({ ...e, amount: undefined }));
+                }}
+                placeholder="0.00"
+                data-autofocus={!initialFile && !editing ? "" : undefined}
+                className={cn("h-14 text-2xl font-semibold", form.refund && "text-good")}
+              />
+            </Field>
+            {/* under the amount, not the date, now that the two stack on phones */}
+            {errors.amount && <p className="mt-1.5 text-xs text-bad">{errors.amount}</p>}
+          </div>
           <Field label={t("form.date")} hint={flag("date")} highlight={aiFields.has("date")} htmlFor="date">
             <Input id="date" type="date" value={form.date} max={todayISO()} onChange={(e) => set({ date: e.target.value })} className="h-14" />
           </Field>
         </div>
-        {errors.amount && <p className="-mt-3 text-xs text-bad">{errors.amount}</p>}
 
         {/* Where + what first: picking a known merchant auto-fills the category below */}
         <div className="grid gap-4 sm:grid-cols-2">

@@ -120,7 +120,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
       <div className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
           <Field label={t("goals.f.name")}>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("goals.f.namePh")} autoFocus={!goal} maxLength={80} />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("goals.f.namePh")} data-autofocus={goal ? undefined : ""} maxLength={80} />
           </Field>
           <Field label={t("goals.f.status")}>
             <Segmented
@@ -301,7 +301,7 @@ export function AddMoneyDialog({ open, goal, onClose }: { open: boolean; goal: G
         </div>
       }
     >
-      <MoneyInput value={amount} onChange={setAmount} placeholder="0.00" autoFocus className="h-14 text-2xl font-semibold" />
+      <MoneyInput value={amount} onChange={setAmount} placeholder="0.00" data-autofocus className="h-14 text-2xl font-semibold" />
       <p className="mt-2 text-sm text-ink-3">
         {f.money0(goal.saved)} → <span className="text-ink">{f.money0(goal.saved + value)}</span> {t("goals.of", { target: f.money0(goal.target) })}
       </p>
@@ -379,7 +379,7 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("acc.name")}>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("acc.namePh")} autoFocus={!account} maxLength={80} />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("acc.namePh")} data-autofocus={account ? undefined : ""} maxLength={80} />
         </Field>
         <Field label={t("acc.institution")}>
           <Input list="gelbien-institutions" value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="Neo Financial" maxLength={80} />

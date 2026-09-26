@@ -83,7 +83,7 @@ function SubscriptionForm({ ds, open, editing, onClose }: { ds: Dataset; open: b
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("budget.subs.name")} className="sm:col-span-2">
-          <Input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Netflix, Spotify, iCloud…" autoFocus maxLength={120} />
+          <Input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Netflix, Spotify, iCloud…" data-autofocus maxLength={120} />
         </Field>
         <Field label={t("budget.subs.amount")} hint={value ? `${f.money(monthlyCost({ amount: value, cycle: s.cycle }))} / ${t("cycle.monthly").toLowerCase()}` : undefined}>
           <MoneyInput value={amount} onChange={setAmount} placeholder="0.00" />
