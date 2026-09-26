@@ -1,0 +1,90 @@
+import { z } from "zod";
+import { CYCLES, EXPENSE_TYPES, PRIORITIES, SUB_STATUSES, WORTH_IT, type Mutation } from "./types";
+
+const text = (max = 500) => z.string().max(max);
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const monthKey = z.union([z.literal("default"), z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)]);
+const money = z.number().finite().gte(-1e9).lte(1e9);
+
+export const transactionSchema = z.object({
+  id: text(64).min(1),
+  date: isoDate,
+  category: text(120),
+  subcategory: text(160),
+  description: text(500),
+  amount: money,
+  payment: text(120),
+  type: z.enum(EXPENSE_TYPES),
+  priority: z.enum(PRIORITIES),
+  merchant: text(160),
+  recurring: z.boolean(),
+  notes: text(2000),
+  receiptUrl: text(1000),
+  createdAt: text(40),
+  updatedAt: text(40),
+});
+
+export const categorySchema = z.object({
+  name: text(120).min(1),
+  color: text(20),
+  icon: text(40),
+  order: z.number().finite(),
+  subcategories: z.array(text(160)).max(200),
+  archived: z.boolean(),
+});
+
+const budgetLine = z.object({ month: monthKey, category: text(120), amount: money });
+const incomeLine = z.object({ month: monthKey, gross: money, net: money, note: text(500) });
+
+export const subscriptionSchema = z.object({
+  id: text(64).min(1),
+  name: text(160).min(1),
+  category: text(120),
+  amount: money,
+  cycle: z.enum(CYCLES),
+  billingDay: z.number().int().min(1).max(31).nullable(),
+  payment: text(120),
+  status: z.enum(SUB_STATUSES),
+  trialEnd: z.union([isoDate, z.literal("")]),
+  worthIt: z.enum(WORTH_IT),
+  notes: text(2000),
+});
+
+export const settingsSchema = z.object({
+  currency: text(8).min(3),
+  locale: z.enum(["pt", "en", "fr"]),
+  reserve: money,
+  savingsGoal: money,
+  paymentMethods: z.array(text(120)).max(50),
+  warnAt: z.number().gt(0).lte(1),
+});
+
+/** A full dataset (also the JSON backup format). */
+export const datasetSchema = z.object({
+  transactions: z.array(transactionSchema).max(50000),
+  categories: z.array(categorySchema).max(100),
+  budgets: z.array(budgetLine).max(5000),
+  incomes: z.array(incomeLine).max(1000),
+  subscriptions: z.array(subscriptionSchema).max(500),
+  settings: settingsSchema,
+});
+
+export const mutationSchema = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("addTransaction"), tx: transactionSchema }),
+  z.object({ op: z.literal("updateTransaction"), tx: transactionSchema }),
+  z.object({ op: z.literal("deleteTransaction"), id: text(64).min(1) }),
+  z.object({
+    op: z.literal("saveCategories"),
+    categories: z.array(categorySchema).max(100),
+    renames: z.array(z.object({ from: text(120), to: text(120) })).max(100),
+  }),
+  z.object({ op: z.literal("saveBudget"), month: monthKey, lines: z.array(budgetLine).max(200), income: incomeLine.nullable(), clearIncome: z.boolean().optional() }),
+  z.object({ op: z.literal("upsertSubscription"), sub: subscriptionSchema }),
+  z.object({ op: z.literal("deleteSubscription"), id: text(64).min(1) }),
+  z.object({ op: z.literal("saveSettings"), settings: settingsSchema }),
+  z.object({ op: z.literal("replaceAll"), data: datasetSchema }),
+]);
+
+export function parseMutation(input: unknown): Mutation {
+  return mutationSchema.parse(input) as Mutation;
+}

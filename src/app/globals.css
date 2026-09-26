@@ -1,26 +1,151 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Gelbien design tokens — dark-first, gold accent.
+ * Chart colors were validated for CVD separation and contrast against
+ * the card surface (#131316) with the dataviz palette validator.
+ */
+@theme {
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-bg: #09090b;
+  --color-surface: #131316;
+  --color-surface-2: #1a1a1f;
+  --color-surface-3: #232329;
+  --color-line: #ffffff14;
+  --color-line-strong: #ffffff24;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-ink: #f4f1ea;
+  --color-ink-2: #bdb8ad;
+  --color-ink-3: #85817a;
+
+  --color-gold: #d9b45f;
+  --color-gold-bright: #f3d894;
+  --color-gold-deep: #9c7a30;
+  --color-gold-soft: #d9b45f1f;
+
+  --color-good: #36c47c;
+  --color-good-soft: #36c47c1f;
+  --color-bad: #f2605f;
+  --color-bad-soft: #f2605f1f;
+  --color-warn: #f2b233;
+  --color-warn-soft: #f2b2331f;
+
+  /* categorical slots (fixed order) */
+  --color-cat-1: #3987e5;
+  --color-cat-2: #d95926;
+  --color-cat-3: #199e70;
+  --color-cat-4: #9085e9;
+  --color-cat-5: #d55181;
+  --color-cat-6: #2aa3c7;
+  --color-cat-7: #c98500;
+  --color-cat-8: #b565c9;
+  --color-cat-other: #6b6a72;
+
+  --radius-card: 1.25rem;
+
+  --animate-shimmer: shimmer 2.2s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
   }
 }
 
+:root {
+  color-scheme: dark;
+}
+
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Ambient gold glow behind the app */
+.app-aura {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(60rem 30rem at 85% -10%, #d9b45f14, transparent 60%),
+    radial-gradient(40rem 24rem at -10% 110%, #3987e50d, transparent 60%);
+}
+
+.gold-text {
+  background: linear-gradient(120deg, var(--color-gold-bright), var(--color-gold) 45%, var(--color-gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gold-fill {
+  background: linear-gradient(135deg, var(--color-gold-bright), var(--color-gold) 50%, var(--color-gold-deep));
+}
+
+.card {
+  background: linear-gradient(180deg, #16161a, var(--color-surface));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #ffffff08 25%, #ffffff14 37%, #ffffff08 63%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+::selection {
+  background: #d9b45f55;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+  opacity: 0.6;
+}
+
+/* Recharts: keep focus rings on the chart surface subtle */
+.recharts-surface:focus,
+.recharts-wrapper:focus,
+.recharts-sector:focus {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
