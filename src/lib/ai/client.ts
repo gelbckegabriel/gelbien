@@ -155,6 +155,85 @@ export async function generateInsights(ai: AiSettings, ds: Dataset, month: strin
 }
 
 // ---------------------------------------------------------------------------
+// Category translation
+// ---------------------------------------------------------------------------
+
+export const categoryTranslationSchema = z.object({
+  categories: z.array(
+    z.object({
+      name: z.string().describe("The category name exactly as given"),
+      translation: z.string(),
+      subcategories: z.array(
+        z.object({
+          name: z.string().describe("The subcategory name exactly as given"),
+          translation: z.string(),
+        }),
+      ),
+    }),
+  ),
+});
+
+export interface NameGroup {
+  name: string;
+  subcategories: string[];
+}
+
+/**
+ * Translate the user's own category/subcategory labels (built-in ones have fixed translations).
+ * Returns original name → translation; names the model skipped are simply absent.
+ */
+export async function translateCategoryNames(
+  ai: AiSettings,
+  groups: NameGroup[],
+  locale: Locale,
+): Promise<Map<string, { name: string; subcategories: Map<string, string> }>> {
+  const language = LANGUAGE_NAME[locale];
+  const system = "You translate short labels for a personal-finance budgeting app.";
+  const ask = [
+    `Translate these spending categories and their subcategories into ${language}.`,
+    "Keep each label short and natural — the way a native speaker would name it in a budgeting app, not a word-for-word translation.",
+    "Keep brand names, proper names and acronyms (e.g. Netflix, Costco, TFSA) as they are.",
+    `If a label is already in ${language}, return it unchanged.`,
+    "Return every category and subcategory given, with its name exactly as given.",
+    "",
+    JSON.stringify(groups),
+  ].join("\n");
+
+  let raw: z.infer<typeof categoryTranslationSchema>;
+  if (ai.provider === "anthropic") {
+    const client = await anthropic(ai);
+    const { betaZodOutputFormat } = await import("@anthropic-ai/sdk/helpers/beta/zod");
+    const { extras, effort } = claudeExtras(ai.model, "low");
+    const res = await client.beta.messages.parse({
+      model: ai.model,
+      max_tokens: 16000,
+      system,
+      messages: [{ role: "user", content: ask }],
+      output_config: { format: betaZodOutputFormat(categoryTranslationSchema), ...(effort ? { effort } : {}) },
+      ...extras,
+    });
+    if (res.stop_reason === "refusal") throw new Error("the model declined this request");
+    if (!res.parsed_output) throw new Error("the model returned an unexpected format");
+    raw = res.parsed_output;
+  } else {
+    const client = await gemini(ai);
+    const res = await client.models.generateContent({
+      model: ai.model,
+      contents: ask,
+      config: { systemInstruction: system, responseMimeType: "application/json", responseJsonSchema: z.toJSONSchema(categoryTranslationSchema) },
+    });
+    raw = categoryTranslationSchema.parse(JSON.parse(res.text ?? "{}"));
+  }
+
+  return new Map(
+    raw.categories.map((c) => [
+      c.name,
+      { name: c.translation.trim(), subcategories: new Map(c.subcategories.map((s) => [s.name, s.translation.trim()])) },
+    ]),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Chat
 // ---------------------------------------------------------------------------
 

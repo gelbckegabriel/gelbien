@@ -21,12 +21,13 @@ import { activeAi, ANTHROPIC_MODELS, GEMINI_MODELS, useAi, type AiProvider } fro
 import { toCsv } from "@/lib/csv";
 import { useDataset, useMode, useMutate, useRefresh } from "@/lib/data/hooks";
 import { clearDemo, resetDemo, signOut } from "@/lib/data/sources";
+import { hasBuiltInTranslations } from "@/lib/defaults";
 import { downloadFile } from "@/lib/files";
-import { CURRENCIES, LOCALES, useI18n, usePrefs } from "@/lib/i18n";
+import { CURRENCIES, LOCALES, translate, useI18n, usePrefs } from "@/lib/i18n";
 import { importMoneySheet, mergeImport, type ImportResult } from "@/lib/import-xlsx";
 import type { Dataset, Locale } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
-import { useUnsavedChanges } from "@/lib/unsaved";
+import { askToLeave, hasUnsaved, useUnsavedChanges } from "@/lib/unsaved";
 import { datasetSchema } from "@/lib/validation";
 import { cn, parseAmount, round2 } from "@/lib/utils";
 
@@ -98,6 +99,7 @@ function AccountCard() {
 function PreferencesCard() {
   const ds = useDataset().data as Dataset;
   const { t } = useI18n();
+  const router = useRouter();
   const mutate = useMutate();
   const setLocale = usePrefs((s) => s.setLocale);
   const setCurrency = usePrefs((s) => s.setCurrency);
@@ -125,6 +127,14 @@ function PreferencesCard() {
                 onClick={() => {
                   setLocale(l);
                   saveSettings({ locale: l }, true);
+                  // Built-in categories stay in the language the sheet was created in — offer to switch them too.
+                  if (l !== ds.settings.locale && hasBuiltInTranslations(ds.categories, l)) {
+                    const review = () => router.push("/config?translate=1");
+                    toast(translate(l, "cfg.tr.offer"), {
+                      duration: 10_000,
+                      action: { label: translate(l, "cfg.tr.review"), onClick: () => (hasUnsaved() ? askToLeave(review) : review()) },
+                    });
+                  }
                 }}
                 className={cn(
                   "flex h-11 items-center justify-center gap-2 rounded-xl border text-sm transition-colors",

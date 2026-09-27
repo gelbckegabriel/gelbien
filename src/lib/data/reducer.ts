@@ -22,11 +22,12 @@ export function applyMutationToDataset(ds: Dataset, m: Mutation): Dataset {
       return { ...ds, transactions: ds.transactions.filter((t) => t.id !== m.id) };
     case "saveCategories": {
       const rename = (name: string) => m.renames.find((r) => r.from === name)?.to ?? name;
-      if (!m.renames.length) return { ...ds, categories: m.categories };
+      const renameSub = (category: string, sub: string) => m.subRenames?.find((r) => r.category === category && r.from === sub)?.to ?? sub;
+      if (!m.renames.length && !m.subRenames?.length) return { ...ds, categories: m.categories };
       return {
         ...ds,
         categories: m.categories,
-        transactions: ds.transactions.map((t) => ({ ...t, category: rename(t.category) })),
+        transactions: ds.transactions.map((t) => ({ ...t, category: rename(t.category), subcategory: renameSub(t.category, t.subcategory) })),
         budgets: ds.budgets.map((b) => ({ ...b, category: rename(b.category) })),
         subscriptions: ds.subscriptions.map((s) => ({ ...s, category: rename(s.category) })),
       };

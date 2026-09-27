@@ -247,16 +247,18 @@ export async function applyMutation(at: string, id: string, m: Mutation): Promis
     case "saveCategories": {
       const { cats, subs } = categoriesToRows(m.categories);
       const updates: Partial<Record<TabKey, Row[]>> = { categories: cats, subcategories: subs };
-      if (m.renames.length) {
+      if (m.renames.length || m.subRenames?.length) {
         const current = await readRanges(at, id, ["transactions", "budgets", "subscriptions"]);
         const rename = (name: unknown) => {
           const hit = m.renames.find((r) => r.from === String(name ?? ""));
           return hit ? hit.to : name;
         };
+        // keyed by the category name before this save
+        const renameSub = (category: string, sub: string) => m.subRenames?.find((r) => r.category === category && r.from === sub)?.to ?? sub;
         updates.transactions = current.transactions
           .map(rowToTransaction)
           .filter((t) => t !== null)
-          .map((t) => transactionToRow({ ...t, category: String(rename(t.category)) }));
+          .map((t) => transactionToRow({ ...t, category: String(rename(t.category)), subcategory: renameSub(t.category, t.subcategory) }));
         updates.budgets = current.budgets.map((r) => [r[0], rename(r[1]) as string, r[2]]);
         updates.subscriptions = current.subscriptions.map((r) => r.map((c, i) => (i === 2 ? (rename(c) as string) : c)));
       }

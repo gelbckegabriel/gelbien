@@ -153,7 +153,13 @@ export type Mutation =
   | { op: "addTransaction"; tx: Transaction }
   | { op: "updateTransaction"; tx: Transaction }
   | { op: "deleteTransaction"; id: string }
-  | { op: "saveCategories"; categories: Category[]; renames: { from: string; to: string }[] }
+  | {
+      op: "saveCategories";
+      categories: Category[];
+      renames: { from: string; to: string }[];
+      /** Subcategory renames, keyed by the category's name before this save */
+      subRenames?: { category: string; from: string; to: string }[];
+    }
   /** Replaces every budget line for `month`; upserts `income`; `clearIncome` drops that month's income override. */
   | { op: "saveBudget"; month: string; lines: BudgetLine[]; income: IncomeLine | null; clearIncome?: boolean }
   | { op: "upsertSubscription"; sub: Subscription }

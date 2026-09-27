@@ -111,6 +111,7 @@ export const mutationSchema = z.discriminatedUnion("op", [
     op: z.literal("saveCategories"),
     categories: z.array(categorySchema).max(100),
     renames: z.array(z.object({ from: text(120), to: text(120) })).max(100),
+    subRenames: z.array(z.object({ category: text(120), from: text(160), to: text(160) })).max(1000).optional(),
   }),
   z.object({ op: z.literal("saveBudget"), month: monthKey, lines: z.array(budgetLine).max(200), income: incomeLine.nullable(), clearIncome: z.boolean().optional() }),
   z.object({ op: z.literal("upsertSubscription"), sub: subscriptionSchema }),

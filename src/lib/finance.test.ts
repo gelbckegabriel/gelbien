@@ -233,6 +233,23 @@ describe("reducer", () => {
     expect(next.budgets[0].category).toBe("Food");
   });
 
+  it("renames subcategories only within their category", () => {
+    const ds = dataset([
+      tx({ date: "2026-09-01", amount: 1, category: "Moradia", subcategory: "Aluguel" }),
+      tx({ date: "2026-09-02", amount: 1, category: "Outros", subcategory: "Aluguel" }),
+    ]);
+    const next = applyMutationToDataset(ds, {
+      op: "saveCategories",
+      categories: ds.categories,
+      renames: [{ from: "Moradia", to: "Housing" }],
+      subRenames: [{ category: "Moradia", from: "Aluguel", to: "Rent" }],
+    });
+    expect(next.transactions.map((t) => [t.category, t.subcategory])).toEqual([
+      ["Housing", "Rent"],
+      ["Outros", "Aluguel"],
+    ]);
+  });
+
   it("replaces only the edited month's budget lines", () => {
     const ds = dataset([], { budgets: [{ month: "default", category: "A", amount: 1 }, { month: "2026-09", category: "A", amount: 2 }] });
     const next = applyMutationToDataset(ds, {

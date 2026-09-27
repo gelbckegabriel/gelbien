@@ -1,11 +1,13 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ChevronDown, Eye, EyeOff, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Eye, EyeOff, Languages, Plus, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion, Reorder } from "motion/react";
+import { useSearchParams } from "next/navigation";
 import { Popover } from "radix-ui";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CategoryIcon, ICONS } from "@/components/icons";
+import { TranslateCategoriesDialog } from "@/components/translate-categories";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, PageHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/form";
@@ -28,12 +30,29 @@ const toDraft = (cats: Category[]): Draft[] =>
   [...cats].sort((a, b) => a.order - b.order).map((c) => ({ ...c, subcategories: [...c.subcategories], key: uid("c"), original: c.name }));
 
 export default function ConfigPage() {
-  const ds = useDataset().data as Dataset;
-  const version = `${JSON.stringify(ds.categories)}|${ds.settings.paymentMethods.join("|")}`;
-  return <ConfigEditor key={version} ds={ds} />;
+  return (
+    <Suspense>
+      <Config />
+    </Suspense>
+  );
 }
 
-function ConfigEditor({ ds }: { ds: Dataset }) {
+function Config() {
+  const ds = useDataset().data as Dataset;
+  const version = `${JSON.stringify(ds.categories)}|${ds.settings.paymentMethods.join("|")}`;
+  // /config?translate=1 (offered after a language change) opens the review straight away
+  const params = useSearchParams();
+  const [translate, setTranslate] = useState(() => ({ open: params.get("translate") === "1", nonce: 0 }));
+  return (
+    <>
+      <ConfigEditor key={version} ds={ds} onTranslate={() => setTranslate((s) => ({ open: true, nonce: s.nonce + 1 }))} />
+      {/* outside the editor, which re-mounts as soon as the translated names are applied */}
+      <TranslateCategoriesDialog key={translate.nonce} ds={ds} open={translate.open} onClose={() => setTranslate((s) => ({ ...s, open: false }))} />
+    </>
+  );
+}
+
+function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => void }) {
   const { t } = useI18n();
   const mutate = useMutate();
   const initialCats = useMemo(() => toDraft(ds.categories), [ds.categories]);
@@ -115,9 +134,15 @@ function ConfigEditor({ ds }: { ds: Dataset }) {
         title={t("cfg.title")}
         subtitle={t("cfg.subtitle")}
         action={
-          <Button variant="outline" size="sm" onClick={addCategory}>
-            <Plus className="h-4 w-4" /> {t("cfg.addCategory")}
-          </Button>
+          <>
+            {/* works on the saved categories, so pending edits must be saved first */}
+            <Button variant="ghost" size="sm" onClick={onTranslate} disabled={dirty} title={dirty ? t("cfg.translateDirty") : undefined}>
+              <Languages className="h-4 w-4" /> {t("cfg.translate")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={addCategory}>
+              <Plus className="h-4 w-4" /> {t("cfg.addCategory")}
+            </Button>
+          </>
         }
       />
       <div className="grid gap-4 lg:grid-cols-12">

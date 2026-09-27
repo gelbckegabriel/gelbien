@@ -253,6 +253,29 @@ export function defaultCategories(locale: Locale): Category[] {
   }));
 }
 
+const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * A built-in category's name and subcategory names in `locale`, found by their name in any of
+ * the three languages. null where a name isn't one of ours (a category or subcategory the user made).
+ */
+export function builtInTranslation(category: string, subcategories: string[], locale: Locale): { name: string | null; subcategories: (string | null)[] } {
+  const i = IDX[locale];
+  const tpl = TEMPLATES.find((t) => t.name.some((n) => same(n, category)));
+  const findSub = (s: string) =>
+    // its own category's list first, then any built-in (a default subcategory moved elsewhere)
+    (tpl?.subs.find((names) => names.some((n) => same(n, s))) ?? TEMPLATES.flatMap((t) => t.subs).find((names) => names.some((n) => same(n, s))))?.[i] ?? null;
+  return { name: tpl ? tpl.name[i] : null, subcategories: subcategories.map(findSub) };
+}
+
+/** Whether switching to `locale` leaves any built-in category or subcategory in another language. */
+export function hasBuiltInTranslations(categories: { name: string; subcategories: string[] }[], locale: Locale): boolean {
+  return categories.some((c) => {
+    const tr = builtInTranslation(c.name, c.subcategories, locale);
+    return (tr.name !== null && tr.name !== c.name) || tr.subcategories.some((s, i) => s !== null && s !== c.subcategories[i]);
+  });
+}
+
 /** Look up a default category's look (icon + color) by any of its three names — used when importing. */
 export function templateFor(name: string): { icon: string; color: string } | null {
   const n = name.trim().toLowerCase();
