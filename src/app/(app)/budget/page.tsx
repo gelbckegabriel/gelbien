@@ -1,10 +1,11 @@
 "use client";
 
-import { CalendarClock, Copy, Plus, RotateCcw, Sparkles, Wand2 } from "lucide-react";
+import { AlertTriangle, CalendarClock, ChevronRight, Copy, Plus, RotateCcw, Sparkles, Wand2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 import { CategoryIcon } from "@/components/icons";
+import { GuardedLink } from "@/components/shell/unsaved";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, PageHeader, Stagger } from "@/components/ui/card";
 import { Field, MoneyInput, Segmented } from "@/components/ui/form";
@@ -19,6 +20,8 @@ import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
 import { addMonths, cn, parseAmount, round2 } from "@/lib/utils";
 
 type Scope = "month" | "default";
+
+const TONE_TEXT = { good: "text-good", warn: "text-warn", bad: "text-bad", gold: "text-gold" } as const;
 
 interface Draft {
   scope: Scope;
@@ -234,17 +237,41 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
             const status = budgetStatus(spent, limit, ds.settings.warnAt);
             return (
               <li key={c.name} className="flex items-center gap-3 border-b border-line/50 py-3">
-                <CategoryIcon icon={c.icon} color={c.color} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm text-ink">{c.name}</span>
-                    {limit > 0 && status !== "within" && <Badge tone={STATUS_TONE[status]}>{t(`budgetStatus.${status}`)}</Badge>}
+                {/* Everything but the input opens this month's expenses for the category */}
+                <GuardedLink
+                  href={`/expenses?category=${encodeURIComponent(c.name)}`}
+                  title={t("budget.plan.viewExpenses", { category: c.name })}
+                  className="-my-1.5 -ml-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 transition-colors hover:bg-white/[0.04]"
+                >
+                  <CategoryIcon icon={c.icon} color={c.color} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm text-ink">{c.name}</span>
+                      {limit > 0 && status !== "within" && (
+                        // Icon-only on phones so long names fit; the coloured % below carries the same status
+                        <Badge tone={STATUS_TONE[status]} className="px-1.5 sm:px-2">
+                          <span title={t(`budgetStatus.${status}`)} className="sm:hidden">
+                            <AlertTriangle className="h-3 w-3" aria-hidden />
+                          </span>
+                          <span className="sr-only sm:not-sr-only">{t(`budgetStatus.${status}`)}</span>
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      {limit > 0 ? <Progress value={spent / limit} tone={STATUS_TONE[status]} className="h-1.5" delay={i * 0.03} /> : <div className="h-1.5 flex-1 rounded-full bg-white/5" />}
+                      <span className="tabular min-w-20 shrink-0 whitespace-nowrap text-right text-[11px] text-ink-3 sm:min-w-28">
+                        {limit > 0 ? (
+                          <>
+                            <span className={cn("font-semibold", TONE_TEXT[STATUS_TONE[status]])}>{f.pct(spent / limit)}</span> · {f.money0(spent)}
+                          </>
+                        ) : (
+                          t("budget.plan.spent", { amount: f.money0(spent) })
+                        )}
+                      </span>
+                      <ChevronRight className="-ml-1 h-3.5 w-3.5 shrink-0 text-ink-3" />
+                    </div>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    {limit > 0 ? <Progress value={spent / limit} tone={STATUS_TONE[status]} className="h-1.5" delay={i * 0.03} /> : <div className="h-1.5 flex-1 rounded-full bg-white/5" />}
-                    <span className="tabular w-24 shrink-0 text-right text-[11px] text-ink-3">{t("budget.plan.spent", { amount: f.money0(spent) })}</span>
-                  </div>
-                </div>
+                </GuardedLink>
                 <div className="w-24 shrink-0 sm:w-32">
                   <MoneyInput value={draft.lines[c.name] ?? ""} onChange={(v) => setLine(c.name, v)} placeholder="0" className="h-10 text-right" aria-label={c.name} />
                 </div>

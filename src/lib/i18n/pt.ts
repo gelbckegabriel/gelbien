@@ -214,6 +214,7 @@ const pt: Messages = {
   "budget.plan.overAllocated": "Distribuído a mais",
   "budget.plan.savings": "Poupança planejada",
   "budget.plan.spent": "{amount} gastos",
+  "budget.plan.viewExpenses": "Ver gastos de {category} no mês",
   "budget.scope.label": "Aplicar a",
   "budget.scope.month": "Só {month}",
   "budget.scope.default": "Todos os meses",

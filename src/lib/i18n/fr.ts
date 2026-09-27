@@ -214,6 +214,7 @@ const fr: Messages = {
   "budget.plan.overAllocated": "Surallocation",
   "budget.plan.savings": "Épargne prévue",
   "budget.plan.spent": "{amount} dépensés",
+  "budget.plan.viewExpenses": "Voir les dépenses « {category} » du mois",
   "budget.scope.label": "Appliquer à",
   "budget.scope.month": "{month} seulement",
   "budget.scope.default": "Tous les mois",

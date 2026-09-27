@@ -2,7 +2,8 @@
 
 import { Download, Paperclip, Plus, Repeat, Search, SlidersHorizontal, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useDeferredValue, useMemo, useState } from "react";
 import { PRIORITY_COLORS } from "@/components/charts/kit";
 import { CategoryIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
@@ -20,17 +21,28 @@ import { addMonths, cn, monthOf, normalize, round2, todayISO } from "@/lib/utils
 const PAGE = 120;
 
 export default function ExpensesPage() {
+  return (
+    <Suspense>
+      <Expenses />
+    </Suspense>
+  );
+}
+
+function Expenses() {
   const ds = useDataset().data as Dataset;
+  // /expenses?category=… (from the budget page) opens with that category filtered
+  const linked = useSearchParams().get("category") ?? "";
+  const initialCategory = ds.categories.some((c) => c.name === linked) ? linked : "";
   const month = useUi((s) => s.month);
   const openExpense = useUi((s) => s.openExpense);
   const { t, f } = useI18n();
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<"month" | "all">("month");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(initialCategory);
   const [priority, setPriority] = useState<Priority | "">("");
   const [payment, setPayment] = useState("");
   const [sort, setSort] = useState<"date" | "amount">("date");
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(!!initialCategory);
   const [limit, setLimit] = useState(PAGE);
   const q = useDeferredValue(normalize(query));
 

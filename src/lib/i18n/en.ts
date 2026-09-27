@@ -212,6 +212,7 @@ const en = {
   "budget.plan.overAllocated": "Over-allocated",
   "budget.plan.savings": "Planned savings",
   "budget.plan.spent": "{amount} spent",
+  "budget.plan.viewExpenses": "See {category} expenses this month",
   "budget.scope.label": "Apply to",
   "budget.scope.month": "{month} only",
   "budget.scope.default": "Every month",
