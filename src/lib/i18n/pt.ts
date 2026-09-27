@@ -49,6 +49,9 @@ const pt: Messages = {
   "month.prev": "Mês anterior",
   "month.next": "Próximo mês",
   "month.thisMonth": "Este mês",
+  "month.pick": "Escolher mês",
+  "month.prevYear": "Ano anterior",
+  "month.nextYear": "Próximo ano",
 
   "priority.essential": "Essencial",
   "priority.important": "Importante",

@@ -47,6 +47,9 @@ const en = {
   "month.prev": "Previous month",
   "month.next": "Next month",
   "month.thisMonth": "This month",
+  "month.pick": "Pick a month",
+  "month.prevYear": "Previous year",
+  "month.nextYear": "Next year",
 
   "priority.essential": "Essential",
   "priority.important": "Important",

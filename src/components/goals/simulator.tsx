@@ -12,7 +12,7 @@ import { addMonths, cn, currentMonth, round2 } from "@/lib/utils";
 import { axisProps, GOLD, INK, Legend, TooltipBox } from "../charts/kit";
 import { CategoryIcon } from "../icons";
 import { Button } from "../ui/button";
-import { Field, Input } from "../ui/form";
+import { Field, MonthField } from "../ui/form";
 import { AnimatedNumber } from "../ui/misc";
 import { Sheet } from "../ui/sheet";
 import { Slider } from "../ui/slider";
@@ -235,7 +235,7 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
           hint={superfluous > 0 ? t("sim.cutHint", { amount: f.money0(extra), avg: f.money0(superfluous) }) : undefined}
         />
         <Field label={t("sim.date")} hint={t("goals.f.optional")}>
-          <Input type="month" value={s.targetMonth} min={addMonths(now, 1)} onChange={(e) => set({ targetMonth: e.target.value })} />
+          <MonthField value={s.targetMonth} min={addMonths(now, 1)} onChange={(targetMonth) => set({ targetMonth })} />
         </Field>
       </div>
     </Sheet>

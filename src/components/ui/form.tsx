@@ -1,9 +1,12 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { CalendarDays, ChevronDown } from "lucide-react";
 import { motion } from "motion/react";
+import { Popover } from "radix-ui";
 import { forwardRef, useId, useLayoutEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
+import { cn, currentMonth } from "@/lib/utils";
+import { MonthGrid } from "./month-grid";
 
 // 16px text: iOS Safari zooms the page into any focused field smaller than that.
 const control =
@@ -175,3 +178,55 @@ export const MoneyInput = forwardRef<
     </div>
   );
 });
+
+/**
+ * Month field ("YYYY-MM", or "" when empty). Replaces <input type="month">, which has no
+ * picker in Safari on macOS or in Firefox — just a bare text box.
+ */
+export function MonthField({ value, onChange, min, className }: { value: string; onChange: (v: string) => void; min?: string; className?: string }) {
+  const { t, f } = useI18n();
+  const [open, setOpen] = useState(false);
+  const startYear = () => Number((value || min || currentMonth()).slice(0, 4));
+  const [year, setYear] = useState(startYear);
+  return (
+    <Popover.Root
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) setYear(startYear());
+      }}
+    >
+      <Popover.Trigger className={cn(control, "flex h-11 items-center justify-between gap-2 text-left", !value && "text-ink-3", className)}>
+        <span className="truncate">{value ? f.monthLong(value) : t("month.pick")}</span>
+        <CalendarDays className="h-4 w-4 shrink-0 text-ink-3" />
+      </Popover.Trigger>
+      <Popover.Portal>
+        {/* above the Sheet (z-50) these fields live in */}
+        <Popover.Content sideOffset={8} align="start" collisionPadding={16} className="z-[60] w-72 rounded-2xl border border-line-strong bg-[#16161b] p-3 shadow-2xl shadow-black/60">
+          <MonthGrid
+            year={year}
+            onYear={setYear}
+            value={value}
+            min={min}
+            onPick={(m) => {
+              onChange(m);
+              setOpen(false);
+            }}
+          />
+          {value && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+              }}
+              className="mt-3 w-full rounded-xl border border-line py-2 text-sm text-ink-2 hover:bg-white/5"
+            >
+              {t("common.clear")}
+            </button>
+          )}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}

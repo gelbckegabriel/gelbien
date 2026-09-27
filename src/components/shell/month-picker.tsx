@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import { useUi } from "@/lib/ui-store";
 import { askToLeave, hasUnsaved } from "@/lib/unsaved";
 import { addMonths, cn, currentMonth, monthOf } from "@/lib/utils";
+import { MonthGrid } from "../ui/month-grid";
 
 export function MonthPicker({ className }: { className?: string }) {
   const month = useUi((s) => s.month);
@@ -61,39 +62,17 @@ export function MonthPicker({ className }: { className?: string }) {
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content sideOffset={8} align="center" className="z-50 w-72 rounded-2xl border border-line-strong bg-[#16161b] p-3 shadow-2xl shadow-black/60">
-            <div className="mb-2 flex items-center justify-between">
-              <button onClick={() => setYear((y) => y - 1)} className="grid h-8 w-8 place-items-center rounded-lg text-ink-3 hover:bg-white/5 hover:text-ink">
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="text-sm font-semibold text-ink">{year}</span>
-              <button onClick={() => setYear((y) => y + 1)} className="grid h-8 w-8 place-items-center rounded-lg text-ink-3 hover:bg-white/5 hover:text-ink">
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {Array.from({ length: 12 }, (_, i) => {
-                const m = `${year}-${String(i + 1).padStart(2, "0")}`;
-                const selected = m === month;
-                return (
-                  <button
-                    key={m}
-                    onClick={() => {
-                      setDir(m > month ? 1 : -1);
-                      setMonth(m);
-                      setOpen(false);
-                    }}
-                    className={cn(
-                      "relative h-10 rounded-xl text-sm capitalize transition-colors",
-                      selected ? "bg-gold text-[#1b1406] font-semibold" : "text-ink-2 hover:bg-white/5",
-                      m === now && !selected && "ring-1 ring-gold/40",
-                    )}
-                  >
-                    {f.monthShort(m)}
-                    {withData.has(m) && !selected && <span className="absolute bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-gold/70" />}
-                  </button>
-                );
-              })}
-            </div>
+            <MonthGrid
+              year={year}
+              onYear={setYear}
+              value={month}
+              marked={withData}
+              onPick={(m) => {
+                setDir(m > month ? 1 : -1);
+                setMonth(m);
+                setOpen(false);
+              }}
+            />
             <button
               onClick={() => {
                 setMonth(now);

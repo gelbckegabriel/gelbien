@@ -134,11 +134,10 @@ input[type="number"]::-webkit-outer-spin-button {
   margin: 0;
 }
 
-/* iOS Safari: native date/month fields keep an intrinsic width that ignores width:100%,
+/* iOS Safari: native date fields keep an intrinsic width that ignores width:100%,
    pushing dialogs sideways. Let them shrink like any other field. */
 @supports (-webkit-touch-callout: none) {
-  input[type="date"],
-  input[type="month"] {
+  input[type="date"] {
     -webkit-appearance: none;
     appearance: none;
     /* keep WebKit's flex layout: it's what centers the date vertically in the field */

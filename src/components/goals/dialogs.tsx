@@ -12,7 +12,7 @@ import { ACCOUNT_TYPES, type Account, type AccountType, type BalanceSnapshot, ty
 import { cn, currentMonth, isValidISODate, parseAmount, round2, todayISO, uid } from "@/lib/utils";
 import { ACCOUNT_TYPE_ICON, CategoryIcon, ICONS } from "../icons";
 import { Button } from "../ui/button";
-import { Field, Input, MoneyInput, Segmented, Select, Switch, Textarea } from "../ui/form";
+import { Field, Input, MoneyInput, MonthField, Segmented, Select, Switch, Textarea } from "../ui/form";
 import { Sheet } from "../ui/sheet";
 
 const str = (n: number) => (n ? String(round2(n)) : "");
@@ -167,7 +167,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
             <MoneyInput value={target} onChange={setTarget} placeholder="0.00" className="text-lg font-semibold" />
           </Field>
           <Field label={t("goals.f.targetDate")} hint={t("goals.f.optional")}>
-            <Input type="month" value={targetMonth} min={currentMonth()} onChange={(e) => setTargetMonth(e.target.value)} />
+            <MonthField value={targetMonth} min={currentMonth()} onChange={setTargetMonth} />
           </Field>
         </div>
 
