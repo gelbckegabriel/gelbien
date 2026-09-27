@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { motion } from "motion/react";
-import { forwardRef, useId } from "react";
+import { forwardRef, useId, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 // 16px text: iOS Safari zooms the page into any focused field smaller than that.
@@ -144,10 +144,24 @@ export function Switch({ checked, onChange, label, id }: { checked: boolean; onC
 export const MoneyInput = forwardRef<
   HTMLInputElement,
   Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "value"> & { value: string; onChange: (v: string) => void; prefix?: string }
->(function MoneyInput({ value, onChange, prefix = "$", className, ...props }, ref) {
+>(function MoneyInput({ value, onChange, prefix = "$", className, style, ...props }, ref) {
+  // Pad the text past the symbol's real width — "R$" or "CA$" is much wider than "$".
+  const prefixRef = useRef<HTMLSpanElement>(null);
+  const [pad, setPad] = useState<number>();
+  useLayoutEffect(() => {
+    const el = prefixRef.current;
+    if (!el) return;
+    const measure = () => setPad(el.offsetLeft + el.offsetWidth + 8);
+    measure();
+    const observer = new ResizeObserver(measure); // re-measure once the web font loads
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [prefix]);
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3">{prefix}</span>
+      <span ref={prefixRef} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3">
+        {prefix}
+      </span>
       <input
         ref={ref}
         inputMode="decimal"
@@ -155,6 +169,7 @@ export const MoneyInput = forwardRef<
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/[^\d.,\-]/g, ""))}
         className={cn(control, "tabular h-11 pl-8", className)}
+        style={{ paddingLeft: pad, ...style }}
         {...props}
       />
     </div>
