@@ -38,6 +38,16 @@ interface FormState {
 }
 
 const LAST_PAYMENT_KEY = "gelbien.lastPayment";
+/** Whether an attached receipt is also uploaded to Drive — remembered from the last expense. */
+const KEEP_RECEIPT_KEY = "gelbien.keepReceipt";
+
+function readKeepReceipt() {
+  try {
+    return localStorage.getItem(KEEP_RECEIPT_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
 
 function initialForm(ds: Dataset, editing: Transaction | null): FormState {
   if (editing) {
@@ -139,6 +149,7 @@ function ExpenseForm({
   const [form, setFormState] = useState<FormState>(() => initialForm(ds, draft ?? editing));
   const [errors, setErrors] = useState<{ amount?: string; category?: string }>({});
   const [receipt, setReceipt] = useState<PreparedReceipt | null>(null);
+  const [keepReceipt, setKeepReceipt] = useState(readKeepReceipt);
   const [reading, setReading] = useState(false);
   const [aiFields, setAiFields] = useState<Set<string>>(new Set());
   const [uncertain, setUncertain] = useState<Set<string>>(new Set());
@@ -300,7 +311,8 @@ function ExpenseForm({
 
     setSaving(true);
     let receiptUrl = form.receiptUrl;
-    if (receipt && mode === "google") {
+    // Without "Save to Drive" the receipt only fills in the form (and goes to the AI provider, if any).
+    if (receipt && mode === "google" && keepReceipt) {
       try {
         toast.loading(t("form.receipt.uploading"), { id: "receipt-upload" });
         receiptUrl = (await uploadReceiptFile(receipt.blob, `${form.date} ${form.merchant || form.description || "receipt"}`.trim())).url;
@@ -331,6 +343,7 @@ function ExpenseForm({
     };
     try {
       localStorage.setItem(LAST_PAYMENT_KEY, form.payment);
+      if (receipt) localStorage.setItem(KEEP_RECEIPT_KEY, keepReceipt ? "1" : "0");
     } catch {
       /* ignore */
     }
@@ -407,6 +420,8 @@ function ExpenseForm({
           receipt={receipt}
           reading={reading}
           existingUrl={form.receiptUrl}
+          // Receipts only go to Drive when signed in with Google
+          keep={mode === "google" ? { checked: keepReceipt, onChange: setKeepReceipt } : undefined}
           onPick={() => fileInput.current?.click()}
           onCamera={() => cameraInput.current?.click()}
           onDrop={(file) => void handleFile(file)}
@@ -613,6 +628,7 @@ function ReceiptZone({
   receipt,
   reading,
   existingUrl,
+  keep,
   onPick,
   onCamera,
   onDrop,
@@ -621,6 +637,7 @@ function ReceiptZone({
   receipt: PreparedReceipt | null;
   reading: boolean;
   existingUrl: string;
+  keep?: { checked: boolean; onChange: (v: boolean) => void };
   onPick: () => void;
   onCamera: () => void;
   onDrop: (f: File) => void;
@@ -654,6 +671,11 @@ function ReceiptZone({
               `${(receipt.blob.size / 1024).toFixed(0)} KB`
             )}
           </p>
+          {keep && (
+            <div className="mt-2">
+              <Switch checked={keep.checked} onChange={keep.onChange} label={t("form.receipt.keep")} />
+            </div>
+          )}
         </div>
         <button type="button" onClick={onRemove} className="rounded-lg p-2 text-ink-3 hover:bg-white/5 hover:text-ink" aria-label={t("form.receipt.remove")}>
           <X className="h-4 w-4" />
