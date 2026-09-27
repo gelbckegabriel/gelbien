@@ -225,6 +225,15 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
         </div>
       </Card>
 
+      <PlanVsActual
+        s={summary}
+        planned={planned}
+        net={net}
+        // spending the plan doesn't cover: categories without a limit
+        unplanned={round2(summary.byCategory.filter((c) => !(parseAmount(draft.lines[c.name]) > 0)).reduce((a, c) => a + c.spent, 0))}
+        warnAt={ds.settings.warnAt}
+      />
+
       <Card>
         <CardHeader
           title={t("budget.plan.title")}
@@ -283,6 +292,68 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
 
       <SaveBar show={dirty} label={t("budget.unsaved")} onSave={save} onReset={() => setDraft(initial)} />
     </>
+  );
+}
+
+/** How the month is going against the plan: spent vs. planned, pace for the current month, savings once it's over. */
+function PlanVsActual({ s, planned, net, unplanned, warnAt }: { s: ReturnType<typeof summarizeMonth>; planned: number; net: number; unplanned: number; warnAt: number }) {
+  const { t, f } = useI18n();
+  const spent = s.total;
+  const diff = planned - spent;
+  const tone = STATUS_TONE[budgetStatus(spent, planned, warnAt)];
+  // straight-line pace, same as the dashboard's pace chart
+  const expected = s.isCurrent && planned > 0 ? (planned * s.elapsed) / s.days : null;
+  const pace = expected === null ? 0 : expected - spent;
+  const month = f.monthName(s.month);
+  // a month that hasn't started has nothing to compare yet (unless something was already logged in it)
+  const compare = planned > 0 && (!s.isFuture || spent > 0);
+  const subtitle = s.isCurrent
+    ? t("budget.vs.soFar", { month, day: s.elapsed, days: s.days })
+    : s.isPast
+      ? t("budget.vs.closed", { month })
+      : t("budget.vs.notStarted", { month });
+
+  return (
+    <Card>
+      <CardHeader title={t("budget.vs.title")} subtitle={subtitle} />
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <AnimatedNumber value={spent} format={f.money0} className="text-2xl font-semibold text-ink" />
+          <span className="text-sm text-ink-3">
+            {planned > 0 ? t("budget.vs.ofPlanned", { pct: f.pct(spent / planned), amount: f.money0(planned) }) : t("budget.vs.noPlan", { month })}
+          </span>
+        </p>
+        {compare && (
+          <Badge tone={diff >= 0 ? "good" : "bad"}>
+            {diff >= 0 ? t("budget.vs.under") : t("budget.vs.over")} · {f.money0(Math.abs(diff))}
+          </Badge>
+        )}
+      </div>
+      {compare && (
+        <div className="relative mt-3">
+          <Progress value={spent / planned} tone={tone} className="h-2.5" />
+          {expected !== null && (
+            <span
+              title={t("budget.vs.todayMarker")}
+              className="absolute -bottom-1 -top-1 w-0.5 -translate-x-1/2 rounded-full bg-ink/80"
+              style={{ left: `${Math.min(100, (expected / planned) * 100)}%` }}
+            />
+          )}
+        </div>
+      )}
+      <div className="mt-3 space-y-1 text-xs text-ink-3">
+        {expected !== null && (
+          <p>
+            {t("budget.vs.pace", { expected: f.money0(expected) })} ·{" "}
+            <span className={pace >= 0 ? "text-good" : "text-bad"}>
+              {pace >= 0 ? t("budget.vs.paceBehind", { amount: f.money0(pace) }) : t("budget.vs.paceAhead", { amount: f.money0(-pace) })}
+            </span>
+          </p>
+        )}
+        {s.isPast && net > 0 && <p>{t("budget.vs.savings", { actual: f.money0(net - spent), planned: f.money0(net - planned) })}</p>}
+        {unplanned > 0 && <p>{t("budget.vs.unplanned", { amount: f.money0(unplanned) })}</p>}
+      </div>
+    </Card>
   );
 }
 
