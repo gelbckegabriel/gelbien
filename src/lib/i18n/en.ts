@@ -532,9 +532,19 @@ const en = {
   "ci.next": "Next check-in {date}",
 
   "err.load": "Couldn't load your data",
-  "err.save": "Couldn't save: {error}",
   "err.session": "Your Google session expired. Please sign in again.",
-  "err.storage": "Your Google storage is full, so changes can't be saved to your spreadsheet. Free up space at one.google.com/storage and try again.",
+  "err.notSaved": "Your changes weren't saved",
+  "err.kept": "Your edits are still here so you can try again.",
+  "err.review": "Review",
+  "err.receipt": "The receipt couldn't be uploaded, so the expense was saved without it.",
+  "err.why.network": "Couldn't reach the server — check your internet connection.",
+  "err.why.storage": "Your Google storage is full. Free up space at one.google.com/storage.",
+  "err.why.rateLimit": "Google is limiting how many changes can be saved per minute. Wait a minute before trying again.",
+  "err.why.unavailable": "Google Sheets isn't responding right now. Try again in a moment.",
+  "err.why.access": "Google refused access to your spreadsheet. Sign out and sign in again to reconnect it.",
+  "err.why.sheet": "Your spreadsheet no longer has the layout Gelbien expects — a tab or header may have been renamed or deleted in Google Sheets.",
+  "err.why.invalid": "Some values weren't accepted: {detail}",
+  "err.why.unknown": "Something went wrong ({detail}).",
   "paste.hint": "Receipt detected — opening a new expense",
 } as const;
 

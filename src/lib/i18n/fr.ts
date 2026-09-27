@@ -534,9 +534,19 @@ const fr: Messages = {
   "ci.next": "Prochain bilan {date}",
 
   "err.load": "Impossible de charger vos données",
-  "err.save": "Impossible d'enregistrer : {error}",
   "err.session": "Votre session Google a expiré. Veuillez vous reconnecter.",
-  "err.storage": "Votre stockage Google est plein : les modifications ne peuvent pas être enregistrées dans votre feuille. Libérez de l'espace sur one.google.com/storage et réessayez.",
+  "err.notSaved": "Vos modifications n'ont pas été enregistrées",
+  "err.kept": "Vos modifications sont conservées pour que vous puissiez réessayer.",
+  "err.review": "Revoir",
+  "err.receipt": "Le reçu n'a pas pu être envoyé : la dépense a été enregistrée sans lui.",
+  "err.why.network": "Impossible de joindre le serveur — vérifiez votre connexion Internet.",
+  "err.why.storage": "Votre stockage Google est plein. Libérez de l'espace sur one.google.com/storage.",
+  "err.why.rateLimit": "Google limite le nombre de modifications enregistrées par minute. Attendez une minute avant de réessayer.",
+  "err.why.unavailable": "Google Sheets ne répond pas pour le moment. Réessayez dans un instant.",
+  "err.why.access": "Google a refusé l'accès à votre feuille. Déconnectez-vous puis reconnectez-vous pour la relier.",
+  "err.why.sheet": "Votre feuille n'a plus la structure attendue par Gelbien — un onglet ou un en-tête a peut-être été renommé ou supprimé dans Google Sheets.",
+  "err.why.invalid": "Certaines valeurs ont été refusées : {detail}",
+  "err.why.unknown": "Une erreur s'est produite ({detail}).",
   "paste.hint": "Reçu détecté — ouverture d'une nouvelle dépense",
 };
 

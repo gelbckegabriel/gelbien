@@ -3,7 +3,7 @@
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useDataset, useMutate } from "@/lib/data/hooks";
+import { useDataset, useMutate, useSaving } from "@/lib/data/hooks";
 import { monthlyCost } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
 import { CYCLES, SUB_STATUSES, WORTH_IT, type Cycle, type Dataset, type SubStatus, type Subscription, type WorthIt } from "@/lib/types";
@@ -24,6 +24,7 @@ export function SubscriptionDialog() {
 function SubscriptionForm({ ds, open, editing, onClose }: { ds: Dataset; open: boolean; editing: Subscription | null; onClose: () => void }) {
   const { t, f } = useI18n();
   const mutate = useMutate();
+  const [saving, run] = useSaving();
   const subsCategory = ds.categories.find((c) => c.icon === "Repeat")?.name ?? ds.categories[0]?.name ?? "";
   const [s, setS] = useState<Subscription>(
     () =>
@@ -45,10 +46,10 @@ function SubscriptionForm({ ds, open, editing, onClose }: { ds: Dataset; open: b
   const set = (patch: Partial<Subscription>) => setS((cur) => ({ ...cur, ...patch }));
   const value = parseAmount(amount);
 
-  const save = () => {
-    if (!s.name.trim() || !value) return;
+  const save = async () => {
+    if (!s.name.trim() || !value || saving) return;
     const sub = { ...s, name: s.name.trim(), amount: round2(value), trialEnd: s.status === "trial" ? s.trialEnd : "" };
-    mutate.mutate({ op: "upsertSubscription", sub });
+    if (!(await run(() => mutate.save({ op: "upsertSubscription", sub })))) return;
     toast.success(t("budget.subs.saved"));
     onClose();
   };
@@ -63,7 +64,7 @@ function SubscriptionForm({ ds, open, editing, onClose }: { ds: Dataset; open: b
   return (
     <Sheet
       open={open}
-      onOpenChange={(o) => !o && onClose()}
+      onOpenChange={(o) => !o && !saving && onClose()}
       title={editing ? t("budget.subs.edit") : t("budget.subs.add")}
       footer={
         <div className="flex items-center gap-2">
@@ -72,11 +73,11 @@ function SubscriptionForm({ ds, open, editing, onClose }: { ds: Dataset; open: b
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
-          <Button variant="ghost" className="ml-auto" onClick={onClose}>
+          <Button variant="ghost" className="ml-auto" onClick={onClose} disabled={saving}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" onClick={save} disabled={!s.name.trim() || !value} className="px-8">
-            {t("common.save")}
+          <Button variant="primary" onClick={save} disabled={!s.name.trim() || !value || saving} className="px-8">
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
       }

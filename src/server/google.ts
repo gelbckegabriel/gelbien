@@ -26,6 +26,20 @@ export function isApiDisabled(err: unknown): boolean {
   return err instanceof GoogleApiError && (err.reason === "SERVICE_DISABLED" || err.reason === "accessNotConfigured");
 }
 
+/** Why a Sheets/Drive call failed, in terms the app can explain to the user (see errorReason on the client). */
+export type GoogleErrorCode = "storage" | "rateLimit" | "unavailable" | "access" | "sheet" | "google";
+
+export function googleErrorCode(err: GoogleApiError): GoogleErrorCode {
+  if (isStorageFull(err)) return "storage";
+  // Sheets answers 429; Drive uses 403 with a rate-limit reason.
+  if (err.status === 429 || /rate_?limit|quota/i.test(err.reason ?? "")) return "rateLimit";
+  if (err.status >= 500) return "unavailable";
+  if (err.status === 403) return "access";
+  // e.g. "Unable to parse range" after a tab was renamed or deleted by hand
+  if (err.status === 400 || err.status === 404) return "sheet";
+  return "google";
+}
+
 function base64url(bytes: Uint8Array): string {
   let s = "";
   for (const b of bytes) s += String.fromCharCode(b);

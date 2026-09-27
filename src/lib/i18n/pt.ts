@@ -534,9 +534,19 @@ const pt: Messages = {
   "ci.next": "Próximo check-in {date}",
 
   "err.load": "Não foi possível carregar seus dados",
-  "err.save": "Não foi possível salvar: {error}",
   "err.session": "Sua sessão do Google expirou. Entre novamente.",
-  "err.storage": "Seu armazenamento do Google está cheio, então as alterações não podem ser salvas na planilha. Libere espaço em one.google.com/storage e tente de novo.",
+  "err.notSaved": "Suas alterações não foram salvas",
+  "err.kept": "Suas edições continuam aqui para você tentar de novo.",
+  "err.review": "Revisar",
+  "err.receipt": "Não foi possível enviar o recibo, então o gasto foi salvo sem ele.",
+  "err.why.network": "Não foi possível conectar ao servidor — verifique sua internet.",
+  "err.why.storage": "Seu armazenamento do Google está cheio. Libere espaço em one.google.com/storage.",
+  "err.why.rateLimit": "O Google está limitando quantas alterações podem ser salvas por minuto. Espere um minuto antes de tentar de novo.",
+  "err.why.unavailable": "O Google Planilhas não está respondendo agora. Tente de novo em instantes.",
+  "err.why.access": "O Google recusou o acesso à sua planilha. Saia e entre de novo para reconectá-la.",
+  "err.why.sheet": "Sua planilha não tem mais o formato que o Gelbien espera — uma aba ou cabeçalho pode ter sido renomeado ou apagado no Google Planilhas.",
+  "err.why.invalid": "Alguns valores não foram aceitos: {detail}",
+  "err.why.unknown": "Algo deu errado ({detail}).",
   "paste.hint": "Recibo detectado — abrindo um novo gasto",
 };
 

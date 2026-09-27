@@ -15,7 +15,7 @@ import { useDataset, useMutate } from "@/lib/data/hooks";
 import { CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/defaults";
 import { useI18n } from "@/lib/i18n";
 import type { Category, Dataset } from "@/lib/types";
-import { useUnsavedChanges } from "@/lib/unsaved";
+import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
 import { cn, normalize, uid } from "@/lib/utils";
 
 interface Draft extends Category {
@@ -37,8 +37,8 @@ function ConfigEditor({ ds }: { ds: Dataset }) {
   const { t } = useI18n();
   const mutate = useMutate();
   const initialCats = useMemo(() => toDraft(ds.categories), [ds.categories]);
-  const [cats, setCats] = useState<Draft[]>(initialCats);
-  const [payments, setPayments] = useState<string[]>(ds.settings.paymentMethods);
+  const [cats, setCats] = useStashedDraft<Draft[]>("config:categories", () => initialCats);
+  const [payments, setPayments] = useStashedDraft<string[]>("config:payments", () => ds.settings.paymentMethods);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [newPayment, setNewPayment] = useState("");
 
@@ -90,9 +90,13 @@ function ConfigEditor({ ds }: { ds: Dataset }) {
     }
     const renames = clean.filter((c) => c.original && c.original !== c.name).map((c) => ({ from: c.original!, to: c.name }));
     const categories: Category[] = clean.map((c, i) => ({ name: c.name, color: c.color, icon: c.icon, order: i, subcategories: c.subcategories, archived: c.archived }));
-    mutate.mutate({ op: "saveCategories", categories, renames });
+    const onFailure = () => {
+      stashDraft("config:categories", cats);
+      stashDraft("config:payments", payments);
+    };
+    mutate.mutate({ op: "saveCategories", categories, renames }, { onFailure });
     if (payments.join("|") !== ds.settings.paymentMethods.join("|")) {
-      mutate.mutate({ op: "saveSettings", settings: { ...ds.settings, paymentMethods: payments } });
+      mutate.mutate({ op: "saveSettings", settings: { ...ds.settings, paymentMethods: payments } }, { onFailure });
     }
     toast.success(t("cfg.saved"));
   };

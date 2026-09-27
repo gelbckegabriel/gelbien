@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 
 export interface UnsavedGuard {
@@ -46,4 +46,22 @@ export function useUnsavedChanges(dirty: boolean, guard: UnsavedGuard) {
       if (useUnsaved.getState().guard === ref) useUnsaved.setState({ guard: null });
     };
   }, [dirty]);
+}
+
+// Page editors re-mount from the sheet data, so a failed save (which rolls the data back)
+// would reset them. They stash their draft on failure and pick it up on the next mount.
+const stashed = new Map<string, unknown>();
+
+export function stashDraft(id: string, draft: unknown) {
+  stashed.set(id, draft);
+}
+
+/** Initial state for a page editor: the draft from a failed save, if any, else `fallback`. */
+export function useStashedDraft<T>(id: string, fallback: () => T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  // Peek here and clear in an effect: StrictMode runs state initializers twice.
+  const state = useState<T>(() => (stashed.has(id) ? (stashed.get(id) as T) : fallback()));
+  useEffect(() => {
+    stashed.delete(id);
+  }, [id]);
+  return state;
 }

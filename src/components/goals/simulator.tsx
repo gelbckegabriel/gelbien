@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
-import { useMutate } from "@/lib/data/hooks";
+import { useMutate, useSaving } from "@/lib/data/hooks";
 import { avgSuperfluous, goalCurrent, goalPlanFor, MAX_MONTHS, planGoal, projectBalance } from "@/lib/goals";
 import { useI18n } from "@/lib/i18n";
 import type { Dataset, Goal } from "@/lib/types";
@@ -28,6 +28,7 @@ export function Simulator({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal
 function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; open: boolean; onClose: () => void }) {
   const { t, f } = useI18n();
   const mutate = useMutate();
+  const [saving, run] = useSaving();
   const base = goalPlanFor(ds, goal);
   const current = goalCurrent(ds, goal);
   const superfluous = avgSuperfluous(ds);
@@ -67,19 +68,18 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
   const targetStep = goal.target >= 20000 ? 500 : 100;
   const tick = (m: string) => `${f.monthShort(m)} ’${m.slice(2, 4)}`;
 
-  const apply = () => {
-    mutate.mutate({
-      op: "upsertGoal",
-      goal: {
-        ...goal,
-        monthlyContribution: Math.round(s.monthly + extra),
-        annualReturn: s.annualReturn,
-        target: round2(s.target),
-        targetDate: s.targetMonth ? `${s.targetMonth}-01` : "",
-        // a deposit can only be recorded on goals tracked by hand; linked accounts show it at the next check-in
-        saved: goal.accountIds.length ? goal.saved : round2(goal.saved + s.boost),
-      },
-    });
+  const apply = async () => {
+    if (saving) return;
+    const next: Goal = {
+      ...goal,
+      monthlyContribution: Math.round(s.monthly + extra),
+      annualReturn: s.annualReturn,
+      target: round2(s.target),
+      targetDate: s.targetMonth ? `${s.targetMonth}-01` : "",
+      // a deposit can only be recorded on goals tracked by hand; linked accounts show it at the next check-in
+      saved: goal.accountIds.length ? goal.saved : round2(goal.saved + s.boost),
+    };
+    if (!(await run(() => mutate.save({ op: "upsertGoal", goal: next })))) return;
     toast.success(t("sim.applied"));
     onClose();
   };
@@ -87,7 +87,7 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
   return (
     <Sheet
       open={open}
-      onOpenChange={(o) => !o && onClose()}
+      onOpenChange={(o) => !o && !saving && onClose()}
       title={
         <span className="flex items-center gap-3">
           <CategoryIcon icon={goal.icon} color={goal.color} size="sm" /> {t("sim.title", { name: goal.name })}
@@ -100,8 +100,8 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
           <Button variant="ghost" onClick={() => setS(initial)}>
             <RotateCcw className="h-4 w-4" /> {t("common.reset")}
           </Button>
-          <Button variant="primary" className="ml-auto px-6" onClick={apply}>
-            {t("sim.apply")}
+          <Button variant="primary" className="ml-auto px-6" onClick={apply} disabled={saving}>
+            {saving ? t("common.saving") : t("sim.apply")}
           </Button>
         </div>
       }

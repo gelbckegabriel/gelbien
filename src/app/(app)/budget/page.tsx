@@ -2,7 +2,7 @@
 
 import { CalendarClock, Copy, Plus, RotateCcw, Sparkles, Wand2 } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { toast } from "sonner";
 import { CategoryIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { budgetStatus, effectiveBudget, effectiveIncome, monthlyCost, subscripti
 import { useI18n } from "@/lib/i18n";
 import type { Dataset, Subscription } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
-import { useUnsavedChanges } from "@/lib/unsaved";
+import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
 import { addMonths, cn, parseAmount, round2 } from "@/lib/utils";
 
 type Scope = "month" | "default";
@@ -58,7 +58,8 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
   const { t, f } = useI18n();
   const mutate = useMutate();
   const initial = useMemo(() => draftFor(ds, month), [ds, month]);
-  const [draft, setDraft] = useState<Draft>(initial);
+  const draftId = `budget:${month}`;
+  const [draft, setDraft] = useStashedDraft<Draft>(draftId, () => initial);
   const summary = summarizeMonth(ds, month);
   const spentBy = new Map(summary.byCategory.map((c) => [c.name, c.spent]));
   const { isOverride } = effectiveBudget(ds.budgets, month);
@@ -79,10 +80,11 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
     const lines = ds.categories
       .map((c) => ({ month: target, category: c.name, amount: round2(parseAmount(draft.lines[c.name])) }))
       .filter((l) => l.amount > 0);
-    mutate.mutate({ op: "saveBudget", month: target, lines, income: { month: target, gross: round2(gross), net: round2(net), note: "" } });
+    const onFailure = () => stashDraft(draftId, draft);
+    mutate.mutate({ op: "saveBudget", month: target, lines, income: { month: target, gross: round2(gross), net: round2(net), note: "" } }, { onFailure });
     // Saving to "every month" drops this month's overrides so the default actually applies here.
     if (draft.scope === "default" && (isOverride || hasIncomeOverride)) {
-      mutate.mutate({ op: "saveBudget", month, lines: [], income: null, clearIncome: true });
+      mutate.mutate({ op: "saveBudget", month, lines: [], income: null, clearIncome: true }, { onFailure });
     }
     toast.success(t("budget.saved"));
   };

@@ -10,6 +10,8 @@ interface ExpenseDialogState {
   editing: Transaction | null;
   /** A receipt handed over from a global paste/drop */
   file: File | null;
+  /** What the user typed last time, when that save failed — prefills the form */
+  draft: Transaction | null;
   /** bump to re-initialize the form when reopened */
   nonce: number;
 }
@@ -20,7 +22,7 @@ interface UiState {
   demo: boolean;
   setDemo: (on: boolean) => void;
   expense: ExpenseDialogState;
-  openExpense: (opts?: { editing?: Transaction | null; file?: File | null }) => void;
+  openExpense: (opts?: { editing?: Transaction | null; file?: File | null; draft?: Transaction | null }) => void;
   closeExpense: () => void;
   subscription: { open: boolean; editing: Subscription | null; nonce: number };
   openSubscription: (editing?: Subscription | null) => void;
@@ -34,12 +36,12 @@ export const useUi = create<UiState>()(
       setMonth: (month) => set({ month }),
       demo: false,
       setDemo: (demo) => set({ demo }),
-      expense: { open: false, editing: null, file: null, nonce: 0 },
+      expense: { open: false, editing: null, file: null, draft: null, nonce: 0 },
       openExpense: (opts) =>
         set((s) => ({
-          expense: { open: true, editing: opts?.editing ?? null, file: opts?.file ?? null, nonce: s.expense.nonce + 1 },
+          expense: { open: true, editing: opts?.editing ?? null, file: opts?.file ?? null, draft: opts?.draft ?? null, nonce: s.expense.nonce + 1 },
         })),
-      closeExpense: () => set((s) => ({ expense: { ...s.expense, open: false, file: null } })),
+      closeExpense: () => set((s) => ({ expense: { ...s.expense, open: false, file: null, draft: null } })),
       subscription: { open: false, editing: null, nonce: 0 },
       openSubscription: (editing) => set((s) => ({ subscription: { open: true, editing: editing ?? null, nonce: s.subscription.nonce + 1 } })),
       closeSubscription: () => set((s) => ({ subscription: { ...s.subscription, open: false } })),

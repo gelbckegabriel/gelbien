@@ -3,7 +3,7 @@
 import { Check, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useMutate } from "@/lib/data/hooks";
+import { useMutate, useSaving } from "@/lib/data/hooks";
 import { CATEGORY_COLORS, GOAL_ICONS, INSTITUTIONS } from "@/lib/defaults";
 import { recentAverages } from "@/lib/finance";
 import { accountsMonthlyGrowth, latestBalances, netWorth, signedBalance } from "@/lib/goals";
@@ -41,6 +41,7 @@ function ColorSwatches({ value, onChange }: { value: string; onChange: (c: strin
 export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boolean; goal: Goal | null; onClose: () => void }) {
   const { t, f } = useI18n();
   const mutate = useMutate();
+  const [saving, run] = useSaving();
   const [name, setName] = useState(goal?.name ?? "");
   const [icon, setIcon] = useState(goal?.icon ?? "Target");
   const [color, setColor] = useState(goal?.color ?? CATEGORY_COLORS[ds.goals.length % 8]);
@@ -64,8 +65,8 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
   const avgSaved = Math.max(0, recentAverages(ds, currentMonth()).saved);
   const valid = name.trim() && parseAmount(target) > 0 && (funding === "manual" || accountIds.length > 0);
 
-  const save = () => {
-    if (!valid) return;
+  const save = async () => {
+    if (!valid || saving) return;
     const next: Goal = {
       id: goal?.id ?? uid("goal"),
       name: name.trim(),
@@ -82,7 +83,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
       notes: notes.trim(),
       createdAt: goal?.createdAt || new Date().toISOString(),
     };
-    mutate.mutate({ op: "upsertGoal", goal: next });
+    if (!(await run(() => mutate.save({ op: "upsertGoal", goal: next })))) return;
     toast.success(t("goals.saved"));
     onClose();
   };
@@ -98,7 +99,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
   return (
     <Sheet
       open={open}
-      onOpenChange={(o) => !o && onClose()}
+      onOpenChange={(o) => !o && !saving && onClose()}
       title={goal ? t("goals.edit") : t("goals.new")}
       wide
       footer={
@@ -108,11 +109,11 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
-          <Button variant="ghost" className="ml-auto" onClick={onClose}>
+          <Button variant="ghost" className="ml-auto" onClick={onClose} disabled={saving}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" className="px-8" onClick={save} disabled={!valid}>
-            {t("common.save")}
+          <Button variant="primary" className="px-8" onClick={save} disabled={!valid || saving}>
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
       }
@@ -275,28 +276,29 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
 export function AddMoneyDialog({ open, goal, onClose }: { open: boolean; goal: Goal | null; onClose: () => void }) {
   const { t, f } = useI18n();
   const mutate = useMutate();
+  const [saving, run] = useSaving();
   const [amount, setAmount] = useState("");
   const value = parseAmount(amount);
   if (!goal) return null;
-  const save = () => {
-    if (!value) return;
-    mutate.mutate({ op: "upsertGoal", goal: { ...goal, saved: round2(goal.saved + value) } });
+  const save = async () => {
+    if (!value || saving) return;
+    if (!(await run(() => mutate.save({ op: "upsertGoal", goal: { ...goal, saved: round2(goal.saved + value) } })))) return;
     toast.success(`${goal.name}: ${f.money0(goal.saved + value)}`);
     onClose();
   };
   return (
     <Sheet
       open={open}
-      onOpenChange={(o) => !o && onClose()}
+      onOpenChange={(o) => !o && !saving && onClose()}
       title={t("goals.addMoneyTitle", { name: goal.name })}
       description={t("goals.addMoneyHint")}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" onClick={save} disabled={!value} className="px-8">
-            {t("common.save")}
+          <Button variant="primary" onClick={save} disabled={!value || saving} className="px-8">
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
       }
@@ -316,6 +318,7 @@ export function AddMoneyDialog({ open, goal, onClose }: { open: boolean; goal: G
 export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; open: boolean; account: Account | null; onClose: () => void }) {
   const { t } = useI18n();
   const mutate = useMutate();
+  const [saving, run] = useSaving();
   const last = account ? latestBalances(ds.balances).get(account.id) : undefined;
   const [name, setName] = useState(account?.name ?? "");
   const [institution, setInstitution] = useState(account?.institution ?? "");
@@ -326,8 +329,8 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
   const [notes, setNotes] = useState(account?.notes ?? "");
   const valid = name.trim().length > 0;
 
-  const save = () => {
-    if (!valid) return;
+  const save = async () => {
+    if (!valid || saving) return;
     const next: Account = {
       id: account?.id ?? uid("acc"),
       name: name.trim(),
@@ -337,14 +340,15 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
       archived,
       notes: notes.trim(),
     };
-    mutate.mutate({ op: "upsertAccount", account: next });
+    const writes = [mutate.save({ op: "upsertAccount", account: next })];
     const value = round2(parseAmount(balance));
     const closing = archived && !account?.archived;
     // A closed account drops to zero so it stops counting toward net worth from now on.
-    if (closing) mutate.mutate({ op: "saveBalances", balances: [{ accountId: next.id, date: todayISO(), balance: 0 }] });
+    if (closing) writes.push(mutate.save({ op: "saveBalances", balances: [{ accountId: next.id, date: todayISO(), balance: 0 }] }));
     else if (balance.trim() !== "" && (!last || last.balance !== value)) {
-      mutate.mutate({ op: "saveBalances", balances: [{ accountId: next.id, date: todayISO(), balance: value }] });
+      writes.push(mutate.save({ op: "saveBalances", balances: [{ accountId: next.id, date: todayISO(), balance: value }] }));
     }
+    if (!(await run(() => Promise.all(writes)))) return;
     toast.success(t("acc.saved"));
     onClose();
   };
@@ -359,7 +363,7 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
   return (
     <Sheet
       open={open}
-      onOpenChange={(o) => !o && onClose()}
+      onOpenChange={(o) => !o && !saving && onClose()}
       title={account ? t("acc.edit") : t("acc.add")}
       footer={
         <div className="flex items-center gap-2">
@@ -368,11 +372,11 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
-          <Button variant="ghost" className="ml-auto" onClick={onClose}>
+          <Button variant="ghost" className="ml-auto" onClick={onClose} disabled={saving}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" className="px-8" onClick={save} disabled={!valid}>
-            {t("common.save")}
+          <Button variant="primary" className="px-8" onClick={save} disabled={!valid || saving}>
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
       }
@@ -424,6 +428,7 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
 export function CheckInDialog({ ds, open, onClose }: { ds: Dataset; open: boolean; onClose: () => void }) {
   const { t, f } = useI18n();
   const mutate = useMutate();
+  const [saving, run] = useSaving();
   const active = ds.accounts.filter((a) => !a.archived);
   const latest = latestBalances(ds.balances);
   const [date, setDate] = useState(todayISO());
@@ -437,9 +442,9 @@ export function CheckInDialog({ ds, open, onClose }: { ds: Dataset; open: boolea
   const before = netWorth(ds).total;
   const after = netWorth({ accounts: ds.accounts, balances: [...ds.balances.filter((b) => b.date !== date || !draft.some((d) => d.accountId === b.accountId)), ...draft] }, date).total;
 
-  const save = () => {
-    if (!draft.length || !isValidISODate(date)) return;
-    mutate.mutate({ op: "saveBalances", balances: draft });
+  const save = async () => {
+    if (!draft.length || !isValidISODate(date) || saving) return;
+    if (!(await run(() => mutate.save({ op: "saveBalances", balances: draft })))) return;
     toast.success(t("ci.saved"), { description: `${t("nw.total")}: ${f.money0(after)}` });
     onClose();
   };
@@ -447,7 +452,7 @@ export function CheckInDialog({ ds, open, onClose }: { ds: Dataset; open: boolea
   return (
     <Sheet
       open={open}
-      onOpenChange={(o) => !o && onClose()}
+      onOpenChange={(o) => !o && !saving && onClose()}
       title={t("ci.title")}
       description={t("ci.subtitle")}
       wide
@@ -461,11 +466,11 @@ export function CheckInDialog({ ds, open, onClose }: { ds: Dataset; open: boolea
               {f.money0(Math.abs(after - before))})
             </span>
           </div>
-          <Button variant="ghost" className="ml-auto" onClick={onClose}>
+          <Button variant="ghost" className="ml-auto" onClick={onClose} disabled={saving}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" className="px-8" onClick={save} disabled={!draft.length}>
-            {t("ci.save")}
+          <Button variant="primary" className="px-8" onClick={save} disabled={!draft.length || saving}>
+            {saving ? t("common.saving") : t("ci.save")}
           </Button>
         </div>
       }

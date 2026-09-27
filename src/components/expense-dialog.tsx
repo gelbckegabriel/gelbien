@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import { friendlyAiError, parseReceipt, RECEIPT_FIELDS, type ReceiptField } from "@/lib/ai/client";
 import { useActiveAi } from "@/lib/ai/config";
 import { useDataset, useMode, useMutate } from "@/lib/data/hooks";
-import { ApiError, uploadReceiptFile } from "@/lib/data/sources";
+import { errorReason } from "@/lib/data/errors";
+import { uploadReceiptFile } from "@/lib/data/sources";
 import { knownMerchants, suggestFromHistory } from "@/lib/finance";
 import { prepareReceipt, receiptFromTransfer, type PreparedReceipt } from "@/lib/files";
 import { useI18n } from "@/lib/i18n";
@@ -105,6 +106,7 @@ export function ExpenseDialog() {
       ds={data}
       open={state.open}
       editing={state.editing}
+      draft={state.draft}
       initialFile={state.file}
       onClose={close}
       onAnother={() => openExpense()}
@@ -116,6 +118,7 @@ function ExpenseForm({
   ds,
   open,
   editing,
+  draft,
   initialFile,
   onClose,
   onAnother,
@@ -123,6 +126,8 @@ function ExpenseForm({
   ds: Dataset;
   open: boolean;
   editing: Transaction | null;
+  /** Prefill from a save that failed (same id, so retrying can't duplicate the row) */
+  draft: Transaction | null;
   initialFile: File | null;
   onClose: () => void;
   onAnother: () => void;
@@ -131,7 +136,7 @@ function ExpenseForm({
   const ai = useActiveAi();
   const { mode } = useMode();
   const mutate = useMutate();
-  const [form, setFormState] = useState<FormState>(() => initialForm(ds, editing));
+  const [form, setFormState] = useState<FormState>(() => initialForm(ds, draft ?? editing));
   const [errors, setErrors] = useState<{ amount?: string; category?: string }>({});
   const [receipt, setReceipt] = useState<PreparedReceipt | null>(null);
   const [reading, setReading] = useState(false);
@@ -302,13 +307,13 @@ function ExpenseForm({
         toast.dismiss("receipt-upload");
       } catch (err) {
         toast.dismiss("receipt-upload");
-        toast.error(err instanceof ApiError && err.code === "storage" ? t("err.storage") : t("err.save", { error: (err as Error).message }));
+        toast.error(t("err.receipt"), { description: errorReason(err, t) });
       }
     }
 
     const now = new Date().toISOString();
     const tx: Transaction = {
-      id: editing?.id ?? uid("t"),
+      id: editing?.id ?? draft?.id ?? uid("t"),
       date: isValidISODate(form.date) ? form.date : todayISO(),
       category: form.category,
       subcategory: form.subcategory,
@@ -321,7 +326,7 @@ function ExpenseForm({
       recurring: form.recurring,
       notes: form.notes.trim(),
       receiptUrl,
-      createdAt: editing?.createdAt || now,
+      createdAt: editing?.createdAt || draft?.createdAt || now,
       updatedAt: now,
     };
     try {
@@ -330,7 +335,19 @@ function ExpenseForm({
       /* ignore */
     }
     const previous = editing;
-    mutate.mutate({ op: editing ? "updateTransaction" : "addTransaction", tx });
+    mutate.mutate(
+      { op: editing ? "updateTransaction" : "addTransaction", tx },
+      {
+        // The dialog closed optimistically: bring it back with what was typed. If the user is
+        // already entering the next expense, don't clobber it — offer "Review" instead.
+        onFailure: () => {
+          const ui = useUi.getState();
+          const reopen = () => ui.openExpense({ editing: previous, draft: tx });
+          if (!ui.expense.open) return reopen();
+          return { label: t("err.review"), onClick: reopen };
+        },
+      },
+    );
     setSaving(false);
     toast.success(editing ? t("exp.updated") : t("exp.saved"), {
       description: `${f.money(tx.amount)} · ${tx.category}`,

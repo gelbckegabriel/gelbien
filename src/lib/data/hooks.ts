@@ -1,11 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useI18n, usePrefs } from "../i18n";
 import type { Dataset, Mutation, SessionInfo } from "../types";
 import { useUi } from "../ui-store";
+import { errorReason } from "./errors";
 import { applyMutationToDataset } from "./reducer";
 import { ApiError, demoSource, fetchSession, googleSource } from "./sources";
 
@@ -47,32 +48,56 @@ export function useDataset() {
   });
 }
 
+export interface MutateOptions {
+  /**
+   * The save failed: hand the user's edits back (reopen the form, restore the draft).
+   * Runs before the optimistic change is rolled back. May return a toast action, e.g. "Review".
+   */
+  onFailure?: () => { label: string; onClick: () => void } | void;
+}
+
+interface Vars extends MutateOptions {
+  m: Mutation;
+  /** The form stays on screen with the user's edits (onFailure, or a dialog awaiting save()). */
+  kept?: boolean;
+}
+
 export function useMutate() {
   const qc = useQueryClient();
   const { key, source, mode } = useSource();
   const { t } = useI18n();
-  return useMutation({
+  const { mutate, mutateAsync } = useMutation<{ syncedAt: string }, Error, Vars, { prev?: Dataset }>({
     // Serialize writes so row lookups in the sheet never race each other.
     scope: { id: "sheet-writes" },
-    mutationFn: (m: Mutation) => source!.apply(m),
-    onMutate: async (m) => {
+    mutationFn: ({ m }) => source!.apply(m),
+    onMutate: async ({ m }) => {
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<Dataset>(key);
       if (prev) qc.setQueryData<Dataset>(key, applyMutationToDataset(prev, m));
       return { prev };
     },
-    onError: (err, _m, ctx) => {
+    // Defined here rather than per mutate() call so it still runs after the calling form unmounts.
+    onError: (err, { onFailure, kept }, ctx) => {
+      const action = onFailure?.() ?? undefined;
       if (ctx?.prev) qc.setQueryData(key, ctx.prev);
       if (err instanceof ApiError && err.status === 401) {
         toast.error(t("err.session"));
         qc.invalidateQueries({ queryKey: ["session"] });
-      } else if (err instanceof ApiError && err.code === "storage") {
-        toast.error(t("err.storage"));
-      } else {
-        toast.error(t("err.save", { error: err.message }));
+        return;
       }
+      const reason = errorReason(err, t);
+      // The optimistic "Saved" / "Undo" toasts are now wrong — replace them with the explanation.
+      toast.dismiss();
+      // One toast per failure burst (a budget save can be two writes).
+      toast.error(t("err.notSaved"), {
+        id: "save-error",
+        description: kept || onFailure ? `${reason} ${t("err.kept")}` : reason,
+        duration: 12_000,
+        action,
+      });
     },
     onSuccess: (res) => {
+      toast.dismiss("save-error"); // a retry went through
       qc.setQueryData<Dataset>(key, (ds) => (ds ? { ...ds, meta: { ...ds.meta, syncedAt: res.syncedAt } } : ds));
     },
     onSettled: () => {
@@ -82,6 +107,35 @@ export function useMutate() {
       }
     },
   });
+  return useMemo(
+    () => ({
+      /** Apply now, sync in the background. On failure the change is rolled back and explained. */
+      mutate: (m: Mutation, opts?: MutateOptions) => mutate({ m, ...opts }),
+      /** For dialogs that stay open until the sheet confirms: rejects (after rollback + toast) on failure. */
+      save: (m: Mutation) => mutateAsync({ m, kept: true }),
+    }),
+    [mutate, mutateAsync],
+  );
+}
+
+/**
+ * For dialogs that stay open until the sheet confirms the write. `run` resolves true once saved;
+ * on failure it resolves false and the dialog keeps the user's input (the error toast says why).
+ */
+export function useSaving() {
+  const [saving, setSaving] = useState(false);
+  const run = async (write: () => Promise<unknown>) => {
+    setSaving(true);
+    try {
+      await write();
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+  return [saving, run] as const;
 }
 
 export function useRefresh() {

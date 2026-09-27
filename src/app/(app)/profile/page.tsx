@@ -368,7 +368,8 @@ function DataCard() {
             settings: { ...pending.data.settings, locale: ds.settings.locale, currency: ds.settings.currency, checkInDay: ds.settings.checkInDay },
           }
         : mergeImport(current, pending.data);
-    mutate.mutate({ op: "replaceAll", data });
+    const preview = pending;
+    mutate.mutate({ op: "replaceAll", data }, { onFailure: () => setPending(preview) });
     setPending(null);
     toast.success(t("prof.data.importDone"));
   };
