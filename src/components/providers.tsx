@@ -53,6 +53,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <Toaster
         theme="dark"
         position="top-center"
+        // Below the iPhone status bar / Dynamic Island: the app draws under it (viewport-fit=cover)
+        offset={{ top: "calc(env(safe-area-inset-top) + 16px)" }}
+        mobileOffset={{ top: "calc(env(safe-area-inset-top) + 12px)" }}
         toastOptions={{
           style: { background: "#1a1a1f", border: "1px solid #ffffff1f", color: "#f4f1ea", borderRadius: "14px" },
         }}

@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarRange, Flame, Gauge, PiggyBank, Receipt, Repeat, ShieldCheck, TrendingUp, Wallet } from "lucide-react";
+import Link from "next/link";
 import { CalendarHeatmap } from "@/components/charts/calendar-heatmap";
 import { CategoryDonut } from "@/components/charts/category-donut";
 import { FlowSankey } from "@/components/charts/flow-sankey";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, Stagger } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/misc";
 import { recentAverages, runway, subscriptionTotals, summarizeMonth, yearMatrix } from "@/lib/finance";
+import { accountsReserve } from "@/lib/goals";
 import { useDataset, useMode } from "@/lib/data/hooks";
 import { useI18n } from "@/lib/i18n";
 import type { Dataset } from "@/lib/types";
@@ -36,7 +38,10 @@ export default function DashboardPage() {
   const subs = subscriptionTotals(ds.subscriptions);
   const year = yearMatrix(ds, Number(month.slice(0, 4)));
   const avg = recentAverages(ds, month);
-  const run = runway(ds.settings.reserve, avg.spent, s.income.net);
+  // the reserve is what's across the accounts (Goals), not a number typed in by hand
+  const reserve = accountsReserve(ds);
+  const run = runway(reserve ?? 0, avg.spent, s.income.net);
+  const noReserve = reserve === null && !run.sustainable;
   const change = (a: number, b: number) => (b ? (a - b) / Math.abs(b) : NaN);
 
   return (
@@ -73,11 +78,19 @@ export default function DashboardPage() {
             />
             <StatTile
               label={t("dash.kpi.runway")}
-              value={run.sustainable ? 0 : run.months}
-              format={(n) => (run.sustainable ? "∞" : t("dash.kpi.runwayValue", { n: f.num(n) }))}
-              tone={run.sustainable ? "good" : run.months < 6 ? "bad" : undefined}
+              value={run.sustainable || noReserve ? 0 : run.months}
+              format={(n) => (run.sustainable ? "∞" : noReserve ? "—" : t("dash.kpi.runwayValue", { n: f.num(n) }))}
+              tone={run.sustainable ? "good" : !noReserve && run.months < 6 ? "bad" : undefined}
               icon={<ShieldCheck className="h-4 w-4" />}
-              sub={`${run.sustainable ? `${t("dash.kpi.sustainable")} · ` : ""}${t("dash.proj.reserve")} ${f.money0(ds.settings.reserve)}`}
+              sub={
+                reserve === null ? (
+                  <Link href="/goals" className="text-gold hover:underline">
+                    {t("dash.kpi.addAccounts")}
+                  </Link>
+                ) : (
+                  `${run.sustainable ? `${t("dash.kpi.sustainable")} · ` : ""}${t("dash.proj.reserve")} ${f.money0(reserve)}`
+                )
+              }
             />
             <StatTile label={t("dash.kpi.fixed")} value={s.fixed} format={f.money0} icon={<Wallet className="h-4 w-4" />} sub={`${t("dash.kpi.variable")} ${f.money0(s.variable)}`} />
             <StatTile

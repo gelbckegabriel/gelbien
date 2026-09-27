@@ -97,6 +97,15 @@ export function netWorth(ds: Pick<Dataset, "accounts" | "balances">, asOf = toda
   return { assets: round2(assets), debts: round2(debts), total: round2(assets - debts) };
 }
 
+/**
+ * What the user has across their accounts today (credit card balances subtract) — the reserve the
+ * runway and the reserve projection start from. null until a balance has been recorded.
+ */
+export function accountsReserve(ds: Pick<Dataset, "accounts" | "balances">, asOf = todayISO()): number | null {
+  const latest = latestBalances(ds.balances, asOf);
+  return ds.accounts.some((a) => latest.has(a.id)) ? netWorth(ds, asOf).total : null;
+}
+
 /** Month-end net worth for the last `count` months, carrying each account's last known balance forward. */
 export function netWorthSeries(ds: Pick<Dataset, "accounts" | "balances">, endMonth = currentMonth(), count = 12) {
   if (!ds.balances.length) return [];

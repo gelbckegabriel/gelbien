@@ -1,15 +1,36 @@
 "use client";
 
+import { Landmark } from "lucide-react";
+import Link from "next/link";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { projection, recentAverages } from "@/lib/finance";
+import { accountsReserve } from "@/lib/goals";
 import { useI18n } from "@/lib/i18n";
 import type { Dataset } from "@/lib/types";
-import { AnimatedNumber } from "../ui/misc";
+import { buttonClasses } from "../ui/button";
+import { AnimatedNumber, EmptyState } from "../ui/misc";
 import { axisProps, BAD, ChartArea, ChartCard, DataTable, GOOD, INK, TooltipBox } from "./kit";
 
 export function ProjectionChart({ ds, month, className }: { ds: Dataset; month: string; className?: string }) {
   const { t, f } = useI18n();
-  const data = projection(ds, month, 12);
+  // starts from what's across the accounts; without any there's nothing to project from
+  const reserve = accountsReserve(ds);
+  if (reserve === null) {
+    return (
+      <ChartCard className={className} title={t("dash.proj.title")} subtitle={t("dash.proj.subtitle")}>
+        <EmptyState
+          icon={<Landmark className="h-6 w-6" />}
+          title={t("dash.proj.noAccounts")}
+          action={
+            <Link href="/goals" className={buttonClasses("secondary", "sm")}>
+              {t("dash.proj.addAccounts")}
+            </Link>
+          }
+        />
+      </ChartCard>
+    );
+  }
+  const data = projection(ds, month, reserve, 12);
   const avg = recentAverages(ds, month);
   const end = data[data.length - 1].value;
   const rising = avg.saved >= 0;

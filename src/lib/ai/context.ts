@@ -30,7 +30,6 @@ export function buildFinanceContext(ds: Dataset, anchorMonth = currentMonth()): 
   lines.push("");
   lines.push("## Profile");
   lines.push(`- Monthly income: gross ${income.gross.toFixed(2)}, net ${income.net.toFixed(2)}`);
-  lines.push(`- Savings / emergency reserve today: ${ds.settings.reserve.toFixed(2)}`);
   lines.push(`- Monthly savings goal: ${ds.settings.savingsGoal.toFixed(2)}`);
   lines.push(`- Payment methods: ${ds.settings.paymentMethods.join(", ")}`);
   lines.push("");

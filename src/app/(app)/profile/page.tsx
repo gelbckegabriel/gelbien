@@ -103,15 +103,14 @@ function PreferencesCard() {
   const mutate = useMutate();
   const setLocale = usePrefs((s) => s.setLocale);
   const setCurrency = usePrefs((s) => s.setCurrency);
-  const [reserve, setReserve] = useState(String(ds.settings.reserve || ""));
   const [goal, setGoal] = useState(String(ds.settings.savingsGoal || ""));
-  const dirty = parseAmount(reserve) !== ds.settings.reserve || parseAmount(goal) !== ds.settings.savingsGoal;
+  const dirty = parseAmount(goal) !== ds.settings.savingsGoal;
 
   const saveSettings = (patch: Partial<Dataset["settings"]>, silent = false) => {
     mutate.mutate({ op: "saveSettings", settings: { ...ds.settings, ...patch } });
     if (!silent) toast.success(t("prof.savedPrefs"));
   };
-  const saveAmounts = () => saveSettings({ reserve: round2(parseAmount(reserve)), savingsGoal: round2(parseAmount(goal)) });
+  const saveAmounts = () => saveSettings({ savingsGoal: round2(parseAmount(goal)) });
   useUnsavedChanges(dirty, { save: saveAmounts });
 
   return (
@@ -160,10 +159,6 @@ function PreferencesCard() {
               </option>
             ))}
           </Select>
-        </Field>
-        <Field label={t("prof.reserve")}>
-          <MoneyInput value={reserve} onChange={setReserve} placeholder="0.00" />
-          <p className="mt-1.5 text-xs text-ink-3">{t("prof.reserveHint")}</p>
         </Field>
         <Field label={t("prof.goal")}>
           <MoneyInput value={goal} onChange={setGoal} placeholder="0.00" />

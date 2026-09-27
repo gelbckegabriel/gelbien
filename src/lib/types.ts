@@ -78,6 +78,7 @@ export interface Settings {
   currency: string;
   locale: Locale;
   /** Emergency fund / savings available today, used for runway */
+  /** Legacy: the runway now uses the account balances (see accountsReserve). Kept so older sheets still load. */
   reserve: number;
   /** Monthly savings target */
   savingsGoal: number;

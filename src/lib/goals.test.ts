@@ -7,6 +7,7 @@ import {
   latestBalances,
   monthsToTarget,
   netWorth,
+  accountsReserve,
   netWorthSeries,
   planGoal,
   projectBalance,
@@ -89,6 +90,11 @@ describe("accounts", () => {
 
   it("subtracts credit card balances from net worth", () => {
     expect(netWorth(ds, "2026-09-26")).toEqual({ assets: 16000, debts: 800, total: 15200 });
+  });
+
+  it("uses the accounts as the runway reserve, once a balance exists", () => {
+    expect(accountsReserve(ds, "2026-09-26")).toBe(15200);
+    expect(accountsReserve({ accounts, balances: [] }, "2026-09-26")).toBeNull();
   });
 
   it("carries balances forward month by month", () => {

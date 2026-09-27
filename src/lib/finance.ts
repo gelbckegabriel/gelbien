@@ -308,9 +308,8 @@ export function runway(reserve: number, avgSpend: number, netIncome: number) {
   return { sustainable: false as const, months: reserve / burn, burn };
 }
 
-export function projection(ds: Dataset, month: string, horizon = 12) {
+export function projection(ds: Dataset, month: string, start: number, horizon = 12) {
   const avg = recentAverages(ds, month);
-  const start = ds.settings.reserve;
   return Array.from({ length: horizon + 1 }, (_, i) => ({
     month: addMonths(month, i),
     value: round2(start + avg.saved * i),

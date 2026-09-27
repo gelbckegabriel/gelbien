@@ -37,8 +37,11 @@ export function Sheet({
         {open && (
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild forceMount>
+              {/* While closing, the fading backdrop and panel stay mounted for the exit animation —
+                  they must not swallow the next tap (e.g. on the bottom nav). Radix puts an inline
+                  pointer-events: auto on the overlay, hence the !important. */}
               <motion.div
-                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[6px]"
+                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[6px] data-[state=closed]:pointer-events-none!"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -63,7 +66,7 @@ export function Sheet({
             >
               <motion.div
                 className={cn(
-                  "fixed z-50 flex flex-col border border-line-strong bg-[#141418] shadow-2xl shadow-black/60 focus:outline-none",
+                  "fixed z-50 flex flex-col border border-line-strong bg-[#141418] shadow-2xl shadow-black/60 focus:outline-none data-[state=closed]:pointer-events-none",
                   mobile
                     ? "inset-x-0 bottom-0 max-h-[94dvh] rounded-t-[28px] pb-[env(safe-area-inset-bottom)]"
                     : cn("left-1/2 top-1/2 max-h-[90dvh] w-[calc(100vw-2rem)] rounded-3xl", wide ? "max-w-3xl" : "max-w-lg"),
