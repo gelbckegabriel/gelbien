@@ -1,5 +1,6 @@
 "use client";
 
+import { guessKind } from "../defaults";
 import { buildDemoDataset } from "../demo";
 import type { Dataset, Locale, Mutation, SessionInfo } from "../types";
 import { applyMutationToDataset } from "./reducer";
@@ -54,10 +55,12 @@ export const MODE_KEY = "gelbien.mode";
 export function normalizeDataset(ds: Dataset): Dataset {
   return {
     ...ds,
+    transactions: ds.transactions.map((t) => ({ ...t, group: t.group ?? "", billId: t.billId ?? "" })),
+    subscriptions: ds.subscriptions.map((s) => ({ ...s, nextCharge: s.nextCharge ?? "", kind: s.kind ?? guessKind(s.category) })),
     accounts: ds.accounts ?? [],
     balances: ds.balances ?? [],
     goals: ds.goals ?? [],
-    settings: { ...ds.settings, checkInDay: ds.settings?.checkInDay ?? 1 },
+    settings: { ...ds.settings, checkInDay: ds.settings?.checkInDay ?? 1, paymentStyles: ds.settings?.paymentStyles ?? {} },
   };
 }
 

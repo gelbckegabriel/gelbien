@@ -6,7 +6,7 @@
  * The sheet is meant to stay human-readable: category names (not ids) are
  * stored on transactions, dates are ISO text, enums are short English codes.
  */
-import { defaultSettings } from "./defaults";
+import { defaultSettings, guessKind } from "./defaults";
 import type {
   Account,
   AccountType,
@@ -22,18 +22,20 @@ import type {
   Locale,
   Priority,
   Settings,
+  SubKind,
   SubStatus,
   Subscription,
   Transaction,
   WorthIt,
 } from "./types";
-import { ACCOUNT_TYPES, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PRIORITIES, SUB_STATUSES, WORTH_IT } from "./types";
+import { ACCOUNT_TYPES, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PRIORITIES, SUB_KINDS, SUB_STATUSES, WORTH_IT } from "./types";
 import { parseAmount, serialToISO } from "./utils";
 
 export const TABS = {
   transactions: {
     title: "Transactions",
-    headers: ["id", "date", "category", "subcategory", "description", "amount", "payment", "type", "priority", "merchant", "recurring", "notes", "receipt", "createdAt", "updatedAt"],
+    // New columns only ever go at the end: ensureTabs adds their headers to older sheets.
+    headers: ["id", "date", "category", "subcategory", "description", "amount", "payment", "type", "priority", "merchant", "recurring", "notes", "receipt", "createdAt", "updatedAt", "group", "bill"],
   },
   categories: { title: "Categories", headers: ["name", "color", "icon", "order", "archived"] },
   subcategories: { title: "Subcategories", headers: ["category", "name"] },
@@ -41,7 +43,7 @@ export const TABS = {
   income: { title: "Income", headers: ["month", "gross", "net", "note"] },
   subscriptions: {
     title: "Subscriptions",
-    headers: ["id", "name", "category", "amount", "cycle", "billingDay", "payment", "status", "trialEnd", "worthIt", "notes"],
+    headers: ["id", "name", "category", "amount", "cycle", "billingDay", "payment", "status", "trialEnd", "worthIt", "notes", "nextCharge", "kind"],
   },
   settings: { title: "Settings", headers: ["key", "value"] },
   accounts: { title: "Accounts", headers: ["id", "name", "institution", "type", "color", "archived", "notes"] },
@@ -109,13 +111,15 @@ export function rowToTransaction(r: Row): Transaction | null {
     receiptUrl: str(r[12]),
     createdAt: str(r[13]),
     updatedAt: str(r[14]),
+    group: str(r[15]),
+    billId: str(r[16]),
   };
 }
 
 export function transactionToRow(t: Transaction): Row {
   return [
     t.id, t.date, t.category, t.subcategory, t.description, t.amount, t.payment, t.type, t.priority,
-    t.merchant, t.recurring, t.notes, t.receiptUrl, t.createdAt, t.updatedAt,
+    t.merchant, t.recurring, t.notes, t.receiptUrl, t.createdAt, t.updatedAt, t.group, t.billId,
   ];
 }
 
@@ -181,11 +185,14 @@ export function rowToSubscription(r: Row): Subscription | null {
     trialEnd: date(r[8]),
     worthIt: oneOf<WorthIt>(r[9], WORTH_IT, "maybe"),
     notes: str(r[10]),
+    nextCharge: date(r[11]),
+    // rows from before bills and subscriptions were told apart
+    kind: oneOf<SubKind>(r[12], SUB_KINDS, guessKind(str(r[2]))),
   };
 }
 
 export const subscriptionToRow = (s: Subscription): Row => [
-  s.id, s.name, s.category, s.amount, s.cycle, s.billingDay ?? "", s.payment, s.status, s.trialEnd, s.worthIt, s.notes,
+  s.id, s.name, s.category, s.amount, s.cycle, s.billingDay ?? "", s.payment, s.status, s.trialEnd, s.worthIt, s.notes, s.nextCharge, s.kind,
 ];
 
 export function rowToAccount(r: Row): Account | null {
@@ -261,6 +268,14 @@ export function rowsToSettings(rows: Row[], fallbackLocale: Locale): Settings {
     const d = Math.round(num(kv.get("checkInDay")));
     if (d >= 1 && d <= 28) parsed.checkInDay = d;
   }
+  if (kv.has("paymentStyles")) {
+    try {
+      const styles = JSON.parse(str(kv.get("paymentStyles")));
+      if (styles && typeof styles === "object" && !Array.isArray(styles)) parsed.paymentStyles = styles;
+    } catch {
+      /* hand-edited into something unreadable: fall back to the built-in looks */
+    }
+  }
   if (kv.has("paymentMethods")) {
     try {
       const list = JSON.parse(str(kv.get("paymentMethods")));
@@ -281,6 +296,7 @@ export function settingsToRows(s: Settings): Row[] {
     ["warnAt", s.warnAt],
     ["checkInDay", s.checkInDay],
     ["paymentMethods", JSON.stringify(s.paymentMethods)],
+    ["paymentStyles", JSON.stringify(s.paymentStyles)],
   ];
 }
 

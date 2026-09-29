@@ -1,4 +1,5 @@
-import type { Category, Locale, Settings } from "./types";
+import type { Category, Locale, PaymentStyle, Settings, SubKind } from "./types";
+import { normalize } from "./utils";
 
 /** Category colors offered in the picker. The first 8 are the CVD-validated chart slots. */
 export const CATEGORY_COLORS = [
@@ -283,11 +284,66 @@ export function templateFor(name: string): { icon: string; color: string } | nul
   return tpl ? { icon: tpl.icon, color: tpl.color } : null;
 }
 
-const PAYMENTS: Record<Locale, string[]> = {
-  pt: ["Crédito", "Débito", "Dinheiro", "Interac e-Transfer", "Débito automático", "Pré-pago / Gift card", "Outro"],
-  en: ["Credit", "Debit", "Cash", "Interac e-Transfer", "Pre-authorized debit", "Prepaid / Gift card", "Other"],
-  fr: ["Crédit", "Débit", "Comptant", "Virement Interac", "Prélèvement automatique", "Prépayée / Carte-cadeau", "Autre"],
-};
+/** Built-in payment methods: names in pt / en / fr (the IDX order) and their look. */
+const PAYMENT_TEMPLATES: { names: [string, string, string]; icon: string; color: string }[] = [
+  { names: ["Crédito", "Credit", "Crédit"], icon: "CreditCard", color: "#e0707a" },
+  { names: ["Débito", "Debit", "Débit"], icon: "WalletCards", color: "#3987e5" },
+  { names: ["Dinheiro", "Cash", "Comptant"], icon: "Banknote", color: "#199e70" },
+  { names: ["Interac e-Transfer", "Interac e-Transfer", "Virement Interac"], icon: "ArrowLeftRight", color: "#c98500" },
+  { names: ["Débito automático", "Pre-authorized debit", "Prélèvement automatique"], icon: "CalendarSync", color: "#9085e9" },
+  { names: ["Pré-pago / Gift card", "Prepaid / Gift card", "Prépayée / Carte-cadeau"], icon: "Gift", color: "#d55181" },
+  { names: ["Outro", "Other", "Autre"], icon: "CircleEllipsis", color: "#6b6a72" },
+];
+
+/** Icons offered for payment methods */
+export const PAYMENT_ICONS = [
+  "CreditCard", "WalletCards", "Banknote", "ArrowLeftRight", "CalendarSync", "Gift", "QrCode", "Smartphone",
+  "Landmark", "Wallet", "Coins", "HandCoins", "PiggyBank", "Receipt", "Globe", "CircleEllipsis",
+] as const;
+
+// For methods the user typed in: an icon from words in the name (accents stripped). First match wins.
+const PAYMENT_GUESSES: [RegExp, string][] = [
+  [/\bpix\b|\bqr\b/, "QrCode"],
+  [/autom|pre-?auth|prelevement|recorr/, "CalendarSync"],
+  [/gift|cadeau|presente|pre-?pa|prepaid/, "Gift"],
+  [/transfer|virement|\bted\b|wise|zelle/, "ArrowLeftRight"],
+  [/credit|visa|master|amex|american express/, "CreditCard"],
+  [/debit|cartao|card|carte/, "WalletCards"],
+  [/cash|dinheiro|especes|comptant/, "Banknote"],
+  [/pay\b|paypal|apple|google|samsung|wallet|carteira|portefeuille/, "Smartphone"],
+  [/crypto|bitcoin|\bbtc\b/, "Coins"],
+];
+
+const paymentTemplate = (name: string) => PAYMENT_TEMPLATES.find((p) => p.names.some((n) => same(n, name)));
+
+/** How a payment method looks: the user's pick, else the built-in look, else a guess from its name. */
+export function paymentLook(name: string, styles?: Record<string, PaymentStyle>): PaymentStyle {
+  const own = styles?.[name];
+  if (own) return own;
+  const tpl = paymentTemplate(name);
+  if (tpl) return { icon: tpl.icon, color: tpl.color };
+  const n = normalize(name);
+  let hash = 0;
+  for (const ch of n) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  // a stable colour per name, from the palette minus its gray
+  return { icon: PAYMENT_GUESSES.find(([re]) => re.test(n))?.[1] ?? "Wallet", color: CATEGORY_COLORS[hash % (CATEGORY_COLORS.length - 1)] };
+}
+
+/** Built-in payment methods whose name reads differently in `locale` (the user's own are left alone). */
+export function paymentTranslations(methods: string[], locale: Locale): { from: string; to: string }[] {
+  return methods.flatMap((from) => {
+    const to = paymentTemplate(from)?.names[IDX[locale]];
+    return to && to !== from ? [{ from, to }] : [];
+  });
+}
+
+/**
+ * Bill or subscription, for recurring payments saved before the two were told apart:
+ * the ones in the built-in Subscriptions category are subscriptions.
+ */
+export function guessKind(category: string): SubKind {
+  return TEMPLATES.some((t) => t.icon === "Repeat" && t.name.some((n) => same(n, category))) ? "subscription" : "bill";
+}
 
 export function defaultSettings(locale: Locale): Settings {
   return {
@@ -295,12 +351,13 @@ export function defaultSettings(locale: Locale): Settings {
     locale,
     reserve: 0,
     savingsGoal: 0,
-    paymentMethods: PAYMENTS[locale],
+    paymentMethods: PAYMENT_TEMPLATES.map((p) => p.names[IDX[locale]]),
+    paymentStyles: {},
     warnAt: 0.85,
     checkInDay: 1,
   };
 }
 
 export function paymentsFor(locale: Locale): string[] {
-  return PAYMENTS[locale];
+  return PAYMENT_TEMPLATES.map((p) => p.names[IDX[locale]]);
 }

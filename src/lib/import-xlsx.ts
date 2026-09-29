@@ -4,7 +4,7 @@
  * located by header text, so re-ordered or extra columns are tolerated.
  * Pure: takes already-parsed sheet data so it runs in the browser and in tests.
  */
-import { defaultSettings, OTHER_COLOR, templateFor } from "./defaults";
+import { defaultSettings, guessKind, OTHER_COLOR, templateFor } from "./defaults";
 import type {
   BudgetLine,
   Category,
@@ -188,6 +188,8 @@ export function importMoneySheet(sheets: SheetData[], locale: Locale, now = new 
           receiptUrl: "",
           createdAt: stamp,
           updatedAt: stamp,
+          group: "",
+          billId: "",
         });
       });
     }
@@ -266,6 +268,8 @@ export function importMoneySheet(sheets: SheetData[], locale: Locale, now = new 
           trialEnd: toISODate(row[c.trial]) ?? "",
           worthIt: mapEnum(row[c.worth], WORTH, "maybe"),
           notes: text(row[c.notes]),
+          nextCharge: "",
+          kind: guessKind(text(row[c.category])),
         });
       });
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Camera, ExternalLink, FileText, Loader2, Paperclip, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, Camera, ExternalLink, FileText, Loader2, Paperclip, Sparkles, Split, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -12,13 +12,15 @@ import { uploadReceiptFile } from "@/lib/data/sources";
 import { knownMerchants, suggestFromHistory } from "@/lib/finance";
 import { prepareReceipt, receiptFromTransfer, type PreparedReceipt } from "@/lib/files";
 import { useI18n } from "@/lib/i18n";
-import { EXPENSE_TYPES, PRIORITIES, type Dataset, type ExpenseType, type Priority, type Transaction } from "@/lib/types";
+import { EXPENSE_TYPES, PRIORITIES, type Dataset, type ExpenseType, type Mutation, type Priority, type Transaction } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { cn, isValidISODate, normalize, parseAmount, round2, todayISO, uid } from "@/lib/utils";
 import { CategoryIcon } from "./icons";
 import { GuardedLink } from "./shell/unsaved";
+import { newItem, newPart, partTotal, SplitEditor, type SplitPart } from "./split-editor";
 import { Button } from "./ui/button";
-import { Field, Input, MoneyInput, Segmented, Select, Switch, Textarea } from "./ui/form";
+import { PaymentSelect } from "./pickers";
+import { Field, Input, MoneyInput, Segmented, Switch, Textarea } from "./ui/form";
 import { Sheet } from "./ui/sheet";
 
 interface FormState {
@@ -117,6 +119,7 @@ export function ExpenseDialog() {
       open={state.open}
       editing={state.editing}
       draft={state.draft}
+      draftGroup={state.draftGroup}
       initialFile={state.file}
       onClose={close}
       onAnother={() => openExpense()}
@@ -129,6 +132,7 @@ function ExpenseForm({
   open,
   editing,
   draft,
+  draftGroup,
   initialFile,
   onClose,
   onAnother,
@@ -138,6 +142,7 @@ function ExpenseForm({
   editing: Transaction | null;
   /** Prefill from a save that failed (same id, so retrying can't duplicate the row) */
   draft: Transaction | null;
+  draftGroup: Transaction[] | null;
   initialFile: File | null;
   onClose: () => void;
   onAnother: () => void;
@@ -146,7 +151,20 @@ function ExpenseForm({
   const ai = useActiveAi();
   const { mode } = useMode();
   const mutate = useMutate();
-  const [form, setFormState] = useState<FormState>(() => initialForm(ds, draft ?? editing));
+  // A split purchase opens with all of its parts (one per category)
+  const [groupTxs] = useState(() => draftGroup ?? (editing?.group ? ds.transactions.filter((t) => t.group === editing.group) : null));
+  const [form, setFormState] = useState<FormState>(() => {
+    const f = initialForm(ds, groupTxs?.[0] ?? draft ?? editing);
+    // parts carry their own descriptions
+    return groupTxs && groupTxs.length > 1 ? { ...f, description: "", amount: "" } : f;
+  });
+  const [split, setSplit] = useState<SplitPart[] | null>(() =>
+    groupTxs && groupTxs.length > 1
+      ? groupTxs.map((t) => newPart(t.category, t.subcategory, [newItem(String(Math.abs(t.amount)), t.description)], t.id))
+      : null,
+  );
+  const [missingCategory, setMissingCategory] = useState<Set<string>>(new Set());
+  const splitTotal = split ? round2(split.reduce((a, p) => a + partTotal(p), 0)) : 0;
   const [errors, setErrors] = useState<{ amount?: string; category?: string }>({});
   const [receipt, setReceipt] = useState<PreparedReceipt | null>(null);
   const [keepReceipt, setKeepReceipt] = useState(readKeepReceipt);
@@ -297,15 +315,32 @@ function ExpenseForm({
     if (receipt?.previewUrl) URL.revokeObjectURL(receipt.previewUrl);
   }, [receipt]);
 
+  // ---- split ----
+  const startSplit = () => {
+    setSplit([newPart(form.category, form.subcategory, [newItem(form.amount, form.description)], editing?.id ?? draft?.id), newPart()]);
+    setErrors((e) => ({ ...e, category: undefined }));
+  };
+  const mergeSplit = () => {
+    if (!split) return;
+    const first = split.find((p) => p.category) ?? split[0];
+    set({ amount: splitTotal ? String(splitTotal) : "", category: first.category, subcategory: first.subcategory });
+    setSplit(null);
+    setMissingCategory(new Set());
+  };
+
   // ---- save ----
   const save = async (another: boolean) => {
-    const value = parseAmount(form.amount);
+    // parts without an amount are ignored; one part left is just an expense in that category
+    const parts = split?.filter((p) => partTotal(p) > 0) ?? null;
+    const value = parts ? round2(parts.reduce((a, p) => a + partTotal(p), 0)) : parseAmount(form.amount);
     const nextErrors: typeof errors = {};
     if (!value || value <= 0) nextErrors.amount = t("form.requiredAmount");
-    if (!form.category) nextErrors.category = t("form.requiredCategory");
+    if (!parts && !form.category) nextErrors.category = t("form.requiredCategory");
+    const missing = new Set(parts?.filter((p) => !p.category).map((p) => p.key) ?? []);
+    setMissingCategory(missing);
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) {
-      if (nextErrors.amount) amountRef.current?.focus();
+    if (Object.keys(nextErrors).length || missing.size) {
+      if (nextErrors.amount && !split) amountRef.current?.focus();
       return;
     }
 
@@ -324,13 +359,15 @@ function ExpenseForm({
     }
 
     const now = new Date().toISOString();
-    const tx: Transaction = {
+    const sign = form.refund ? -1 : 1;
+    const loaded = groupTxs && groupTxs.length > 1 ? groupTxs : null;
+    const base: Transaction = {
       id: editing?.id ?? draft?.id ?? uid("t"),
       date: isValidISODate(form.date) ? form.date : todayISO(),
       category: form.category,
       subcategory: form.subcategory,
       description: form.description.trim(),
-      amount: round2(form.refund ? -value : value),
+      amount: round2(sign * value),
       payment: form.payment,
       type: form.type,
       priority: form.priority,
@@ -338,37 +375,59 @@ function ExpenseForm({
       recurring: form.recurring,
       notes: form.notes.trim(),
       receiptUrl,
-      createdAt: editing?.createdAt || draft?.createdAt || now,
+      createdAt: loaded?.[0].createdAt || editing?.createdAt || draft?.createdAt || now,
       updatedAt: now,
+      group: "",
+      billId: (draft ?? editing)?.billId ?? "",
     };
+    // A split is one row per category sharing a group id, so budgets and charts need nothing special
+    const groupId = loaded?.[0].group || uid("g");
+    const txs: Transaction[] = parts
+      ? parts.map((p) => ({
+          ...base,
+          id: p.txId ?? uid("t"),
+          category: p.category,
+          subcategory: p.subcategory,
+          description: p.items.map((i) => i.name.trim()).filter(Boolean).join(", ") || base.description || base.merchant,
+          amount: round2(sign * partTotal(p)),
+          group: parts.length > 1 ? groupId : "",
+        }))
+      : [base];
+    const isGroup = txs.length > 1;
+    const wasGroup = loaded?.[0].group ?? "";
+    // Group writes also delete the parts that were removed (or all but one, when merged back)
+    const byGroup = isGroup || !!wasGroup;
+    const group = isGroup ? groupId : wasGroup;
+    const previous = loaded ?? (editing ? [editing] : null);
+    const mutation: Mutation = byGroup ? { op: "saveTransactionGroup", group, txs } : { op: editing ? "updateTransaction" : "addTransaction", tx: txs[0] };
+    const undo: Mutation = previous
+      ? byGroup
+        ? { op: "saveTransactionGroup", group, txs: previous }
+        : { op: "updateTransaction", tx: previous[0] }
+      : isGroup
+        ? { op: "deleteTransactionGroup", group }
+        : { op: "deleteTransaction", id: txs[0].id };
+
     try {
       localStorage.setItem(LAST_PAYMENT_KEY, form.payment);
       if (receipt) localStorage.setItem(KEEP_RECEIPT_KEY, keepReceipt ? "1" : "0");
     } catch {
       /* ignore */
     }
-    const previous = editing;
-    mutate.mutate(
-      { op: editing ? "updateTransaction" : "addTransaction", tx },
-      {
-        // The dialog closed optimistically: bring it back with what was typed. If the user is
-        // already entering the next expense, don't clobber it — offer "Review" instead.
-        onFailure: () => {
-          const ui = useUi.getState();
-          const reopen = () => ui.openExpense({ editing: previous, draft: tx });
-          if (!ui.expense.open) return reopen();
-          return { label: t("err.review"), onClick: reopen };
-        },
+    mutate.mutate(mutation, {
+      // The dialog closed optimistically: bring it back with what was typed. If the user is
+      // already entering the next expense, don't clobber it — offer "Review" instead.
+      onFailure: () => {
+        const ui = useUi.getState();
+        const reopen = () => (isGroup ? ui.openExpense({ editing, draftGroup: txs }) : ui.openExpense({ editing: previous?.[0] ?? null, draft: txs[0] }));
+        if (!ui.expense.open) return reopen();
+        return { label: t("err.review"), onClick: reopen };
       },
-    );
+    });
     setSaving(false);
-    toast.success(editing ? t("exp.updated") : t("exp.saved"), {
-      description: `${f.money(tx.amount)} · ${tx.category}`,
-      action: {
-        label: t("common.undo"),
-        onClick: () =>
-          mutate.mutate(previous ? { op: "updateTransaction", tx: previous } : { op: "deleteTransaction", id: tx.id }),
-      },
+    toast.success(previous ? t("exp.updated") : t("exp.saved"), {
+      description: isGroup ? `${f.money(base.amount)} · ${t("split.nParts", { n: txs.length })}` : `${f.money(txs[0].amount)} · ${txs[0].category}`,
+      action: { label: t("common.undo"), onClick: () => mutate.mutate(undo) },
     });
     if (another) onAnother();
     else onClose();
@@ -376,12 +435,22 @@ function ExpenseForm({
 
   const remove = () => {
     if (!editing || !window.confirm(t("form.deleteConfirm"))) return;
-    const removed = editing;
-    mutate.mutate({ op: "deleteTransaction", id: removed.id });
-    toast(t("exp.deleted"), {
-      description: `${f.money(removed.amount)} · ${removed.description || removed.category}`,
-      action: { label: t("common.undo"), onClick: () => mutate.mutate({ op: "addTransaction", tx: removed }) },
-    });
+    if (groupTxs && groupTxs.length > 1) {
+      const removed = groupTxs;
+      const group = removed[0].group;
+      mutate.mutate({ op: "deleteTransactionGroup", group });
+      toast(t("exp.deleted"), {
+        description: `${f.money(round2(removed.reduce((a, x) => a + x.amount, 0)))} · ${t("split.nParts", { n: removed.length })}`,
+        action: { label: t("common.undo"), onClick: () => mutate.mutate({ op: "saveTransactionGroup", group, txs: removed }) },
+      });
+    } else {
+      const removed = editing;
+      mutate.mutate({ op: "deleteTransaction", id: removed.id });
+      toast(t("exp.deleted"), {
+        description: `${f.money(removed.amount)} · ${removed.description || removed.category}`,
+        action: { label: t("common.undo"), onClick: () => mutate.mutate({ op: "addTransaction", tx: removed }) },
+      });
+    }
     onClose();
   };
 
@@ -461,19 +530,21 @@ function ExpenseForm({
         {/* Amount + date */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="min-w-0">
-            <Field label={t("form.amount")} hint={flag("amount")} highlight={aiFields.has("amount")} htmlFor="amount">
+            <Field label={t("form.amount")} hint={split ? <span className="text-xs text-ink-3">{t("split.totalHint")}</span> : flag("amount")} highlight={aiFields.has("amount")} htmlFor="amount">
               <MoneyInput
                 ref={amountRef}
                 id="amount"
                 prefix={currencySymbol}
-                value={form.amount}
+                // while split, the amount is the sum of the parts below
+                value={split ? (splitTotal ? String(splitTotal) : "") : form.amount}
+                readOnly={!!split}
                 onChange={(v) => {
                   set({ amount: v });
                   setErrors((e) => ({ ...e, amount: undefined }));
                 }}
                 placeholder="0.00"
                 data-autofocus={!initialFile && !editing ? "" : undefined}
-                className={cn("h-14 text-2xl font-semibold", form.refund && "text-good")}
+                className={cn("h-14 text-2xl font-semibold", form.refund && "text-good", split && "text-ink-2")}
               />
             </Field>
             {/* under the amount, not the date, now that the two stack on phones */}
@@ -507,33 +578,42 @@ function ExpenseForm({
           </Field>
         </div>
 
-        {/* Category chips */}
+        {/* Category chips — or, for a purchase split across categories, the split editor */}
         <div>
-          <div className="mb-2 flex items-center justify-between text-[13px] font-medium text-ink-2">
-            <span>{t("form.category")}</span>
-            {flag("category")}
+          <div className="mb-2 flex items-center justify-between gap-2 text-[13px] font-medium text-ink-2">
+            <span className="flex items-center gap-2">
+              {split ? t("split.title") : t("form.category")}
+              {flag("category")}
+            </span>
+            <button type="button" onClick={split ? mergeSplit : startSplit} className="inline-flex items-center gap-1 text-[13px] font-medium text-gold hover:underline">
+              <Split className="h-3.5 w-3.5" /> {split ? t("split.merge") : t("split.start")}
+            </button>
           </div>
-          <div className={cn("grid grid-cols-3 gap-2 sm:grid-cols-5", errors.category && "rounded-2xl ring-1 ring-bad/50 ring-offset-4 ring-offset-[#141418]")}>
-            {categories.map((c) => {
-              const active = c.name === form.category;
-              return (
-                <motion.button
-                  key={c.name}
-                  type="button"
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => pickCategory(c.name)}
-                  className={cn(
-                    "relative flex flex-col items-center gap-1.5 rounded-2xl border px-1.5 py-2.5 text-center transition-colors",
-                    active ? "border-transparent" : "border-line bg-surface-2/60 hover:border-line-strong",
-                  )}
-                  style={active ? { background: `${c.color}26`, boxShadow: `inset 0 0 0 1.5px ${c.color}` } : undefined}
-                >
-                  <CategoryIcon icon={c.icon} color={c.color} size="sm" />
-                  <span className={cn("line-clamp-2 text-[11px] leading-tight", active ? "text-ink" : "text-ink-2")}>{c.name}</span>
-                </motion.button>
-              );
-            })}
-          </div>
+          {split ? (
+            <SplitEditor parts={split} onChange={setSplit} categories={ds.categories} currency={currencySymbol} missingCategory={missingCategory} />
+          ) : (
+            <div className={cn("grid grid-cols-3 gap-2 sm:grid-cols-5", errors.category && "rounded-2xl ring-1 ring-bad/50 ring-offset-4 ring-offset-[#141418]")}>
+              {categories.map((c) => {
+                const active = c.name === form.category;
+                return (
+                  <motion.button
+                    key={c.name}
+                    type="button"
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => pickCategory(c.name)}
+                    className={cn(
+                      "relative flex flex-col items-center gap-1.5 rounded-2xl border px-1.5 py-2.5 text-center transition-colors",
+                      active ? "border-transparent" : "border-line bg-surface-2/60 hover:border-line-strong",
+                    )}
+                    style={active ? { background: `${c.color}26`, boxShadow: `inset 0 0 0 1.5px ${c.color}` } : undefined}
+                  >
+                    <CategoryIcon icon={c.icon} color={c.color} size="sm" />
+                    <span className={cn("line-clamp-2 text-[11px] leading-tight", active ? "text-ink" : "text-ink-2")}>{c.name}</span>
+                  </motion.button>
+                );
+              })}
+            </div>
+          )}
           {errors.category && <p className="mt-2 text-xs text-bad">{errors.category}</p>}
           <AnimatePresence>
             {suggestedFrom && (
@@ -546,7 +626,7 @@ function ExpenseForm({
 
         {/* Subcategory chips */}
         <AnimatePresence initial={false}>
-          {currentCat && currentCat.subcategories.length > 0 && (
+          {!split && currentCat && currentCat.subcategories.length > 0 && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
               <div className="mb-2 flex items-center justify-between text-[13px] font-medium text-ink-2">
                 <span>{t("form.subcategory")}</span>
@@ -576,13 +656,14 @@ function ExpenseForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("form.payment")} hint={flag("payment")} highlight={aiFields.has("payment")} htmlFor="payment">
-            <Select id="payment" value={form.payment} onChange={(e) => set({ payment: e.target.value })}>
-              {[...new Set([...ds.settings.paymentMethods, form.payment].filter(Boolean))].map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </Select>
+            <PaymentSelect
+              id="payment"
+              value={form.payment}
+              onChange={(payment) => set({ payment })}
+              methods={[...new Set([...ds.settings.paymentMethods, form.payment].filter(Boolean))]}
+              styles={ds.settings.paymentStyles}
+              placeholder={t("form.payment")}
+            />
           </Field>
           <Field label={t("form.type")}>
             <Segmented value={form.type} onChange={(v) => set({ type: v })} options={EXPENSE_TYPES.map((v) => ({ value: v, label: t(`type.${v}`) }))} />

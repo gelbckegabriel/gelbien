@@ -1,9 +1,10 @@
 "use client";
 
-import { Download, Paperclip, Plus, Repeat, Search, SlidersHorizontal, X } from "lucide-react";
+import { Download, Paperclip, Plus, Repeat, Search, SlidersHorizontal, Split, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useDeferredValue, useMemo, useState } from "react";
+import { CategorySelect, PaymentSelect } from "@/components/pickers";
 import { PRIORITY_COLORS } from "@/components/charts/kit";
 import { CategoryIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
@@ -30,8 +31,9 @@ export default function ExpensesPage() {
 
 function Expenses() {
   const ds = useDataset().data as Dataset;
-  // /expenses?category=… (from the budget page) opens with that category filtered
-  const linked = useSearchParams().get("category") ?? "";
+  // /expenses?category=… (from the budget page) opens with that filter applied
+  const params = useSearchParams();
+  const linked = params.get("category") ?? "";
   const initialCategory = ds.categories.some((c) => c.name === linked) ? linked : "";
   const month = useUi((s) => s.month);
   const openExpense = useUi((s) => s.openExpense);
@@ -58,6 +60,12 @@ function Expenses() {
     );
     return sort === "amount" ? [...out].sort((a, b) => b.amount - a.amount) : out;
   }, [ds.transactions, scope, month, category, priority, payment, q, sort]);
+  // parts per split purchase: a purchase shows as one row when all of its parts are listed
+  const groupSize = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const tx of ds.transactions) if (tx.group) m.set(tx.group, (m.get(tx.group) ?? 0) + 1);
+    return m;
+  }, [ds.transactions]);
 
   const total = round2(rows.reduce((a, r) => a + r.amount, 0));
   const visible = rows.slice(0, limit);
@@ -75,6 +83,26 @@ function Expenses() {
     return todayISO(d);
   })();
   const dayLabel = (iso: string) => (iso === today ? t("common.today") : iso === yesterday ? t("common.yesterday") : f.dayLong(iso));
+  // A split purchase shows as one row when all of its parts are in the list (a category
+  // filter can leave only some — those show on their own).
+  const rowsOf = (items: Transaction[]) => {
+    const out: ({ kind: "tx"; tx: Transaction } | { kind: "split"; txs: Transaction[] })[] = [];
+    const done = new Set<string>();
+    for (const tx of items) {
+      const size = tx.group ? (groupSize.get(tx.group) ?? 0) : 0;
+      if (size > 1) {
+        if (done.has(tx.group)) continue;
+        const parts = items.filter((x) => x.group === tx.group);
+        if (parts.length === size) {
+          done.add(tx.group);
+          out.push({ kind: "split", txs: parts });
+          continue;
+        }
+      }
+      out.push({ kind: "tx", tx });
+    }
+    return out;
+  };
   const filtersActive = !!(category || priority || payment || query);
   const payments = [...new Set([...ds.settings.paymentMethods, ...ds.transactions.map((x) => x.payment)].filter(Boolean))];
 
@@ -118,15 +146,15 @@ function Expenses() {
       <AnimatePresence initial={false}>
         {showFilters && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-            <div className="mb-4 grid gap-2 sm:grid-cols-4">
-              <Select value={category} onChange={(e) => setCategory(e.target.value)} aria-label={t("exp.col.category")}>
-                <option value="">{t("exp.allCategories")}</option>
-                {ds.categories.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
+            <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <CategorySelect
+                value={category}
+                onChange={setCategory}
+                categories={ds.categories}
+                placeholder={t("exp.allCategories")}
+                allLabel={t("exp.allCategories")}
+                aria-label={t("exp.col.category")}
+              />
               <Select value={priority} onChange={(e) => setPriority(e.target.value as Priority | "")} aria-label={t("exp.col.priority")}>
                 <option value="">{t("exp.allPriorities")}</option>
                 {PRIORITIES.map((p) => (
@@ -135,14 +163,15 @@ function Expenses() {
                   </option>
                 ))}
               </Select>
-              <Select value={payment} onChange={(e) => setPayment(e.target.value)} aria-label={t("exp.col.payment")}>
-                <option value="">{t("exp.allPayments")}</option>
-                {payments.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </Select>
+              <PaymentSelect
+                value={payment}
+                onChange={setPayment}
+                methods={payments}
+                styles={ds.settings.paymentStyles}
+                placeholder={t("exp.allPayments")}
+                allLabel={t("exp.allPayments")}
+                aria-label={t("exp.col.payment")}
+              />
               <Select value={sort} onChange={(e) => setSort(e.target.value as "date" | "amount")} aria-label="Sort">
                 <option value="date">{t("exp.sort.date")}</option>
                 <option value="amount">{t("exp.sort.amount")}</option>
@@ -200,7 +229,41 @@ function Expenses() {
               )}
               <ul className="divide-y divide-line/50">
                 <AnimatePresence initial={false}>
-                  {g.items.map((tx) => {
+                  {rowsOf(g.items).map((row) => {
+                    if (row.kind === "split") {
+                      const [first] = row.txs;
+                      const c = cats.get(first.category);
+                      const sumAll = round2(row.txs.reduce((a, x) => a + x.amount, 0));
+                      return (
+                        <motion.li key={first.group} layout exit={{ opacity: 0, height: 0 }}>
+                          <button onClick={() => openExpense({ editing: first })} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]">
+                            <span className="relative shrink-0">
+                              <CategoryIcon icon={c?.icon ?? "Package"} color={c?.color ?? "#6b6a72"} />
+                              <span className="absolute -bottom-1 -right-1 grid h-4 min-w-4 place-items-center rounded-full border border-bg bg-surface-3 px-1 text-[9px] font-semibold text-ink-2">
+                                +{row.txs.length - 1}
+                              </span>
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center gap-1.5">
+                                <span className="truncate text-[14px] text-ink">{first.merchant || row.txs.map((x) => x.description).filter(Boolean).join(", ") || first.category}</span>
+                                <Split className="h-3.5 w-3.5 shrink-0 text-ink-3" aria-label={t("exp.split")} />
+                                {first.receiptUrl && <Paperclip className="h-3.5 w-3.5 shrink-0 text-ink-3" aria-label={t("exp.receipt")} />}
+                              </span>
+                              <span className="block truncate text-xs text-ink-3">
+                                {[sort === "amount" ? f.dateShort(first.date) : null, row.txs.map((x) => x.category).join(" + "), first.payment]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            </span>
+                            <span className="flex shrink-0 flex-col items-end gap-1">
+                              <span className={cn("tabular text-[14px] font-medium", sumAll < 0 ? "text-good" : "text-ink")}>{f.money(sumAll)}</span>
+                              <span className="text-[10px] text-ink-3">{t("split.nParts", { n: row.txs.length })}</span>
+                            </span>
+                          </button>
+                        </motion.li>
+                      );
+                    }
+                    const tx = row.tx;
                     const c = cats.get(tx.category);
                     return (
                       <motion.li key={tx.id} layout exit={{ opacity: 0, height: 0 }}>
@@ -210,6 +273,7 @@ function Expenses() {
                             <span className="flex items-center gap-1.5">
                               <span className="truncate text-[14px] text-ink">{tx.description || tx.merchant || tx.subcategory || tx.category}</span>
                               {tx.recurring && <Repeat className="h-3.5 w-3.5 shrink-0 text-ink-3" aria-label={t("exp.recurring")} />}
+                              {tx.group && <Split className="h-3.5 w-3.5 shrink-0 text-ink-3" aria-label={t("exp.split")} />}
                               {tx.receiptUrl && <Paperclip className="h-3.5 w-3.5 shrink-0 text-ink-3" aria-label={t("exp.receipt")} />}
                             </span>
                             <span className="block truncate text-xs text-ink-3">

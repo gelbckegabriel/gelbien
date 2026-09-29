@@ -62,10 +62,15 @@ export function subscriptionTotals(subs: Subscription[]) {
   const trial = subs.filter((s) => s.status === "trial");
   const activeMonthly = sum(active, monthlyCost);
   const trialMonthly = sum(trial, monthlyCost);
+  const subscriptions = active.filter((s) => s.kind === "subscription");
   return {
     activeCount: active.length,
     activeMonthly: round2(activeMonthly),
     activeYearly: round2(activeMonthly * 12),
+    /** of the active ones: bills (rent, utilities…) vs subscriptions */
+    billsMonthly: round2(sum(active.filter((s) => s.kind === "bill"), monthlyCost)),
+    subscriptionCount: subscriptions.length,
+    subscriptionsMonthly: round2(sum(subscriptions, monthlyCost)),
     trialCount: trial.length,
     trialMonthly: round2(trialMonthly),
     trialYearly: round2(trialMonthly * 12),
@@ -490,9 +495,10 @@ export function localInsights(ds: Dataset, month: string, today = todayISO()): L
     }
   }
 
+  // subscriptions only: rent and other bills aren't what this nudge is about
   const subs = subscriptionTotals(ds.subscriptions);
-  if (subs.activeCount >= 2) {
-    out.push({ id: "subs", tone: "info", key: "subs", weight: 20, vars: { amount: subs.activeYearly, count: subs.activeCount, monthly: subs.activeMonthly } });
+  if (subs.subscriptionCount >= 2) {
+    out.push({ id: "subs", tone: "info", key: "subs", weight: 20, vars: { amount: round2(subs.subscriptionsMonthly * 12), count: subs.subscriptionCount, monthly: subs.subscriptionsMonthly } });
   }
 
   if (s.largest && s.total > 0 && s.largest.amount / s.total >= 0.2 && s.count > 3) {

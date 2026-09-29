@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { friendlyAiError, translateCategoryNames, type NameGroup } from "@/lib/ai/client";
 import { useActiveAi } from "@/lib/ai/config";
 import { useMutate, useSaving } from "@/lib/data/hooks";
-import { builtInTranslation } from "@/lib/defaults";
+import { builtInTranslation, paymentTranslations } from "@/lib/defaults";
 import { LOCALES, useI18n } from "@/lib/i18n";
 import type { Category, Dataset, Locale } from "@/lib/types";
 import { cn, normalize } from "@/lib/utils";
@@ -45,10 +45,24 @@ function initialRows(categories: Category[], locale: Locale): Row[] {
   });
 }
 
+/** Rows for the built-in payment methods whose name reads differently in `locale` */
+const paymentRows = (methods: string[], locale: Locale): Row[] =>
+  paymentTranslations(methods, locale).map(({ from, to }) => ({
+    id: `\u0001${from}`,
+    category: "",
+    sub: null,
+    from,
+    to,
+    include: true,
+    source: "builtin",
+    edited: false,
+  }));
+
 /**
  * Review screen for translating categories and subcategories into the app's language.
  * Built-in names use fixed translations; the user's own names go to the AI when one is set up.
  * Nothing is written until "Apply", which renames everywhere (expenses, budgets, subscriptions).
+ * Built-in payment methods ("Crédito" → "Credit") are offered at the end, renamed the same way.
  */
 export function TranslateCategoriesDialog({ ds, open, onClose }: { ds: Dataset; open: boolean; onClose: () => void }) {
   const { t, locale } = useI18n();
@@ -59,6 +73,8 @@ export function TranslateCategoriesDialog({ ds, open, onClose }: { ds: Dataset; 
   // (optimistically), and the rows below are keyed by these names.
   const [base] = useState(() => ds.categories);
   const [rows, setRows] = useState<Row[]>(() => initialRows(base, locale));
+  const [baseSettings] = useState(() => ds.settings);
+  const [payRows, setPayRows] = useState<Row[]>(() => paymentRows(baseSettings.paymentMethods, locale));
   const [aiState, setAiState] = useState<{ status: "idle" | "running" | "failed"; error?: string }>({ status: "idle" });
   const language = new Intl.DisplayNames([LOCALES[locale].intl], { type: "language" }).of(locale) ?? LOCALES[locale].label;
 
@@ -99,6 +115,7 @@ export function TranslateCategoriesDialog({ ds, open, onClose }: { ds: Dataset; 
   }, [open]);
 
   const update = (id: string, patch: Partial<Row>) => setRows((cur) => cur.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const updatePay = (id: string, patch: Partial<Row>) => setPayRows((cur) => cur.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const groups = useMemo(
     () =>
       base
@@ -124,9 +141,17 @@ export function TranslateCategoriesDialog({ ds, open, onClose }: { ds: Dataset; 
     };
     mark(rows.filter((r) => r.sub === null));
     for (const c of base) mark(rows.filter((r) => r.category === c.name && r.sub !== null));
+    // payment methods, against the ones that aren't being renamed too
+    const renamed = new Set(payRows.map((r) => r.from));
+    mark([
+      ...payRows,
+      ...baseSettings.paymentMethods.filter((p) => !renamed.has(p)).map((p) => ({ id: `\u0002${p}`, from: p, to: p, include: false }) as Row),
+    ]);
     return dup;
-  }, [rows, base]);
-  const changes = rows.filter((r) => final(r) !== r.from).length;
+  }, [rows, base, payRows, baseSettings]);
+  const categoryChanges = rows.filter((r) => final(r) !== r.from).length;
+  const paymentChanges = payRows.filter((r) => final(r) !== r.from);
+  const changes = categoryChanges + paymentChanges.length;
 
   const apply = async () => {
     if (!changes || duplicates.size || saving) return;
@@ -137,7 +162,18 @@ export function TranslateCategoriesDialog({ ds, open, onClose }: { ds: Dataset; 
     const subRenames = base.flatMap((c) =>
       c.subcategories.filter((s) => nameOf(c.name, s) !== s).map((s) => ({ category: c.name, from: s, to: nameOf(c.name, s) })),
     );
-    if (!(await run(() => mutate.save({ op: "saveCategories", categories, renames, subRenames })))) return;
+    const paymentRenames = paymentChanges.map((r) => ({ from: r.from, to: final(r) }));
+    const newName = (p: string) => paymentRenames.find((r) => r.from === p)?.to ?? p;
+    const settings = {
+      ...baseSettings,
+      paymentMethods: baseSettings.paymentMethods.map(newName),
+      paymentStyles: Object.fromEntries(Object.entries(baseSettings.paymentStyles).map(([name, style]) => [newName(name), style])),
+    };
+    const ok = await run(async () => {
+      if (categoryChanges) await mutate.save({ op: "saveCategories", categories, renames, subRenames });
+      if (paymentRenames.length) await mutate.save({ op: "saveSettings", settings, paymentRenames });
+    });
+    if (!ok) return;
     toast.success(t("cfg.tr.done"));
     onClose();
   };
@@ -185,7 +221,7 @@ export function TranslateCategoriesDialog({ ds, open, onClose }: { ds: Dataset; 
         </div>
       )}
 
-      {groups.length === 0 ? (
+      {groups.length === 0 && payRows.length === 0 ? (
         <p className="py-6 text-center text-sm text-ink-3">{t("cfg.tr.none", { language })}</p>
       ) : (
         <ul className="space-y-5">
@@ -208,6 +244,18 @@ export function TranslateCategoriesDialog({ ds, open, onClose }: { ds: Dataset; 
               )}
             </li>
           ))}
+          {payRows.length > 0 && (
+            <li>
+              <p className="text-sm font-medium text-ink-2">{t("cfg.payments.title")}</p>
+              <ul className="ml-2 mt-3 space-y-3 border-l border-line pl-4">
+                {payRows.map((r) => (
+                  <li key={r.id}>
+                    <RowEditor row={r} duplicate={duplicates.has(r.id)} loading={false} onChange={(p) => updatePay(r.id, p)} />
+                  </li>
+                ))}
+              </ul>
+            </li>
+          )}
         </ul>
       )}
     </Sheet>

@@ -34,13 +34,16 @@ function Ring({ value, tone }: { value: number; tone: "gold" | "warn" | "bad" })
   );
 }
 
-export function Hero({ s, prevTotal, name }: { s: MonthSummary; prevTotal: number; name?: string }) {
+export function Hero({ s, prevTotal, name, bills = 0 }: { s: MonthSummary; prevTotal: number; name?: string; /** still to pay this month */ bills?: number }) {
   const { t, f } = useI18n();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? t("dash.greeting.morning") : hour < 18 ? t("dash.greeting.afternoon") : t("dash.greeting.evening");
   const used = s.budgetTotal > 0 ? s.total / s.budgetTotal : 0;
   const tone = used > 1 ? "bad" : used >= 0.85 ? "warn" : "gold";
   const change = prevTotal > 0 ? (s.total - prevTotal) / prevTotal : NaN;
+  // bills still to pay this month are already spoken for
+  const left = s.remaining - bills;
+  const perDay = s.daysLeft > 0 ? left / s.daysLeft : 0;
 
   return (
     <Card className="p-6 sm:p-7">
@@ -69,12 +72,13 @@ export function Hero({ s, prevTotal, name }: { s: MonthSummary; prevTotal: numbe
           </div>
           {s.budgetTotal > 0 && (
             <div className="mt-5 flex flex-wrap items-center gap-2">
-              <Badge tone={s.remaining >= 0 ? "good" : "bad"} className="px-3 py-1 text-[13px]">
-                {s.remaining >= 0 ? t("dash.left", { amount: f.money(s.remaining) }) : t("dash.overBy", { amount: f.money(-s.remaining) })}
+              <Badge tone={left >= 0 ? "good" : "bad"} className="px-3 py-1 text-[13px]">
+                {left >= 0 ? t("dash.left", { amount: f.money(left) }) : t("dash.overBy", { amount: f.money(-left) })}
               </Badge>
+              {bills > 0 && <span className="text-[13px] text-ink-3">{t("dash.afterBills", { amount: f.money0(bills) })}</span>}
               {s.isCurrent && s.daysLeft > 0 && (
                 <span className="text-[13px] text-ink-2">
-                  {s.remaining > 0 ? t("dash.perDay", { amount: f.money(s.perDayLeft), days: s.daysLeft }) : t("dash.perDayOver", { days: s.daysLeft })}
+                  {left > 0 ? t("dash.perDay", { amount: f.money(perDay), days: s.daysLeft }) : t("dash.perDayOver", { days: s.daysLeft })}
                 </span>
               )}
               {s.isPast && <Badge>{t("dash.pastMonth")}</Badge>}

@@ -5,12 +5,15 @@ export type ExpenseType = "fixed" | "variable";
 export type Cycle = "weekly" | "monthly" | "bimonthly" | "quarterly" | "semiannual" | "annual";
 export type SubStatus = "active" | "trial" | "paused" | "cancelled";
 export type WorthIt = "yes" | "maybe" | "no";
+/** A bill (rent, utilities, insurance) or a subscription (streaming, apps) — both repeat */
+export type SubKind = "bill" | "subscription";
 
 export const PRIORITIES: Priority[] = ["essential", "important", "superfluous"];
 export const EXPENSE_TYPES: ExpenseType[] = ["fixed", "variable"];
 export const CYCLES: Cycle[] = ["weekly", "monthly", "bimonthly", "quarterly", "semiannual", "annual"];
 export const SUB_STATUSES: SubStatus[] = ["active", "trial", "paused", "cancelled"];
 export const WORTH_IT: WorthIt[] = ["yes", "maybe", "no"];
+export const SUB_KINDS: SubKind[] = ["bill", "subscription"];
 
 export type AccountType = "chequing" | "savings" | "investment" | "credit" | "cash" | "other";
 export type GoalStatus = "active" | "paused" | "achieved";
@@ -35,6 +38,10 @@ export interface Transaction {
   receiptUrl: string;
   createdAt: string;
   updatedAt: string;
+  /** Shared by the parts of one purchase split across categories; "" for a normal expense */
+  group: string;
+  /** The subscription / recurring bill this expense pays; "" otherwise */
+  billId: string;
 }
 
 export interface Category {
@@ -72,6 +79,15 @@ export interface Subscription {
   trialEnd: string;
   worthIt: WorthIt;
   notes: string;
+  /** A known upcoming charge date (YYYY-MM-DD) — anchors non-monthly cycles; "" when unknown */
+  nextCharge: string;
+  /** Free trials and "worth it?" only apply to subscriptions */
+  kind: SubKind;
+}
+
+export interface PaymentStyle {
+  icon: string;
+  color: string;
 }
 
 export interface Settings {
@@ -83,6 +99,8 @@ export interface Settings {
   /** Monthly savings target */
   savingsGoal: number;
   paymentMethods: string[];
+  /** Icon + colour the user picked for a payment method, by name. Others use the built-in look (see paymentLook). */
+  paymentStyles: Record<string, PaymentStyle>;
   /** Fraction of a budget at which a category flips to "attention" */
   warnAt: number;
   /** Day of the month (1-28) when balances should be checked in */
@@ -154,6 +172,12 @@ export type Mutation =
   | { op: "addTransaction"; tx: Transaction }
   | { op: "updateTransaction"; tx: Transaction }
   | { op: "deleteTransaction"; id: string }
+  /** Several new expenses in one write (e.g. marking bills paid) */
+  | { op: "addTransactions"; txs: Transaction[] }
+  | { op: "deleteTransactions"; ids: string[] }
+  /** Replaces every part of split purchase `group` with `txs` (parts left out are deleted). */
+  | { op: "saveTransactionGroup"; group: string; txs: Transaction[] }
+  | { op: "deleteTransactionGroup"; group: string }
   | {
       op: "saveCategories";
       categories: Category[];
@@ -165,7 +189,8 @@ export type Mutation =
   | { op: "saveBudget"; month: string; lines: BudgetLine[]; income: IncomeLine | null; clearIncome?: boolean }
   | { op: "upsertSubscription"; sub: Subscription }
   | { op: "deleteSubscription"; id: string }
-  | { op: "saveSettings"; settings: Settings }
+  /** `paymentRenames` renames a payment method on past expenses and recurring payments too */
+  | { op: "saveSettings"; settings: Settings; paymentRenames?: { from: string; to: string }[] }
   | { op: "upsertAccount"; account: Account }
   | { op: "deleteAccount"; id: string }
   /** Upserts snapshots by (accountId, date) */

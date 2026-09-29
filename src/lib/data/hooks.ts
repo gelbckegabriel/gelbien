@@ -43,6 +43,8 @@ export function useDataset() {
     queryKey: key,
     queryFn: () => source!.load(),
     enabled: source !== null,
+    // an expired login won't fix itself: go to /login straight away (see AppShell)
+    retry: (count, err) => count < 1 && !(err instanceof ApiError && err.status === 401),
     staleTime: mode === "google" ? 60_000 : Infinity,
     refetchOnWindowFocus: mode === "google",
   });

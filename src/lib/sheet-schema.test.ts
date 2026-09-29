@@ -5,6 +5,7 @@ import {
   dataRange,
   datasetFromRanges,
   datasetToRanges,
+  rowToSubscription,
   rowToTransaction,
   rowsToSettings,
 } from "./sheet-schema";
@@ -16,7 +17,7 @@ describe("sheet schema", () => {
     expect(colLetter(1)).toBe("A");
     expect(colLetter(15)).toBe("O");
     expect(colLetter(27)).toBe("AA");
-    expect(dataRange("transactions")).toBe("Transactions!A2:O");
+    expect(dataRange("transactions")).toBe("Transactions!A2:Q");
   });
 
   it("round-trips a whole dataset through sheet rows", () => {
@@ -26,13 +27,14 @@ describe("sheet schema", () => {
           id: "t1", date: "2026-09-20", category: "Groceries", subcategory: "Bakery", description: "=SUM(A1)", amount: 12.5,
           payment: "Debit", type: "variable", priority: "essential", merchant: "Cobs", recurring: false, notes: "",
           receiptUrl: "", createdAt: "2026-09-20T10:00:00.000Z", updatedAt: "2026-09-20T10:00:00.000Z",
+          group: "g1", billId: "s1",
         },
       ],
       categories: defaultCategories("en"),
       budgets: [{ month: "default", category: "Groceries", amount: 500 }],
       incomes: [{ month: "default", gross: 6000, net: 4800, note: "" }],
       subscriptions: [
-        { id: "s1", name: "Spotify", category: "Subscriptions", amount: 11.99, cycle: "monthly", billingDay: 5, payment: "Credit", status: "active", trialEnd: "", worthIt: "yes", notes: "" },
+        { id: "s1", name: "Spotify", category: "Subscriptions", amount: 11.99, cycle: "monthly", billingDay: 5, payment: "Credit", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "2026-10-05", kind: "subscription" },
       ],
       accounts: [
         { id: "a1", name: "HISA", institution: "Neo Financial", type: "savings", color: "#199e70", archived: false, notes: "" },
@@ -52,7 +54,7 @@ describe("sheet schema", () => {
           monthlyContribution: 150, annualReturn: 0, status: "paused", order: 1, notes: "Brazil", createdAt: "",
         },
       ],
-      settings: { ...defaultSettings("en"), reserve: 15000, checkInDay: 5 },
+      settings: { ...defaultSettings("en"), reserve: 15000, checkInDay: 5, paymentStyles: { Credit: { icon: "Gift", color: "#d55181" } } },
     };
     const back = datasetFromRanges(datasetToRanges(data), "en");
     expect(back).toEqual(data);
@@ -73,6 +75,15 @@ describe("sheet schema", () => {
     expect(s.warnAt).toBe(0.85);
     expect(s.paymentMethods).toEqual(["Pix", "Cartão"]);
     expect(s.locale).toBe("pt");
+    expect(s.paymentStyles).toEqual({});
+    const styled = rowsToSettings([["paymentStyles", JSON.stringify({ Pix: { icon: "QrCode", color: "#199e70" } })]], "pt");
+    expect(styled.paymentStyles).toEqual({ Pix: { icon: "QrCode", color: "#199e70" } });
+  });
+
+  it("tells bills from subscriptions on rows saved before the kind column", () => {
+    expect(rowToSubscription(["s1", "Netflix", "Subscriptions", 18.99, "monthly", 5])?.kind).toBe("subscription");
+    expect(rowToSubscription(["s2", "Rent", "Housing", 1650, "monthly", 1])?.kind).toBe("bill");
+    expect(rowToSubscription(["s3", "Gym", "Health", 50, "monthly", 1, "", "active", "", "yes", "", "", "subscription"])?.kind).toBe("subscription");
   });
 
   it("parses human-typed amounts", () => {

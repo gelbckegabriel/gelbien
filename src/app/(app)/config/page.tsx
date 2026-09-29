@@ -14,9 +14,9 @@ import { Input } from "@/components/ui/form";
 import { Badge } from "@/components/ui/misc";
 import { SaveBar } from "@/components/ui/save-bar";
 import { useDataset, useMutate } from "@/lib/data/hooks";
-import { CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/defaults";
+import { CATEGORY_COLORS, CATEGORY_ICONS, PAYMENT_ICONS, paymentLook } from "@/lib/defaults";
 import { useI18n } from "@/lib/i18n";
-import type { Category, Dataset } from "@/lib/types";
+import type { Category, Dataset, PaymentStyle, Settings } from "@/lib/types";
 import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
 import { cn, normalize, uid } from "@/lib/utils";
 
@@ -24,6 +24,32 @@ interface Draft extends Category {
   key: string;
   /** Name when loaded — used to detect renames */
   original: string | null;
+}
+
+interface PaymentDraft {
+  key: string;
+  original: string | null;
+  name: string;
+  /** The look the user picked; null keeps the built-in one, which follows the name (and its translation) */
+  style: PaymentStyle | null;
+}
+
+const toPaymentDrafts = (s: Settings): PaymentDraft[] =>
+  s.paymentMethods.map((name) => ({ key: uid("p"), original: name, name, style: s.paymentStyles[name] ?? null }));
+
+const sameLook = (a: PaymentStyle, b: PaymentStyle) => a.icon === b.icon && a.color === b.color;
+// order-insensitive, so a re-keyed map (after a translation) doesn't read as an unsaved change
+const stylesKey = (st: Record<string, PaymentStyle>) => JSON.stringify(Object.keys(st).sort().map((k) => [k, st[k].icon, st[k].color]));
+
+/** The settings a list of payment drafts saves as, plus the renames to carry over to past expenses */
+function fromPaymentDrafts(list: PaymentDraft[]) {
+  const kept = list.map((d) => ({ ...d, name: d.name.trim() })).filter((d) => d.name);
+  return {
+    paymentMethods: kept.map((d) => d.name),
+    // only looks that differ from the built-in one for that name
+    paymentStyles: Object.fromEntries(kept.filter((d) => d.style && !sameLook(d.style, paymentLook(d.name))).map((d) => [d.name, d.style!])),
+    paymentRenames: kept.filter((d) => d.original && d.original !== d.name).map((d) => ({ from: d.original!, to: d.name })),
+  };
 }
 
 const toDraft = (cats: Category[]): Draft[] =>
@@ -39,7 +65,7 @@ export default function ConfigPage() {
 
 function Config() {
   const ds = useDataset().data as Dataset;
-  const version = `${JSON.stringify(ds.categories)}|${ds.settings.paymentMethods.join("|")}`;
+  const version = `${JSON.stringify(ds.categories)}|${ds.settings.paymentMethods.join("|")}|${JSON.stringify(ds.settings.paymentStyles)}`;
   // /config?translate=1 (offered after a language change) opens the review straight away
   const params = useSearchParams();
   const [translate, setTranslate] = useState(() => ({ open: params.get("translate") === "1", nonce: 0 }));
@@ -57,7 +83,11 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
   const mutate = useMutate();
   const initialCats = useMemo(() => toDraft(ds.categories), [ds.categories]);
   const [cats, setCats] = useStashedDraft<Draft[]>("config:categories", () => initialCats);
-  const [payments, setPayments] = useStashedDraft<string[]>("config:payments", () => ds.settings.paymentMethods);
+  const initialPayments = useMemo(() => toPaymentDrafts(ds.settings), [ds.settings]);
+  const [payments, setPayments] = useStashedDraft<PaymentDraft[]>("config:payments", () => initialPayments);
+  const paymentsOut = fromPaymentDrafts(payments);
+  const paymentsDirty =
+    paymentsOut.paymentMethods.join("|") !== ds.settings.paymentMethods.join("|") || stylesKey(paymentsOut.paymentStyles) !== stylesKey(ds.settings.paymentStyles);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [newPayment, setNewPayment] = useState("");
 
@@ -68,7 +98,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
   }, [ds.transactions]);
 
   const strip = (list: Draft[]) => list.map(({ name, color, icon, subcategories, archived }) => ({ name: name.trim(), color, icon, subcategories, archived }));
-  const dirty = JSON.stringify(strip(cats)) !== JSON.stringify(strip(initialCats)) || payments.join("|") !== ds.settings.paymentMethods.join("|");
+  const dirty = JSON.stringify(strip(cats)) !== JSON.stringify(strip(initialCats)) || paymentsDirty;
   const duplicate = (name: string, key: string) => cats.some((c) => c.key !== key && normalize(c.name) === normalize(name));
 
   const update = (key: string, patch: Partial<Draft>) => setCats((list) => list.map((c) => (c.key === key ? { ...c, ...patch } : c)));
@@ -103,7 +133,8 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
   const save = () => {
     const clean = cats.map((c) => ({ ...c, name: c.name.trim() })).filter((c) => c.name);
     const names = clean.map((c) => normalize(c.name));
-    if (new Set(names).size !== names.length) {
+    const paymentNames = paymentsOut.paymentMethods.map(normalize);
+    if (new Set(names).size !== names.length || new Set(paymentNames).size !== paymentNames.length) {
       toast.error(t("cfg.duplicate"));
       return false;
     }
@@ -114,8 +145,9 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
       stashDraft("config:payments", payments);
     };
     mutate.mutate({ op: "saveCategories", categories, renames }, { onFailure });
-    if (payments.join("|") !== ds.settings.paymentMethods.join("|")) {
-      mutate.mutate({ op: "saveSettings", settings: { ...ds.settings, paymentMethods: payments } }, { onFailure });
+    if (paymentsDirty) {
+      const { paymentRenames, ...settings } = paymentsOut;
+      mutate.mutate({ op: "saveSettings", settings: { ...ds.settings, ...settings }, paymentRenames }, { onFailure });
     }
     toast.success(t("cfg.saved"));
   };
@@ -123,10 +155,11 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
 
   const addPayment = () => {
     const v = newPayment.trim();
-    if (!v || payments.some((p) => normalize(p) === normalize(v))) return;
-    setPayments((p) => [...p, v]);
+    if (!v || payments.some((p) => normalize(p.name) === normalize(v))) return;
+    setPayments((p) => [...p, { key: uid("p"), original: null, name: v, style: null }]);
     setNewPayment("");
   };
+  const updatePayment = (key: string, patch: Partial<PaymentDraft>) => setPayments((list) => list.map((p) => (p.key === key ? { ...p, ...patch } : p)));
 
   return (
     <div>
@@ -154,7 +187,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
               return (
                 <Reorder.Item key={c.key} value={c} dragListener={false} className={cn("card overflow-hidden", c.archived && "opacity-60")}>
                   <div className="flex items-center gap-3 p-3">
-                    <IconPicker category={c} onChange={(patch) => update(c.key, patch)} />
+                    <IconPicker value={c} icons={CATEGORY_ICONS} onChange={(patch) => update(c.key, patch)} />
                     <div className="min-w-0 flex-1">
                       <input
                         value={c.name}
@@ -224,21 +257,39 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
             <CardHeader title={t("cfg.payments.title")} subtitle={t("cfg.payments.subtitle")} />
             <ul className="space-y-1.5">
               <AnimatePresence initial={false}>
-                {payments.map((p) => (
-                  <motion.li
-                    key={p}
-                    layout
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 8 }}
-                    className="flex items-center justify-between rounded-xl border border-line bg-surface-2/50 px-3 py-2 text-sm text-ink-2"
-                  >
-                    {p}
-                    <button onClick={() => setPayments((list) => list.filter((x) => x !== p))} className="text-ink-3 hover:text-bad" aria-label={t("common.delete")}>
-                      <X className="h-4 w-4" />
-                    </button>
-                  </motion.li>
-                ))}
+                {payments.map((p) => {
+                  const look = p.style ?? paymentLook(p.name);
+                  const renamed = !!p.original && p.original !== p.name.trim();
+                  return (
+                    <motion.li
+                      key={p.key}
+                      layout
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 8 }}
+                      className="flex items-center gap-2 rounded-xl border border-line bg-surface-2/50 py-1.5 pl-1.5 pr-2.5"
+                    >
+                      <IconPicker value={look} icons={PAYMENT_ICONS} size="md" onChange={(patch) => updatePayment(p.key, { style: { ...look, ...patch } })} />
+                      <div className="min-w-0 flex-1">
+                        <input
+                          value={p.name}
+                          // a renamed method keeps the look it had, rather than one guessed from the new name
+                          onChange={(e) => updatePayment(p.key, { name: e.target.value, style: p.style ?? (p.original ? paymentLook(p.original) : null) })}
+                          className={cn(
+                            "w-full rounded-lg bg-transparent px-2 py-1 text-base text-ink outline-none transition focus:bg-white/5 sm:text-sm",
+                            payments.some((x) => x.key !== p.key && normalize(x.name) === normalize(p.name)) && "text-bad",
+                          )}
+                          aria-label={t("cfg.payments.ph")}
+                          maxLength={60}
+                        />
+                        {renamed && <p className="px-2 text-[11px] text-gold">{t("cfg.payments.renameHint")}</p>}
+                      </div>
+                      <button onClick={() => setPayments((list) => list.filter((x) => x.key !== p.key))} className="text-ink-3 hover:text-bad" aria-label={t("common.delete")}>
+                        <X className="h-4 w-4" />
+                      </button>
+                    </motion.li>
+                  );
+                })}
               </AnimatePresence>
             </ul>
             <form
@@ -262,7 +313,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
         onSave={save}
         onReset={() => {
           setCats(initialCats);
-          setPayments(ds.settings.paymentMethods);
+          setPayments(initialPayments);
         }}
       />
     </div>
@@ -315,12 +366,23 @@ function SubcategoryEditor({ items, onChange }: { items: string[]; onChange: (it
   );
 }
 
-function IconPicker({ category, onChange }: { category: Category; onChange: (patch: Partial<Category>) => void }) {
+/** Icon + colour for a category or a payment method */
+function IconPicker({
+  value,
+  icons,
+  size = "lg",
+  onChange,
+}: {
+  value: PaymentStyle;
+  icons: readonly string[];
+  size?: "md" | "lg";
+  onChange: (patch: Partial<PaymentStyle>) => void;
+}) {
   const { t } = useI18n();
   return (
     <Popover.Root>
       <Popover.Trigger className="rounded-xl outline-none transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-gold" aria-label={`${t("cfg.icon")} / ${t("cfg.color")}`}>
-        <CategoryIcon icon={category.icon} color={category.color} size="lg" />
+        <CategoryIcon icon={value.icon} color={value.color} size={size} />
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content sideOffset={8} align="start" className="z-50 w-72 rounded-2xl border border-line-strong bg-[#16161b] p-4 shadow-2xl shadow-black/60">
@@ -330,7 +392,7 @@ function IconPicker({ category, onChange }: { category: Category; onChange: (pat
               <button
                 key={c}
                 onClick={() => onChange({ color: c })}
-                className={cn("h-7 w-7 rounded-full transition hover:scale-110", category.color === c && "ring-2 ring-white ring-offset-2 ring-offset-[#16161b]")}
+                className={cn("h-7 w-7 rounded-full transition hover:scale-110", value.color === c && "ring-2 ring-white ring-offset-2 ring-offset-[#16161b]")}
                 style={{ background: c }}
                 aria-label={c}
               />
@@ -338,14 +400,14 @@ function IconPicker({ category, onChange }: { category: Category; onChange: (pat
           </div>
           <p className="mb-2 mt-4 text-xs font-medium text-ink-3">{t("cfg.icon")}</p>
           <div className="grid grid-cols-8 gap-1">
-            {CATEGORY_ICONS.map((name) => {
+            {icons.map((name) => {
               const Icon = ICONS[name];
               return (
                 <button
                   key={name}
                   onClick={() => onChange({ icon: name })}
-                  className={cn("grid h-8 w-8 place-items-center rounded-lg transition hover:bg-white/10", category.icon === name ? "bg-white/10" : "text-ink-3")}
-                  style={category.icon === name ? { color: category.color } : undefined}
+                  className={cn("grid h-8 w-8 place-items-center rounded-lg transition hover:bg-white/10", value.icon === name ? "bg-white/10" : "text-ink-3")}
+                  style={value.icon === name ? { color: value.color } : undefined}
                   aria-label={name}
                 >
                   <Icon className="h-4 w-4" />

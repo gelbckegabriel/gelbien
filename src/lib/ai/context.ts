@@ -63,10 +63,12 @@ export function buildFinanceContext(ds: Dataset, anchorMonth = currentMonth()): 
   lines.push("");
 
   if (ds.subscriptions.length) {
-    lines.push("## Subscriptions (name, category, price, cycle, monthly equivalent, status, worth it?, trial end)");
+    lines.push("## Recurring payments (name, bill or subscription, category, price, cycle, monthly equivalent, status, worth it?, trial end)");
     for (const s of ds.subscriptions) {
       lines.push(
-        [s.name, s.category, s.amount.toFixed(2), s.cycle, monthlyCost(s).toFixed(2), s.status, s.worthIt, s.trialEnd || "-"].map(csv).join(", "),
+        [s.name, s.kind, s.category, s.amount.toFixed(2), s.cycle, monthlyCost(s).toFixed(2), s.status, s.kind === "subscription" ? s.worthIt : "-", s.trialEnd || "-"]
+          .map(csv)
+          .join(", "),
       );
     }
     lines.push("");

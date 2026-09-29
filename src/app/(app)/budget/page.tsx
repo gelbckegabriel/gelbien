@@ -1,9 +1,10 @@
 "use client";
 
-import { AlertTriangle, CalendarClock, ChevronRight, Copy, Plus, RotateCcw, Sparkles, Wand2 } from "lucide-react";
+import { AlertTriangle, CalendarClock, ChevronRight, ClipboardCheck, Copy, Plus, Repeat, RotateCcw, Wand2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo } from "react";
 import { toast } from "sonner";
+import { useSkippedBills } from "@/components/dashboard/bills";
 import { CategoryIcon } from "@/components/icons";
 import { GuardedLink } from "@/components/shell/unsaved";
 import { Button } from "@/components/ui/button";
@@ -11,13 +12,14 @@ import { Card, CardHeader, PageHeader, Stagger } from "@/components/ui/card";
 import { Field, MoneyInput, Segmented } from "@/components/ui/form";
 import { AnimatedNumber, Badge, EmptyState, Progress, STATUS_TONE } from "@/components/ui/misc";
 import { SaveBar } from "@/components/ui/save-bar";
+import { committedBills, type BillCharge } from "@/lib/bills";
 import { useDataset, useMutate } from "@/lib/data/hooks";
 import { budgetStatus, effectiveBudget, effectiveIncome, monthlyCost, subscriptionTotals, suggestBudget, summarizeMonth } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
-import type { Dataset, Subscription } from "@/lib/types";
+import { SUB_KINDS, type Dataset, type Subscription } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
-import { addMonths, cn, parseAmount, round2 } from "@/lib/utils";
+import { addMonths, cn, parseAmount, round2, todayISO } from "@/lib/utils";
 
 type Scope = "month" | "default";
 
@@ -65,6 +67,8 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
   const [draft, setDraft] = useStashedDraft<Draft>(draftId, () => initial);
   const summary = summarizeMonth(ds, month);
   const spentBy = new Map(summary.byCategory.map((c) => [c.name, c.spent]));
+  const skipped = useSkippedBills();
+  const committed = useMemo(() => committedBills(ds, month, todayISO(), skipped), [ds, month, skipped]);
   const { isOverride } = effectiveBudget(ds.budgets, month);
   const hasIncomeOverride = ds.incomes.some((i) => i.month === month);
   const categories = ds.categories.filter((c) => !c.archived || parseAmount(draft.lines[c.name]) > 0);
@@ -232,6 +236,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
         // spending the plan doesn't cover: categories without a limit
         unplanned={round2(summary.byCategory.filter((c) => !(parseAmount(draft.lines[c.name]) > 0)).reduce((a, c) => a + c.spent, 0))}
         warnAt={ds.settings.warnAt}
+        committed={committed}
       />
 
       <Card>
@@ -296,17 +301,40 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
 }
 
 /** How the month is going against the plan: spent vs. planned, pace for the current month, savings once it's over. */
-function PlanVsActual({ s, planned, net, unplanned, warnAt }: { s: ReturnType<typeof summarizeMonth>; planned: number; net: number; unplanned: number; warnAt: number }) {
+// the part of the plan already spoken for by bills
+const BILL_STRIPES = { background: "repeating-linear-gradient(135deg, #d9b45fb3 0 3px, #d9b45f40 3px 6px)" };
+
+function PlanVsActual({
+  s,
+  planned,
+  net,
+  unplanned,
+  warnAt,
+  committed,
+}: {
+  s: ReturnType<typeof summarizeMonth>;
+  planned: number;
+  net: number;
+  unplanned: number;
+  warnAt: number;
+  /** bills this month with nothing logged yet */
+  committed: BillCharge[];
+}) {
   const { t, f } = useI18n();
+  const openReview = useUi((st) => st.openReview);
   const spent = s.total;
-  const diff = planned - spent;
-  const tone = STATUS_TONE[budgetStatus(spent, planned, warnAt)];
+  const bills = round2(committed.reduce((a, c) => a + c.sub.amount, 0));
+  // what's free once the bills still to pay are set aside
+  const left = planned - spent - bills;
+  const tone = STATUS_TONE[budgetStatus(spent + bills, planned, warnAt)];
+  const at = (amount: number) => Math.min(100, (amount / planned) * 100);
+  const names = [...new Set(committed.map((c) => c.sub.name))];
   // straight-line pace, same as the dashboard's pace chart
   const expected = s.isCurrent && planned > 0 ? (planned * s.elapsed) / s.days : null;
   const pace = expected === null ? 0 : expected - spent;
   const month = f.monthName(s.month);
   // a month that hasn't started has nothing to compare yet (unless something was already logged in it)
-  const compare = planned > 0 && (!s.isFuture || spent > 0);
+  const compare = planned > 0 && (!s.isFuture || spent > 0 || bills > 0);
   const subtitle = s.isCurrent
     ? t("budget.vs.soFar", { month, day: s.elapsed, days: s.days })
     : s.isPast
@@ -324,14 +352,19 @@ function PlanVsActual({ s, planned, net, unplanned, warnAt }: { s: ReturnType<ty
           </span>
         </p>
         {compare && (
-          <Badge tone={diff >= 0 ? "good" : "bad"}>
-            {diff >= 0 ? t("budget.vs.under") : t("budget.vs.over")} · {f.money0(Math.abs(diff))}
+          <Badge tone={left >= 0 ? "good" : "bad"}>
+            {left < 0 ? t("budget.vs.over") : s.isPast ? t("budget.vs.under") : t("budget.vs.left")} · {f.money0(Math.abs(left))}
           </Badge>
         )}
       </div>
       {compare && (
         <div className="relative mt-3">
           <Progress value={spent / planned} tone={tone} className="h-2.5" />
+          {bills > 0 && (
+            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+              <span className="absolute inset-y-0" style={{ left: `${at(spent)}%`, width: `${Math.max(0, at(spent + bills) - at(spent))}%`, ...BILL_STRIPES }} />
+            </div>
+          )}
           {expected !== null && (
             <span
               title={t("budget.vs.todayMarker")}
@@ -342,6 +375,18 @@ function PlanVsActual({ s, planned, net, unplanned, warnAt }: { s: ReturnType<ty
         </div>
       )}
       <div className="mt-3 space-y-1 text-xs text-ink-3">
+        {bills > 0 && (
+          <p className="flex items-start gap-1.5">
+            <span className="mt-0.5 h-2.5 w-3 shrink-0 rounded-sm" style={BILL_STRIPES} />
+            <span>
+              {t("budget.vs.bills", {
+                amount: f.money0(bills),
+                month,
+                names: `${names.slice(0, 3).join(", ")}${names.length > 3 ? ` +${names.length - 3}` : ""}`,
+              })}
+            </span>
+          </p>
+        )}
         {expected !== null && (
           <p>
             {t("budget.vs.pace", { expected: f.money0(expected) })} ·{" "}
@@ -353,6 +398,11 @@ function PlanVsActual({ s, planned, net, unplanned, warnAt }: { s: ReturnType<ty
         {s.isPast && net > 0 && <p>{t("budget.vs.savings", { actual: f.money0(net - spent), planned: f.money0(net - planned) })}</p>}
         {unplanned > 0 && <p>{t("budget.vs.unplanned", { amount: f.money0(unplanned) })}</p>}
       </div>
+      {s.isPast && s.count > 0 && (
+        <button onClick={() => openReview(s.month)} className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-gold hover:underline">
+          <ClipboardCheck className="h-4 w-4" /> {t("review.openFull")}
+        </button>
+      )}
     </Card>
   );
 }
@@ -362,8 +412,10 @@ function Subscriptions({ ds }: { ds: Dataset }) {
   const open = useUi((s) => s.openSubscription);
   const totals = subscriptionTotals(ds.subscriptions);
   const order: Record<Subscription["status"], number> = { trial: 0, active: 1, paused: 2, cancelled: 3 };
-  const subs = [...ds.subscriptions].sort((a, b) => order[a.status] - order[b.status] || monthlyCost(b) - monthlyCost(a));
+  const sorted = [...ds.subscriptions].sort((a, b) => order[a.status] - order[b.status] || monthlyCost(b) - monthlyCost(a));
+  const groups = SUB_KINDS.map((kind) => ({ kind, items: sorted.filter((s) => s.kind === kind) })).filter((g) => g.items.length);
   const cats = new Map(ds.categories.map((c) => [c.name, c]));
+  const perMonth = (n: number) => t("budget.subs.perMonth", { amount: f.money(n) });
 
   return (
     <Card>
@@ -380,49 +432,73 @@ function Subscriptions({ ds }: { ds: Dataset }) {
         {[
           { label: `${t("budget.subs.active")} · ${t("budget.subs.monthly")}`, value: totals.activeMonthly, cls: "text-ink" },
           { label: `${t("budget.subs.active")} · ${t("budget.subs.yearly")}`, value: totals.activeYearly, cls: "text-gold-bright" },
-          { label: t("budget.subs.inTrial"), value: totals.trialMonthly, cls: totals.trialCount ? "text-warn" : "text-ink-3" },
+          {
+            // the part that's easiest to cut
+            label: `${t("budget.subs.group.subscription")} · ${t("budget.subs.monthly")}`,
+            value: totals.subscriptionsMonthly,
+            cls: "text-ink",
+            note: totals.trialCount ? t("budget.subs.trialExtra", { amount: f.money(totals.trialMonthly) }) : undefined,
+          },
         ].map((k) => (
           <div key={k.label} className="flex items-baseline justify-between gap-3 rounded-xl border border-line bg-surface-2/50 px-3 py-2.5 sm:block sm:p-3">
             <p className="text-xs text-ink-3 sm:text-[11px]">{k.label}</p>
-            <AnimatedNumber value={k.value} format={f.money} className={cn("block whitespace-nowrap text-lg font-semibold sm:mt-1", k.cls)} />
+            <span className="text-right sm:text-left">
+              <AnimatedNumber value={k.value} format={f.money} className={cn("block whitespace-nowrap text-lg font-semibold sm:mt-1", k.cls)} />
+              {k.note && <span className="block text-[11px] text-warn">{k.note}</span>}
+            </span>
           </div>
         ))}
       </div>
-      {subs.length === 0 ? (
-        <EmptyState icon={<Sparkles className="h-6 w-6" />} title={t("budget.subs.empty")} />
+      {groups.length === 0 ? (
+        <EmptyState icon={<Repeat className="h-6 w-6" />} title={t("budget.subs.empty")} />
       ) : (
-        <ul className="-mx-2 space-y-0.5">
-          {subs.map((s, i) => {
-            const c = cats.get(s.category);
-            const tone = s.status === "active" ? "good" : s.status === "trial" ? "warn" : "neutral";
-            return (
-              <motion.li key={s.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-                <button
-                  onClick={() => open(s)}
-                  className={cn("flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.04]", s.status === "cancelled" && "opacity-50")}
-                >
-                  <CategoryIcon icon={c?.icon ?? "Repeat"} color={c?.color ?? "#6f7fe0"} size="sm" />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate text-sm text-ink">{s.name}</span>
-                      <Badge tone={tone}>{t(`status.${s.status}`)}</Badge>
-                    </span>
-                    <span className="block truncate text-[11px] text-ink-3">
-                      {t(`cycle.${s.cycle}`)}
-                      {s.billingDay ? ` · ${t("budget.subs.dayN", { day: s.billingDay })}` : ""}
-                      {s.status === "trial" && s.trialEnd ? ` · ${t("budget.subs.trialEnd")} ${f.dateShort(s.trialEnd)}` : ""}
-                      {` · ${t("budget.subs.worth")} ${t(`worth.${s.worthIt}`)}`}
-                    </span>
-                  </span>
-                  <span className="text-right">
-                    <span className="tabular block text-sm font-medium text-ink">{f.money(s.amount)}</span>
-                    {s.cycle !== "monthly" && <span className="tabular block text-[11px] text-ink-3">{f.money(monthlyCost(s))}/{t("cycle.monthly").toLowerCase()}</span>}
-                  </span>
-                </button>
-              </motion.li>
-            );
-          })}
-        </ul>
+        <div className="-mx-2 space-y-3">
+          {groups.map((g) => (
+            <section key={g.kind}>
+              {/* headed only when both kinds are there */}
+              {groups.length > 1 && (
+                <h3 className="flex items-baseline justify-between px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-ink-3">
+                  <span>{t(`budget.subs.group.${g.kind}`)}</span>
+                  <span className="tabular normal-case tracking-normal">{perMonth(g.kind === "bill" ? totals.billsMonthly : totals.subscriptionsMonthly)}</span>
+                </h3>
+              )}
+              <ul className="space-y-0.5">
+                {g.items.map((s, i) => {
+                  const c = cats.get(s.category);
+                  const tone = s.status === "trial" ? "warn" : "neutral";
+                  return (
+                    <motion.li key={s.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+                      <button
+                        onClick={() => open(s)}
+                        className={cn("flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.04]", s.status === "cancelled" && "opacity-50")}
+                      >
+                        <CategoryIcon icon={c?.icon ?? "Repeat"} color={c?.color ?? "#6f7fe0"} size="sm" />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-sm text-ink">{s.name}</span>
+                            {/* active is the norm; only the exceptions get a badge */}
+                            {s.status !== "active" && <Badge tone={tone}>{t(`status.${s.status}`)}</Badge>}
+                          </span>
+                          <span className="block truncate text-[11px] text-ink-3">
+                            {t(`cycle.${s.cycle}`)}
+                            {s.billingDay && s.cycle === "monthly" ? ` · ${t("budget.subs.dayN", { day: s.billingDay })}` : ""}
+                            {s.cycle !== "monthly" && s.nextCharge ? ` · ${t("budget.subs.nextCharge")} ${f.dateShort(s.nextCharge)}` : ""}
+                            {s.status === "trial" && s.trialEnd ? ` · ${t("budget.subs.trialEnd")} ${f.dateShort(s.trialEnd)}` : ""}
+                            {s.kind === "subscription" && s.worthIt !== "yes" ? ` · ${t("budget.subs.worth")} ${t(`worth.${s.worthIt}`)}` : ""}
+                          </span>
+                        </span>
+                        <span className="text-right">
+                          <span className="tabular block text-sm font-medium text-ink">{f.money(s.amount)}</span>
+                          {s.cycle !== "monthly" && <span className="tabular block text-[11px] text-ink-3">{perMonth(monthlyCost(s))}</span>}
+                        </span>
+                      </button>
+                    </motion.li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </Card>
   );

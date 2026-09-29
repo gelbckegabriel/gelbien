@@ -122,6 +122,8 @@ export function buildDemoDataset(locale: Locale, today = todayISO()): Dataset {
       receiptUrl: "",
       createdAt: stamp,
       updatedAt: stamp,
+      group: "",
+      billId: "",
     };
   };
 
@@ -151,6 +153,17 @@ export function buildDemoDataset(locale: Locale, today = todayISO()): Dataset {
     const date = `${addMonths(nowMonth, o.offset)}-${pad(o.day)}`;
     if (date <= today) txs.push(make(o, date, o.min));
   }
+  // One purchase split across two categories
+  const splitDay = new Date(`${today}T12:00:00`);
+  splitDay.setDate(splitDay.getDate() - 3);
+  const costco = (tpl: Omit<Tpl, "min" | "max">, amount: number): Transaction => ({
+    ...make({ ...tpl, min: amount, max: amount }, todayISO(splitDay), amount),
+    group: "demo_split",
+  });
+  txs.push(
+    costco({ c: 2, s: 0, m: "Costco", d: ["Frutas, laticínios", "Produce, dairy", "Fruits, produits laitiers"], pr: "essential" }, 86.4),
+    costco({ c: 7, s: 0, m: "Costco", d: ["Papel toalha, detergente", "Paper towels, detergent", "Essuie-tout, détergent"], pr: "important" }, 42.9),
+  );
   txs.sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const budgetAmounts = [1700, 330, 640, 320, 170, 90, 200, 150, 40, 170, 50, 0, 220];
@@ -161,14 +174,21 @@ export function buildDemoDataset(locale: Locale, today = todayISO()): Dataset {
 
   const trialEnd = new Date(`${today}T12:00:00`);
   trialEnd.setDate(trialEnd.getDate() + 9);
+  const caaDue = new Date(`${today}T12:00:00`);
+  caaDue.setDate(caaDue.getDate() + 12);
+  // charged a few days ago with nothing logged, so the demo asks "were these paid?"
+  const gymDay = Math.max(1, Math.min(28, Number(today.slice(8, 10)) - 3));
   const subsCat = categories[8].name;
   const subscriptions: Subscription[] = [
-    { id: "sub_1", name: "Spotify", category: subsCat, amount: 11.99, cycle: "monthly", billingDay: 5, payment: pays[0], status: "active", trialEnd: "", worthIt: "yes", notes: "" },
-    { id: "sub_2", name: "Netflix", category: subsCat, amount: 18.99, cycle: "monthly", billingDay: 18, payment: pays[0], status: "active", trialEnd: "", worthIt: "maybe", notes: "" },
-    { id: "sub_3", name: "iCloud+", category: subsCat, amount: 3.99, cycle: "monthly", billingDay: 2, payment: pays[0], status: "active", trialEnd: "", worthIt: "yes", notes: "200 GB" },
-    { id: "sub_4", name: "Koodo", category: categories[1].name, amount: 45, cycle: "monthly", billingDay: 11, payment: pays[0], status: "active", trialEnd: "", worthIt: "yes", notes: "50 GB" },
-    { id: "sub_5", name: "Disney+", category: subsCat, amount: 14.99, cycle: "monthly", billingDay: null, payment: pays[0], status: "trial", trialEnd: todayISO(trialEnd), worthIt: "no", notes: "" },
-    { id: "sub_6", name: "Amazon Prime", category: subsCat, amount: 99, cycle: "annual", billingDay: 14, payment: pays[0], status: "paused", trialEnd: "", worthIt: "maybe", notes: "" },
+    { id: "sub_1", name: "Spotify", category: subsCat, amount: 11.99, cycle: "monthly", billingDay: 5, payment: pays[0], status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "subscription" },
+    { id: "sub_2", name: "Netflix", category: subsCat, amount: 18.99, cycle: "monthly", billingDay: 18, payment: pays[0], status: "active", trialEnd: "", worthIt: "maybe", notes: "", nextCharge: "", kind: "subscription" },
+    { id: "sub_3", name: "iCloud+", category: subsCat, amount: 3.99, cycle: "monthly", billingDay: 2, payment: pays[0], status: "active", trialEnd: "", worthIt: "yes", notes: "200 GB", nextCharge: "", kind: "subscription" },
+    { id: "sub_4", name: "Koodo", category: categories[1].name, amount: 45, cycle: "monthly", billingDay: 11, payment: pays[0], status: "active", trialEnd: "", worthIt: "yes", notes: "50 GB", nextCharge: "", kind: "bill" },
+    { id: "sub_5", name: "Disney+", category: subsCat, amount: 14.99, cycle: "monthly", billingDay: null, payment: pays[0], status: "trial", trialEnd: todayISO(trialEnd), worthIt: "no", notes: "", nextCharge: "", kind: "subscription" },
+    { id: "sub_6", name: "Amazon Prime", category: subsCat, amount: 99, cycle: "annual", billingDay: 14, payment: pays[0], status: "paused", trialEnd: "", worthIt: "maybe", notes: "", nextCharge: "", kind: "subscription" },
+    { id: "sub_7", name: "GoodLife Fitness", category: categories[5].name, amount: 54.99, cycle: "monthly", billingDay: gymDay, payment: pays[0], status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "subscription" },
+    { id: "sub_0", name: ["Aluguel", "Rent", "Loyer"][li], category: categories[0].name, amount: 1650, cycle: "monthly", billingDay: 1, payment: pays[3], status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill" },
+    { id: "sub_8", name: "CAA", category: categories[4].name, amount: 128, cycle: "annual", billingDay: null, payment: pays[0], status: "active", trialEnd: "", worthIt: "maybe", notes: "", nextCharge: todayISO(caaDue), kind: "bill" },
   ];
 
   // Accounts with a check-in on the 1st of each previous month. This month's check-in is

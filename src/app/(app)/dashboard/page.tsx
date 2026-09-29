@@ -11,20 +11,23 @@ import { ProjectionChart } from "@/components/charts/projection-chart";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { WeekdayChart } from "@/components/charts/weekday-chart";
 import { YearMatrix } from "@/components/charts/year-matrix";
+import { DueBills, UpcomingBills, useSkippedBills } from "@/components/dashboard/bills";
 import { BudgetBars, PaymentBreakdown, PrioritySplit, TopExpenses } from "@/components/dashboard/breakdowns";
 import { Hero } from "@/components/dashboard/hero";
 import { CheckInBanner } from "@/components/goals/checkin-banner";
+import { ReviewPrompt } from "@/components/month-review";
 import { Insights } from "@/components/dashboard/insights";
 import { Button } from "@/components/ui/button";
 import { Card, Stagger } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/misc";
 import { recentAverages, runway, subscriptionTotals, summarizeMonth, yearMatrix } from "@/lib/finance";
+import { committedBills } from "@/lib/bills";
 import { accountsReserve } from "@/lib/goals";
 import { useDataset, useMode } from "@/lib/data/hooks";
 import { useI18n } from "@/lib/i18n";
 import type { Dataset } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
-import { addMonths } from "@/lib/utils";
+import { addMonths, round2, todayISO } from "@/lib/utils";
 
 export default function DashboardPage() {
   const ds = useDataset().data as Dataset;
@@ -32,6 +35,7 @@ export default function DashboardPage() {
   const openExpense = useUi((s) => s.openExpense);
   const { session } = useMode();
   const { t, f } = useI18n();
+  const skipped = useSkippedBills();
 
   const s = summarizeMonth(ds, month);
   const prev = summarizeMonth(ds, addMonths(month, -1));
@@ -43,15 +47,19 @@ export default function DashboardPage() {
   const run = runway(reserve ?? 0, avg.spent, s.income.net);
   const noReserve = reserve === null && !run.sustainable;
   const change = (a: number, b: number) => (b ? (a - b) / Math.abs(b) : NaN);
+  // bills this month with nothing logged yet — taken out of what's left to spend
+  const bills = round2(committedBills(ds, month, todayISO(), skipped).reduce((a, c) => a + c.sub.amount, 0));
 
   return (
     <>
       <CheckInBanner ds={ds} className="mb-4" />
+      <ReviewPrompt ds={ds} className="mb-4" />
+      <DueBills ds={ds} className="mb-4" />
       {/* Every row is one grid row whose height comes from a "natural" block (text, lists, tiles);
           the cards beside it stretch to that height and their charts grow to fill it — no gaps. */}
       <Stagger className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="flex flex-col gap-4 lg:col-span-8">
-          <Hero s={s} prevTotal={prev.total} name={session?.user?.name} />
+          <Hero s={s} prevTotal={prev.total} name={session?.user?.name} bills={bills} />
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <StatTile
               label={s.saved >= 0 ? t("dash.kpi.saved") : t("dash.kpi.deficit")}
@@ -101,11 +109,11 @@ export default function DashboardPage() {
               sub={s.largest ? `${t("dash.kpi.largest")} ${f.money0(s.largest.amount)}` : undefined}
             />
             <StatTile
-              label={t("dash.kpi.subscriptions")}
+              label={t("dash.kpi.recurring")}
               value={subs.activeMonthly}
               format={f.money}
               icon={<Repeat className="h-4 w-4" />}
-              sub={`${f.money0(subs.activeYearly)} / ${t("cycle.annual").toLowerCase()}`}
+              sub={t("dash.kpi.subsPart", { amount: f.money0(subs.subscriptionsMonthly) })}
             />
             <StatTile
               label={t("dash.kpi.yearTotal", { year: month.slice(0, 4) })}
@@ -143,8 +151,11 @@ export default function DashboardPage() {
           <CategoryDonut summary={s} className="h-full" />
         </div>
 
-        <div className="lg:col-span-12">
-          <BudgetBars summary={s} />
+        <div className="lg:col-span-8">
+          <BudgetBars summary={s} className="h-full" />
+        </div>
+        <div className="lg:col-span-4">
+          <UpcomingBills ds={ds} className="h-full" />
         </div>
 
         <div className="lg:col-span-8">
@@ -159,7 +170,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-col gap-4 lg:col-span-4">
           <PrioritySplit summary={s} />
-          <PaymentBreakdown summary={s} className="flex-1" />
+          <PaymentBreakdown summary={s} styles={ds.settings.paymentStyles} className="flex-1" />
         </div>
 
         <div className="lg:col-span-5">

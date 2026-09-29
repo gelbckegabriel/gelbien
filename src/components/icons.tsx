@@ -1,9 +1,10 @@
 "use client";
 
 import {
-  Baby, Banknote, Bike, BookOpen, Briefcase, Bus, Car, Coffee, CreditCard, Dumbbell, FileText, Gamepad2, Gem, Gift, Globe,
-  GraduationCap, HeartPulse, Home, Landmark, Laptop, Music, Package, PawPrint, PiggyBank, Plane, Repeat, ShoppingCart, Shirt,
-  Smartphone, Sofa, Sparkles, Target, Ticket, TrendingUp, Umbrella, UtensilsCrossed, Wallet, Wrench, Zap, type LucideIcon,
+  ArrowLeftRight, Baby, Banknote, Bike, BookOpen, Briefcase, Bus, CalendarSync, Car, CircleEllipsis, Coffee, Coins, CreditCard,
+  Dumbbell, FileText, Gamepad2, Gem, Gift, Globe, GraduationCap, HandCoins, HeartPulse, Home, Landmark, Laptop, Music, Package,
+  PawPrint, PiggyBank, Plane, QrCode, Receipt, Repeat, ShoppingCart, Shirt, Smartphone, Sofa, Sparkles, Target, Ticket,
+  TrendingUp, Umbrella, UtensilsCrossed, Wallet, WalletCards, Wrench, Zap, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +13,8 @@ export const ICONS: Record<string, LucideIcon> = {
   Package, PawPrint, Plane, Gift, Baby, Car, Dumbbell, Coffee, Smartphone, Wallet, Briefcase, FileText, Music,
   Gamepad2, BookOpen, Wrench, PiggyBank, CreditCard, Globe, Sparkles, Target, Umbrella, Laptop, Gem, Bike, TrendingUp,
   Banknote,
+  // payment methods
+  WalletCards, ArrowLeftRight, CalendarSync, QrCode, Coins, HandCoins, Receipt, CircleEllipsis,
 };
 
 export const ACCOUNT_TYPE_ICON = {

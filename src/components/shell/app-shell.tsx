@@ -13,6 +13,7 @@ import { useHydrated } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
 import { ExpenseDialog } from "../expense-dialog";
 import { LogoMark } from "../logo";
+import { MonthReviewSheet } from "../month-review";
 import { SubscriptionDialog } from "../subscription-dialog";
 import { Button } from "../ui/button";
 import { EmptyState, Skeleton } from "../ui/misc";
@@ -214,7 +215,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const err = ds.error as { status?: number } | null;
-    if (err?.status === 401) router.replace("/login");
+    // the server has dropped the expired session cookie by now
+    if (err?.status === 401) router.replace("/login?error=expired");
   }, [ds.error, router]);
 
   if (!hydrated || mode === "loading" || mode === "signedOut") return <Splash />;
@@ -249,6 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <GlobalReceiptCapture />
           <ExpenseDialog />
           <SubscriptionDialog />
+          <MonthReviewSheet />
           <UnsavedDialog />
         </>
       )}

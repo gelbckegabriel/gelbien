@@ -1,7 +1,7 @@
 import "server-only";
 import type { Locale } from "@/lib/types";
 import { GoogleApiError, googleErrorCode, refreshAccessToken } from "./google";
-import { readSession, writeSession, type Session } from "./session";
+import { clearSession, readSession, writeSession, type Session } from "./session";
 import { ensureSpreadsheet } from "./sheets";
 
 export class AuthError extends Error {}
@@ -32,6 +32,21 @@ async function freshToken(session: Session, force = false): Promise<Session> {
  * Retries once on a stale token or a spreadsheet that was deleted from Drive.
  */
 export async function withGoogle<T>(locale: Locale, fn: (ctx: GoogleContext) => Promise<T>): Promise<T> {
+  try {
+    return await withSession(locale, fn);
+  } catch (err) {
+    // Google no longer accepts this login: the refresh token expired or was revoked, or a request
+    // was refused even with a fresh token. Drop the cookie too — while it's there /login treats
+    // the user as signed in and sends them straight back here. (Out here, after withSession's own cookie write.)
+    if (err instanceof AuthError || (err instanceof GoogleApiError && err.status === 401)) {
+      await clearSession();
+      throw err instanceof AuthError ? err : new AuthError("Google session expired");
+    }
+    throw err;
+  }
+}
+
+async function withSession<T>(locale: Locale, fn: (ctx: GoogleContext) => Promise<T>): Promise<T> {
   let session = await readSession();
   if (!session) throw new AuthError("Not signed in");
   const original = JSON.stringify(session);

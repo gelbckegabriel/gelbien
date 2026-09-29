@@ -5,11 +5,12 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import type { MonthSummary } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
-import { PRIORITIES, type Dataset } from "@/lib/types";
+import { PRIORITIES, type Dataset, type PaymentStyle } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 import { ChartCard, DataTable, GOLD, PRIORITY_COLORS } from "../charts/kit";
 import { CategoryIcon } from "../icons";
+import { PaymentIcon } from "../pickers";
 import { Card, CardHeader } from "../ui/card";
 import { Badge, Progress, STATUS_TONE } from "../ui/misc";
 
@@ -101,7 +102,7 @@ export function PrioritySplit({ summary, className }: { summary: MonthSummary; c
   );
 }
 
-export function PaymentBreakdown({ summary, className }: { summary: MonthSummary; className?: string }) {
+export function PaymentBreakdown({ summary, styles, className }: { summary: MonthSummary; styles: Record<string, PaymentStyle>; className?: string }) {
   const { t, f } = useI18n();
   const max = Math.max(...summary.byPayment.map((p) => p.amount), 1);
   return (
@@ -109,8 +110,9 @@ export function PaymentBreakdown({ summary, className }: { summary: MonthSummary
       <ul className="space-y-3">
         {summary.byPayment.map((p, i) => (
           <li key={p.name}>
-            <div className="mb-1 flex justify-between text-[13px]">
-              <span className="text-ink-2">{p.name}</span>
+            <div className="mb-1 flex items-center gap-2 text-[13px]">
+              <PaymentIcon name={p.name} styles={styles} className="h-6 w-6 rounded-md" />
+              <span className="min-w-0 flex-1 truncate text-ink-2">{p.name}</span>
               <span className="tabular text-ink">{f.money0(p.amount)}</span>
             </div>
             <div className="h-1.5 rounded-full bg-white/5">

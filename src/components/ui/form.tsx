@@ -1,8 +1,8 @@
 "use client";
 
-import { CalendarDays, ChevronDown } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { motion } from "motion/react";
-import { Popover } from "radix-ui";
+import { Popover, Select as SelectPrimitive } from "radix-ui";
 import { forwardRef, useId, useLayoutEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn, currentMonth } from "@/lib/utils";
@@ -41,6 +41,96 @@ export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<H
     </div>
   );
 });
+
+export interface RichOption {
+  value: string;
+  label: string;
+  /** Shown before the label, in the list and in the field (e.g. a category's icon) */
+  icon?: React.ReactNode;
+}
+
+// Radix reserves "" for "nothing picked yet", so an explicit "none" option uses this instead
+const NONE = "__none__";
+
+/**
+ * A select whose options carry an icon (categories, subcategories). Built on Radix Select, so it
+ * keeps what the native one does well: keyboard, type-to-find, screen readers.
+ */
+export function RichSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+  noneLabel,
+  noneIcon,
+  className,
+  id,
+  "aria-label": ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: RichOption[];
+  /** Shown while nothing is picked */
+  placeholder: string;
+  /** Adds a first option that picks "" (shown as the placeholder) — "All categories", "No subcategory" */
+  noneLabel?: string;
+  noneIcon?: React.ReactNode;
+  className?: string;
+  id?: string;
+  "aria-label"?: string;
+}) {
+  const current = options.find((o) => o.value === value);
+  const icon = current ? current.icon : value === "" && noneLabel ? noneIcon : undefined;
+  const item = (o: RichOption) => (
+    <SelectPrimitive.Item
+      key={o.value}
+      value={o.value}
+      className="flex cursor-pointer select-none items-center gap-3 rounded-xl px-2.5 py-2 text-[15px] text-ink outline-none data-[highlighted]:bg-white/[0.06] data-[state=checked]:font-medium"
+    >
+      {o.icon}
+      <span className="min-w-0 flex-1 truncate">
+        {/* only the text: Radix copies it into the field once picked */}
+        <SelectPrimitive.ItemText>{o.label}</SelectPrimitive.ItemText>
+      </span>
+      <SelectPrimitive.ItemIndicator>
+        <Check className="h-4 w-4 text-gold" />
+      </SelectPrimitive.ItemIndicator>
+    </SelectPrimitive.Item>
+  );
+  return (
+    <SelectPrimitive.Root value={value} onValueChange={(v) => onChange(v === NONE ? "" : v)}>
+      <SelectPrimitive.Trigger id={id} aria-label={ariaLabel} className={cn(control, "flex h-11 items-center gap-2.5 pl-2 pr-3 text-left data-[placeholder]:text-ink-3", !icon && "pl-3.5", className)}>
+        {icon}
+        <span className="min-w-0 flex-1 truncate">
+          <SelectPrimitive.Value placeholder={placeholder} />
+        </span>
+        <SelectPrimitive.Icon asChild>
+          <ChevronDown className="h-4 w-4 shrink-0 text-ink-3" />
+        </SelectPrimitive.Icon>
+      </SelectPrimitive.Trigger>
+      <SelectPrimitive.Portal>
+        {/* above the Sheet (z-50) these fields live in */}
+        <SelectPrimitive.Content
+          position="popper"
+          sideOffset={6}
+          collisionPadding={12}
+          className="z-[60] max-h-[min(var(--radix-select-content-available-height),24rem)] w-[var(--radix-select-trigger-width)] min-w-56 origin-[var(--radix-select-content-transform-origin)] overflow-hidden rounded-2xl border border-line-strong bg-[#16161b] shadow-2xl shadow-black/60 animate-pop-in motion-reduce:animate-none"
+        >
+          <SelectPrimitive.ScrollUpButton className="flex h-6 items-center justify-center text-ink-3">
+            <ChevronUp className="h-4 w-4" />
+          </SelectPrimitive.ScrollUpButton>
+          <SelectPrimitive.Viewport className="p-1.5">
+            {noneLabel && item({ value: NONE, label: noneLabel, icon: noneIcon })}
+            {options.map(item)}
+          </SelectPrimitive.Viewport>
+          <SelectPrimitive.ScrollDownButton className="flex h-6 items-center justify-center text-ink-3">
+            <ChevronDown className="h-4 w-4" />
+          </SelectPrimitive.ScrollDownButton>
+        </SelectPrimitive.Content>
+      </SelectPrimitive.Portal>
+    </SelectPrimitive.Root>
+  );
+}
 
 export function Field({
   label,

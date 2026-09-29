@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { ACCOUNT_TYPES, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PRIORITIES, SUB_STATUSES, WORTH_IT, type Mutation } from "./types";
+import { guessKind } from "./defaults";
+import { ACCOUNT_TYPES, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PRIORITIES, SUB_KINDS, SUB_STATUSES, WORTH_IT, type Mutation } from "./types";
 
 const text = (max = 500) => z.string().max(max);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -22,6 +23,9 @@ export const transactionSchema = z.object({
   receiptUrl: text(1000),
   createdAt: text(40),
   updatedAt: text(40),
+  // defaults: backups made before splits / bills existed still restore
+  group: text(64).default(""),
+  billId: text(64).default(""),
 });
 
 export const categorySchema = z.object({
@@ -48,7 +52,10 @@ export const subscriptionSchema = z.object({
   trialEnd: z.union([isoDate, z.literal("")]),
   worthIt: z.enum(WORTH_IT),
   notes: text(2000),
-});
+  nextCharge: z.union([isoDate, z.literal("")]).default(""),
+  // optional so backups from before bills and subscriptions were told apart still restore
+  kind: z.enum(SUB_KINDS).optional(),
+}).transform((s) => ({ ...s, kind: s.kind ?? guessKind(s.category) }));
 
 export const settingsSchema = z.object({
   currency: text(8).min(3),
@@ -56,6 +63,7 @@ export const settingsSchema = z.object({
   reserve: money,
   savingsGoal: money,
   paymentMethods: z.array(text(120)).max(50),
+  paymentStyles: z.record(text(120), z.object({ icon: text(40), color: text(20) })).default({}),
   warnAt: z.number().gt(0).lte(1),
   // optional so backups made before Goals existed still restore
   checkInDay: z.number().int().min(1).max(28).default(1),
@@ -107,6 +115,10 @@ export const mutationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("addTransaction"), tx: transactionSchema }),
   z.object({ op: z.literal("updateTransaction"), tx: transactionSchema }),
   z.object({ op: z.literal("deleteTransaction"), id: text(64).min(1) }),
+  z.object({ op: z.literal("addTransactions"), txs: z.array(transactionSchema).min(1).max(50) }),
+  z.object({ op: z.literal("deleteTransactions"), ids: z.array(text(64).min(1)).min(1).max(50) }),
+  z.object({ op: z.literal("saveTransactionGroup"), group: text(64).min(1), txs: z.array(transactionSchema).max(50) }),
+  z.object({ op: z.literal("deleteTransactionGroup"), group: text(64).min(1) }),
   z.object({
     op: z.literal("saveCategories"),
     categories: z.array(categorySchema).max(100),
@@ -116,7 +128,11 @@ export const mutationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("saveBudget"), month: monthKey, lines: z.array(budgetLine).max(200), income: incomeLine.nullable(), clearIncome: z.boolean().optional() }),
   z.object({ op: z.literal("upsertSubscription"), sub: subscriptionSchema }),
   z.object({ op: z.literal("deleteSubscription"), id: text(64).min(1) }),
-  z.object({ op: z.literal("saveSettings"), settings: settingsSchema }),
+  z.object({
+    op: z.literal("saveSettings"),
+    settings: settingsSchema,
+    paymentRenames: z.array(z.object({ from: text(120).min(1), to: text(120).min(1) })).max(50).optional(),
+  }),
   z.object({ op: z.literal("upsertAccount"), account: accountSchema }),
   z.object({ op: z.literal("deleteAccount"), id: text(64).min(1) }),
   z.object({ op: z.literal("saveBalances"), balances: z.array(balanceSchema).min(1).max(200) }),

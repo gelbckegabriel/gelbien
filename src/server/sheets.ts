@@ -22,7 +22,7 @@ import {
   type Row,
   type TabKey,
 } from "@/lib/sheet-schema";
-import type { Dataset, Locale, Mutation } from "@/lib/types";
+import type { Dataset, Locale, Mutation, Transaction } from "@/lib/types";
 import { gfetch, GoogleApiError } from "./google";
 
 const SHEETS = "https://sheets.googleapis.com/v4/spreadsheets";
@@ -199,9 +199,63 @@ async function deleteRow(at: string, id: string, tab: TabKey, recordId: string) 
   });
 }
 
+/** Deletes the transaction rows with these ids in one request (bottom-up, so row numbers stay valid). */
+async function deleteTransactionRows(at: string, id: string, ids: string[]) {
+  const res = await gfetch<{ values?: Row[] }>(at, `${SHEETS}/${id}/values/${encodeURIComponent(`${TABS.transactions.title}!A2:A`)}`);
+  const wanted = new Set(ids);
+  const rows = (res.values ?? []).flatMap((r, i) => (wanted.has(String(r[0] ?? "")) ? [i + 2] : [])).sort((a, b) => b - a);
+  if (!rows.length) return;
+  const sheetId = await sheetIdOf(at, id, "transactions");
+  await gfetch(at, `${SHEETS}/${id}:batchUpdate`, {
+    method: "POST",
+    body: JSON.stringify({ requests: rows.map((n) => ({ deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: n - 1, endIndex: n } } })) }),
+  });
+}
+
 /**
- * Sheets created by an older version of Gelbien lack tabs added later (e.g. Goals).
- * Add any missing tab with its header row. Memoized per server instance.
+ * Rewrites the parts of split purchase `group`: updates parts that already have a row, deletes
+ * the ones left out, appends the new ones. One read, then at most three writes.
+ */
+async function replaceGroup(at: string, id: string, group: string, txs: Transaction[]) {
+  const tab = TABS.transactions;
+  const groupCol = colLetter(tab.headers.indexOf("group") + 1);
+  const lastCol = colLetter(tab.headers.length);
+  const ranges = [`${tab.title}!A2:A`, `${tab.title}!${groupCol}2:${groupCol}`].map((r) => `ranges=${encodeURIComponent(r)}`).join("&");
+  const res = await gfetch<{ valueRanges: { values?: Row[] }[] }>(at, `${SHEETS}/${id}/values:batchGet?${ranges}`);
+  const rows = (res.valueRanges[0]?.values ?? []).map((r, i) => ({
+    id: String(r[0] ?? ""),
+    n: i + 2,
+    group: String(res.valueRanges[1]?.values?.[i]?.[0] ?? ""),
+  }));
+  const rowOf = new Map(rows.map((r) => [r.id, r.n]));
+  const keep = new Set(txs.map((t) => t.id));
+
+  const existing = txs.filter((t) => rowOf.has(t.id));
+  if (existing.length) {
+    await writeValues(at, id, existing.map((t) => ({ range: `${tab.title}!A${rowOf.get(t.id)}:${lastCol}${rowOf.get(t.id)}`, values: [transactionToRow(t)] })));
+  }
+  // bottom-up, so deleting one row doesn't shift the ones still to delete
+  const stale = rows.filter((r) => r.group === group && !keep.has(r.id)).map((r) => r.n).sort((a, b) => b - a);
+  if (stale.length) {
+    const sheetId = await sheetIdOf(at, id, "transactions");
+    await gfetch(at, `${SHEETS}/${id}:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({ requests: stale.map((n) => ({ deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: n - 1, endIndex: n } } })) }),
+    });
+  }
+  const added = txs.filter((t) => !rowOf.has(t.id));
+  if (added.length) {
+    await gfetch(at, `${SHEETS}/${id}/values/${encodeURIComponent(`${tab.title}!A1`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+      method: "POST",
+      body: JSON.stringify({ values: added.map(transactionToRow) }),
+    });
+  }
+}
+
+/**
+ * Sheets created by an older version of Gelbien lack tabs and columns added later (e.g. Goals,
+ * split expenses). Add any missing tab with its header row, and any missing header cells at the
+ * end of an existing tab. Memoized per server instance.
  */
 const ensured = new Set<string>();
 export async function ensureTabs(at: string, id: string): Promise<void> {
@@ -217,6 +271,29 @@ export async function ensureTabs(at: string, id: string): Promise<void> {
       }),
     });
     await writeValues(at, id, missing.map((k) => ({ range: `${TABS[k].title}!A1`, values: [[...TABS[k].headers] as Row] })));
+  }
+  const present = TAB_KEYS.filter((k) => have.has(TABS[k].title));
+  if (present.length) {
+    const ranges = present.map((k) => `ranges=${encodeURIComponent(`${TABS[k].title}!A1:${colLetter(TABS[k].headers.length)}1`)}`).join("&");
+    const heads = await gfetch<{ valueRanges: { values?: Row[] }[] }>(at, `${SHEETS}/${id}/values:batchGet?${ranges}`);
+    // A pre-release build had a "tags" column at P of Transactions, dropped again before release:
+    // remove it so group / bill line up with the columns above. (Only ever on the developer's sheet.)
+    const txHead = heads.valueRanges[present.indexOf("transactions")]?.values?.[0];
+    if (present.includes("transactions") && txHead?.[15] === "tags") {
+      const sheetId = await sheetIdOf(at, id, "transactions");
+      await gfetch(at, `${SHEETS}/${id}:batchUpdate`, {
+        method: "POST",
+        body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId, dimension: "COLUMNS", startIndex: 15, endIndex: 16 } } }] }),
+      });
+      txHead.splice(15, 1);
+    }
+    // only past the cells already there, so nothing typed into the sheet is overwritten
+    const fixes = present.flatMap((k, i) => {
+      const current = heads.valueRanges[i]?.values?.[0] ?? [];
+      const wanted = TABS[k].headers;
+      return current.length < wanted.length ? [{ range: `${TABS[k].title}!${colLetter(current.length + 1)}1`, values: [wanted.slice(current.length) as Row] }] : [];
+    });
+    await writeValues(at, id, fixes);
   }
   ensured.add(id);
 }
@@ -238,12 +315,33 @@ export async function applyMutation(at: string, id: string, m: Mutation): Promis
       return upsertRow(at, id, "transactions", m.tx.id, transactionToRow(m.tx));
     case "deleteTransaction":
       return deleteRow(at, id, "transactions", m.id);
+    case "addTransactions":
+      await gfetch(at, `${SHEETS}/${id}/values/${encodeURIComponent(`${TABS.transactions.title}!A1`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+        method: "POST",
+        body: JSON.stringify({ values: m.txs.map(transactionToRow) }),
+      });
+      return;
+    case "deleteTransactions":
+      return deleteTransactionRows(at, id, m.ids);
+    case "saveTransactionGroup":
+      return replaceGroup(at, id, m.group, m.txs);
+    case "deleteTransactionGroup":
+      return replaceGroup(at, id, m.group, []);
     case "upsertSubscription":
       return upsertRow(at, id, "subscriptions", m.sub.id, subscriptionToRow(m.sub));
     case "deleteSubscription":
       return deleteRow(at, id, "subscriptions", m.id);
-    case "saveSettings":
-      return replaceTabs(at, id, { settings: settingsToRows(m.settings) });
+    case "saveSettings": {
+      await replaceTabs(at, id, { settings: settingsToRows(m.settings) });
+      if (!m.paymentRenames?.length) return;
+      // Rewrite only the payment column (G) of expenses and recurring payments, where a name changed.
+      const renames = new Map(m.paymentRenames.map((r) => [r.from, r.to]));
+      const current = await readRanges(at, id, ["transactions", "subscriptions"]);
+      const columns = (["transactions", "subscriptions"] as const)
+        .filter((k) => current[k].some((r) => renames.has(String(r[6] ?? ""))))
+        .map((k) => ({ range: `${TABS[k].title}!G2`, values: current[k].map((r) => [renames.get(String(r[6] ?? "")) ?? String(r[6] ?? "")]) }));
+      return writeValues(at, id, columns);
+    }
     case "saveCategories": {
       const { cats, subs } = categoriesToRows(m.categories);
       const updates: Partial<Record<TabKey, Row[]>> = { categories: cats, subcategories: subs };

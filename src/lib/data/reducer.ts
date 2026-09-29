@@ -20,6 +20,20 @@ export function applyMutationToDataset(ds: Dataset, m: Mutation): Dataset {
       };
     case "deleteTransaction":
       return { ...ds, transactions: ds.transactions.filter((t) => t.id !== m.id) };
+    case "addTransactions": {
+      const ids = new Set(m.txs.map((t) => t.id));
+      return { ...ds, transactions: [...m.txs, ...ds.transactions.filter((t) => !ids.has(t.id))].sort(byDateDesc) };
+    }
+    case "deleteTransactions": {
+      const ids = new Set(m.ids);
+      return { ...ds, transactions: ds.transactions.filter((t) => !ids.has(t.id)) };
+    }
+    case "saveTransactionGroup": {
+      const ids = new Set(m.txs.map((t) => t.id));
+      return { ...ds, transactions: [...m.txs, ...ds.transactions.filter((t) => t.group !== m.group && !ids.has(t.id))].sort(byDateDesc) };
+    }
+    case "deleteTransactionGroup":
+      return { ...ds, transactions: ds.transactions.filter((t) => t.group !== m.group) };
     case "saveCategories": {
       const rename = (name: string) => m.renames.find((r) => r.from === name)?.to ?? name;
       const renameSub = (category: string, sub: string) => m.subRenames?.find((r) => r.category === category && r.from === sub)?.to ?? sub;
@@ -48,8 +62,17 @@ export function applyMutationToDataset(ds: Dataset, m: Mutation): Dataset {
       };
     case "deleteSubscription":
       return { ...ds, subscriptions: ds.subscriptions.filter((s) => s.id !== m.id) };
-    case "saveSettings":
-      return { ...ds, settings: m.settings };
+    case "saveSettings": {
+      if (!m.paymentRenames?.length) return { ...ds, settings: m.settings };
+      const renames = new Map(m.paymentRenames.map((r) => [r.from, r.to]));
+      const rename = (p: string) => renames.get(p) ?? p;
+      return {
+        ...ds,
+        settings: m.settings,
+        transactions: ds.transactions.map((t) => (renames.has(t.payment) ? { ...t, payment: rename(t.payment) } : t)),
+        subscriptions: ds.subscriptions.map((s) => (renames.has(s.payment) ? { ...s, payment: rename(s.payment) } : s)),
+      };
+    }
     case "upsertAccount":
       return {
         ...ds,

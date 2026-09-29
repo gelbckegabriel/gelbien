@@ -18,6 +18,7 @@ import {
   yearMatrix,
 } from "./finance";
 import { applyMutationToDataset } from "./data/reducer";
+import { monthReview } from "./review";
 import type { Dataset, Transaction } from "./types";
 
 function tx(partial: Partial<Transaction> & Pick<Transaction, "date" | "amount" | "category">): Transaction {
@@ -34,6 +35,8 @@ function tx(partial: Partial<Transaction> & Pick<Transaction, "date" | "amount" 
     receiptUrl: "",
     createdAt: "",
     updatedAt: "",
+    group: "",
+    billId: "",
     ...partial,
   };
 }
@@ -167,12 +170,13 @@ describe("trend, year matrix, subscriptions and runway", () => {
     expect(monthlyCost({ amount: 120, cycle: "annual" })).toBe(10);
     expect(monthlyCost({ amount: 30, cycle: "quarterly" })).toBe(10);
     const totals = subscriptionTotals([
-      { id: "a", name: "A", category: "", amount: 10, cycle: "monthly", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "" },
-      { id: "b", name: "B", category: "", amount: 120, cycle: "annual", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "" },
-      { id: "c", name: "C", category: "", amount: 15, cycle: "monthly", billingDay: 1, payment: "", status: "trial", trialEnd: "", worthIt: "no", notes: "" },
-      { id: "d", name: "D", category: "", amount: 99, cycle: "monthly", billingDay: 1, payment: "", status: "cancelled", trialEnd: "", worthIt: "no", notes: "" },
+      { id: "a", name: "A", category: "", amount: 10, cycle: "monthly", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill" },
+      { id: "b", name: "B", category: "", amount: 120, cycle: "annual", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "subscription" },
+      { id: "c", name: "C", category: "", amount: 15, cycle: "monthly", billingDay: 1, payment: "", status: "trial", trialEnd: "", worthIt: "no", notes: "", nextCharge: "", kind: "subscription" },
+      { id: "d", name: "D", category: "", amount: 99, cycle: "monthly", billingDay: 1, payment: "", status: "cancelled", trialEnd: "", worthIt: "no", notes: "", nextCharge: "", kind: "subscription" },
     ]);
     expect(totals.activeMonthly).toBe(20);
+    expect(totals).toMatchObject({ billsMonthly: 10, subscriptionsMonthly: 10, subscriptionCount: 1 });
     expect(totals.activeYearly).toBe(240);
     expect(totals.trialMonthly).toBe(15);
   });
@@ -233,6 +237,15 @@ describe("reducer", () => {
     expect(next.budgets[0].category).toBe("Food");
   });
 
+  it("adds several expenses and replaces a split purchase's parts", () => {
+    const ds = dataset([tx({ id: "a", date: "2026-09-01", amount: 5, category: "Groceries", group: "g1" }), tx({ id: "b", date: "2026-09-01", amount: 7, category: "Home", group: "g1" })]);
+    const added = applyMutationToDataset(ds, { op: "addTransactions", txs: [tx({ id: "c", date: "2026-09-02", amount: 1, category: "Fees" }), tx({ id: "d", date: "2026-09-03", amount: 2, category: "Fees" })] });
+    expect(added.transactions.map((t) => t.id)).toEqual(["d", "c", "a", "b"]);
+    const regrouped = applyMutationToDataset(ds, { op: "saveTransactionGroup", group: "g1", txs: [tx({ id: "a", date: "2026-09-01", amount: 12, category: "Groceries", group: "" })] });
+    expect(regrouped.transactions.map((t) => [t.id, t.amount, t.group])).toEqual([["a", 12, ""]]);
+    expect(applyMutationToDataset(ds, { op: "deleteTransactionGroup", group: "g1" }).transactions).toEqual([]);
+  });
+
   it("renames subcategories only within their category", () => {
     const ds = dataset([
       tx({ date: "2026-09-01", amount: 1, category: "Moradia", subcategory: "Aluguel" }),
@@ -248,6 +261,19 @@ describe("reducer", () => {
       ["Housing", "Rent"],
       ["Outros", "Aluguel"],
     ]);
+  });
+
+  it("renames a payment method on expenses and recurring payments", () => {
+    const base = dataset([tx({ date: "2026-09-01", amount: 1, category: "A", payment: "Crédito" }), tx({ date: "2026-09-02", amount: 1, category: "A", payment: "Pix" })]);
+    const ds = {
+      ...base,
+      subscriptions: [{ id: "s", name: "Netflix", category: "A", amount: 1, cycle: "monthly" as const, billingDay: 1, payment: "Crédito", status: "active" as const, trialEnd: "", worthIt: "yes" as const, notes: "", nextCharge: "", kind: "subscription" as const }],
+    };
+    const settings = { ...ds.settings, paymentMethods: ["Credit", "Pix"] };
+    const next = applyMutationToDataset(ds, { op: "saveSettings", settings, paymentRenames: [{ from: "Crédito", to: "Credit" }] });
+    expect(next.transactions.map((t) => t.payment)).toEqual(["Credit", "Pix"]);
+    expect(next.subscriptions[0].payment).toBe("Credit");
+    expect(next.settings.paymentMethods).toEqual(["Credit", "Pix"]);
   });
 
   it("replaces only the edited month's budget lines", () => {
@@ -272,5 +298,23 @@ describe("demo data", () => {
     expect(a.transactions.every((t) => t.date <= "2026-09-25" && t.date >= "2026-04-01")).toBe(true);
     expect(a.categories[0].name).toBe("Moradia");
     expect(buildDemoDataset("fr", "2026-09-25").categories[0].name).toBe("Logement");
+  });
+});
+
+describe("month review", () => {
+  it("reviews a month against the plan", () => {
+    const ds = dataset(
+      [
+        tx({ date: "2026-08-03", amount: 700, category: "Groceries" }),
+        tx({ date: "2026-08-05", amount: 100, category: "Leisure" }),
+        tx({ date: "2026-08-06", amount: 50, category: "Gifts" }),
+        tx({ date: "2026-07-06", amount: 425, category: "Groceries" }),
+      ],
+      { budgets: [{ month: "default", category: "Groceries", amount: 600 }, { month: "default", category: "Leisure", amount: 300 }] },
+    );
+    const r = monthReview(ds, "2026-08", "2026-09-28");
+    expect(r).toMatchObject({ spent: 850, planned: 900, diff: 50, unplanned: 50, change: 1 });
+    expect(r.over).toEqual([{ name: "Groceries", spent: 700, budget: 600, amount: 100 }]);
+    expect(r.under).toEqual([{ name: "Leisure", spent: 100, budget: 300, amount: 200 }]);
   });
 });

@@ -73,11 +73,13 @@ function LoginInner() {
   const { t, locale } = useI18n();
   const setLocale = usePrefs((s) => s.setLocale);
   const setDemo = useUi((s) => s.setDemo);
-  const { data: session } = useSession();
+  const { data: session, isFetchedAfterMount } = useSession();
 
+  // Only on the server's answer: a cached "signed in" may be a login Google has since expired,
+  // and the dashboard would send us straight back here.
   useEffect(() => {
-    if (session?.user) router.replace("/dashboard");
-  }, [session?.user, router]);
+    if (isFetchedAfterMount && session?.user) router.replace("/dashboard");
+  }, [isFetchedAfterMount, session?.user, router]);
 
   const error = params.get("error");
   const errorText =
@@ -93,9 +95,11 @@ function LoginInner() {
             ? t("login.error.cookie")
             : error === "denied"
               ? t("login.error.denied")
-              : error
-                ? t("login.error.generic")
-                : null;
+              : error === "expired"
+                ? t("err.session")
+                : error
+                  ? t("login.error.generic")
+                  : null;
   const configured = session?.googleConfigured ?? true;
 
   const features = [
