@@ -9,7 +9,7 @@ import { GoalCard } from "@/components/goals/goal-card";
 import { AccountsCard, NetWorthCard, PlanCard } from "@/components/goals/overview";
 import { Simulator } from "@/components/goals/simulator";
 import { Button } from "@/components/ui/button";
-import { Card, PageHeader, Stagger } from "@/components/ui/card";
+import { Card, FillGrid, PageHeader, Stagger } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/misc";
 import { useDataset } from "@/lib/data/hooks";
 import { goalPlanFor } from "@/lib/goals";
@@ -93,8 +93,7 @@ function Goals() {
           </Card>
         ) : (
           <>
-            {/* Equal-height cards: each card fills its grid row */}
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <FillGrid>
               {goals.map(({ goal, plan }, i) => (
                 <GoalCard
                   key={goal.id}
@@ -107,7 +106,7 @@ function Goals() {
                   onAddMoney={() => open({ kind: "addMoney", goal })}
                 />
               ))}
-            </div>
+            </FillGrid>
             <PlanCard ds={ds} />
           </>
         )}

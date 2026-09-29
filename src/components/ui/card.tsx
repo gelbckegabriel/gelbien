@@ -43,6 +43,18 @@ export function CardHeader({
   );
 }
 
+/**
+ * Cards 1 → 2 → 3 per row. Unlike a CSS grid, a row that isn't full stretches its cards to use the
+ * whole width (two cards on a three-wide row get half each). Rows keep equal-height cards.
+ */
+export function FillGrid({ className, children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <div className={cn("flex flex-wrap gap-4 *:min-w-0 *:grow *:basis-full sm:*:basis-[calc(50%-0.5rem)] xl:*:basis-[calc((100%-2rem)/3)]", className)}>
+      {children}
+    </div>
+  );
+}
+
 /** Page wrapper that staggers its direct Card children in. */
 export function Stagger({ className, children, ...props }: HTMLMotionProps<"div">) {
   return (

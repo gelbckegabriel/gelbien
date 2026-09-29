@@ -47,7 +47,7 @@ export function GoalCard({
   const linked = accounts.filter((a) => goal.accountIds.includes(a.id));
 
   return (
-    <Card className={cn("flex h-full flex-col", goal.status === "paused" && "opacity-70")}>
+    <Card className={cn("flex flex-col", goal.status === "paused" && "opacity-70")}>
       {achieved && <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-gold/20 blur-3xl" />}
       <button onClick={onEdit} className="-m-2 flex flex-1 flex-col rounded-2xl p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-gold/50">
         <div className="flex items-start gap-3">
