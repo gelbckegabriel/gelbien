@@ -152,6 +152,8 @@ export interface DatasetMeta {
   spreadsheetId?: string;
   spreadsheetUrl?: string;
   syncedAt: string;
+  /** The sheet could be read but not written — why (an error code, e.g. "storage"); changes won't save */
+  warning?: string;
 }
 
 export interface Dataset {

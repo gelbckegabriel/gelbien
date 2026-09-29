@@ -9,7 +9,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CACHE_KEY } from "@/components/providers";
+import { clearCachedData, useSignOut } from "@/components/shell/load-error";
 import { GuardedLink } from "@/components/shell/unsaved";
 import { Avatar } from "@/components/shell/user-chip";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -20,27 +20,28 @@ import { friendlyAiError, testConnection } from "@/lib/ai/client";
 import { activeAi, ANTHROPIC_MODELS, GEMINI_MODELS, useAi, type AiProvider } from "@/lib/ai/config";
 import { toCsv } from "@/lib/csv";
 import { useDataset, useMode, useMutate, useRefresh } from "@/lib/data/hooks";
-import { clearDemo, resetDemo, signOut } from "@/lib/data/sources";
+import { clearDemo, resetDemo } from "@/lib/data/sources";
 import { hasBuiltInTranslations, paymentTranslations } from "@/lib/defaults";
 import { downloadFile } from "@/lib/files";
 import { CURRENCIES, LOCALES, translate, useI18n, usePrefs } from "@/lib/i18n";
 import { importMoneySheet, mergeImport, type ImportResult } from "@/lib/import-xlsx";
 import type { Dataset, Locale } from "@/lib/types";
-import { useUi } from "@/lib/ui-store";
 import { askToLeave, hasUnsaved, useUnsavedChanges } from "@/lib/unsaved";
 import { datasetSchema } from "@/lib/validation";
 import { cn, parseAmount, round2 } from "@/lib/utils";
 
 export default function ProfilePage() {
   const { t } = useI18n();
+  // Reachable even when the data can't be loaded (see AppShell) — then only what works without it
+  const { data } = useDataset();
   return (
     <div>
       <PageHeader title={t("prof.title")} />
       <Stagger className="space-y-4">
         <AccountCard />
-        <PreferencesCard />
+        {data && <PreferencesCard />}
         <AiCard />
-        <DataCard />
+        {data && <DataCard />}
         <CacheCard />
       </Stagger>
     </div>
@@ -50,22 +51,8 @@ export default function ProfilePage() {
 function AccountCard() {
   const { t } = useI18n();
   const { mode, session } = useMode();
-  const qc = useQueryClient();
-  const router = useRouter();
-  const setDemo = useUi((s) => s.setDemo);
+  const leave = useSignOut();
   const user = session?.user;
-
-  const leave = async () => {
-    if (mode === "google") await signOut();
-    setDemo(false);
-    try {
-      localStorage.removeItem(CACHE_KEY);
-    } catch {
-      /* ignore */
-    }
-    qc.clear();
-    router.replace("/login");
-  };
 
   return (
     <Card className="flex flex-col gap-5 sm:flex-row sm:items-center">
@@ -531,13 +518,7 @@ function CacheCard() {
   const size = bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
   const clear = () => {
-    try {
-      for (const k of Object.keys(localStorage)) {
-        if (k === CACHE_KEY || k.startsWith("gelbien.insights.") || k.startsWith("gelbien.chat.")) localStorage.removeItem(k);
-      }
-    } catch {
-      /* ignore */
-    }
+    clearCachedData();
     if (mode === "google") refresh();
     setBytes(cachedBytes());
     toast.success(t("prof.cache.cleared"));

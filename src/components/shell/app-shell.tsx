@@ -2,7 +2,7 @@
 
 import { CloudCheck, FileUp, MessageCircle, RefreshCw } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useDataset, useMode, useRefresh } from "@/lib/data/hooks";
@@ -15,10 +15,10 @@ import { ExpenseDialog } from "../expense-dialog";
 import { LogoMark } from "../logo";
 import { MonthReviewSheet } from "../month-review";
 import { SubscriptionDialog } from "../subscription-dialog";
-import { Button } from "../ui/button";
-import { EmptyState, Skeleton } from "../ui/misc";
+import { Skeleton } from "../ui/misc";
 import { MonthPicker } from "./month-picker";
 import { BottomNav, DesktopFab, Sidebar } from "./nav";
+import { LoadError, WriteBlocked } from "./load-error";
 import { GuardedLink, UnsavedDialog } from "./unsaved";
 import { UserChip } from "./user-chip";
 
@@ -207,7 +207,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { mode } = useMode();
   const ds = useDataset();
   const refresh = useRefresh();
-  const { t } = useI18n();
+  const pathname = usePathname();
+  // Profile works without the data (sign out, clear the cache, AI keys): the way out when loading fails
+  const standalone = pathname === "/profile";
 
   useEffect(() => {
     if (hydrated && mode === "signedOut") router.replace("/login");
@@ -230,14 +232,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <TopBar />
         <main className={cn("mx-auto max-w-7xl px-4 pb-32 pt-6 sm:px-6 lg:px-8 lg:pb-16")}>
           {ready ? (
-            children
+            <>
+              {ds.data?.meta.warning && <WriteBlocked code={ds.data.meta.warning} />}
+              {children}
+            </>
+          ) : standalone ? (
+            // children keep their place whether or not the error shows: remounting the page would
+            // start a new load, which hides the error, which remounts the page… (a request loop)
+            <>
+              {ds.isError && <LoadError error={ds.error} onRetry={() => refresh()} className="mb-4 max-w-none" />}
+              {children}
+            </>
           ) : ds.isError ? (
-            <EmptyState
-              icon={<RefreshCw className="h-6 w-6" />}
-              title={t("err.load")}
-              body={(ds.error as Error)?.message}
-              action={<Button onClick={() => refresh()}>{t("common.retry")}</Button>}
-            />
+            <LoadError error={ds.error} onRetry={() => refresh()} />
           ) : (
             <ContentSkeleton />
           )}

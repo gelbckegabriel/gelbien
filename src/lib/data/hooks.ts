@@ -43,8 +43,9 @@ export function useDataset() {
     queryKey: key,
     queryFn: () => source!.load(),
     enabled: source !== null,
-    // an expired login won't fix itself: go to /login straight away (see AppShell)
-    retry: (count, err) => count < 1 && !(err instanceof ApiError && err.status === 401),
+    // Retry what can clear up by itself (network, rate limits, Google down). Refusals won't: an
+    // expired login goes to /login (see AppShell), a full Drive or a lost sheet shows why at once.
+    retry: (count, err) => count < 1 && !(err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 429),
     staleTime: mode === "google" ? 60_000 : Infinity,
     refetchOnWindowFocus: mode === "google",
   });

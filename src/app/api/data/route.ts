@@ -13,10 +13,10 @@ export async function GET(request: Request) {
   try {
     const locale = localeOf(request);
     const data = await withGoogle(locale, async ({ accessToken, spreadsheetId }) => {
-      const ds = await readDataset(accessToken, spreadsheetId, locale);
+      const { data, warning } = await readDataset(accessToken, spreadsheetId, locale);
       const full: Dataset = {
-        ...ds,
-        meta: { source: "google", spreadsheetId, spreadsheetUrl: sheetUrl(spreadsheetId), syncedAt: new Date().toISOString() },
+        ...data,
+        meta: { source: "google", spreadsheetId, spreadsheetUrl: sheetUrl(spreadsheetId), syncedAt: new Date().toISOString(), warning },
       };
       return full;
     });

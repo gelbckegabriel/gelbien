@@ -23,16 +23,41 @@ import {
   type TabKey,
 } from "@/lib/sheet-schema";
 import type { Dataset, Locale, Mutation, Transaction } from "@/lib/types";
-import { gfetch, GoogleApiError } from "./google";
+import { gfetch, GoogleApiError, googleErrorCode, type GoogleErrorCode } from "./google";
 
 const SHEETS = "https://sheets.googleapis.com/v4/spreadsheets";
 const DRIVE = "https://www.googleapis.com/drive/v3/files";
+const DRIVE_ABOUT = "https://www.googleapis.com/drive/v3/about";
 const UPLOAD = "https://www.googleapis.com/upload/drive/v3/files";
 const APP_KEY = "gelbien";
 const DATA_MARK = "data-v1";
 const RECEIPTS_MARK = "receipts";
 
 export const sheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;
+
+/**
+ * Google Sheets answers a bare 403 "The caller does not have permission" for different causes.
+ * Find the likely one so the user can be told what to do: a full Drive (Google then refuses
+ * edits to the owner's files), or a spreadsheet out of the app's reach (deleted for good, or
+ * the app's access removed in the Google account). Otherwise the error is returned unchanged.
+ */
+export async function explainRefusal(at: string, id: string, err: GoogleApiError): Promise<GoogleApiError> {
+  if (err.status !== 403 || googleErrorCode(err) !== "access") return err;
+  const as = (reason: string) => new GoogleApiError(err.status, err.message, reason);
+  try {
+    const { storageQuota: q } = await gfetch<{ storageQuota?: { limit?: string; usage?: string } }>(at, `${DRIVE_ABOUT}?fields=storageQuota`);
+    // no limit: unlimited storage
+    if (q?.limit && Number(q.usage) >= Number(q.limit)) return as("storageQuotaExceeded");
+  } catch {
+    /* can't tell from here — check the file itself */
+  }
+  try {
+    await gfetch(at, `${DRIVE}/${id}?fields=id`);
+  } catch (e) {
+    if (e instanceof GoogleApiError && (e.status === 403 || e.status === 404)) return as("fileNotAccessible");
+  }
+  return err;
+}
 
 // ---------------------------------------------------------------------------
 // Locating / creating the spreadsheet
@@ -302,9 +327,19 @@ export async function ensureTabs(at: string, id: string): Promise<void> {
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function readDataset(at: string, id: string, locale: Locale): Promise<Omit<Dataset, "meta">> {
-  await ensureTabs(at, id);
-  return datasetFromRanges(await readRanges(at, id, TAB_KEYS), locale);
+/** The whole dataset, plus `warning` when the sheet can be read but not written (why changes won't save). */
+export async function readDataset(at: string, id: string, locale: Locale): Promise<{ data: Omit<Dataset, "meta">; warning?: GoogleErrorCode }> {
+  let warning: GoogleErrorCode | undefined;
+  try {
+    await ensureTabs(at, id);
+  } catch (err) {
+    // Adding the columns of a newer version is a write. When Google refuses writes (a full Drive,
+    // say) the data can still be read: show it, and say why changes can't be saved.
+    // 401 and 404 go up — withGoogle refreshes the token or finds the spreadsheet again.
+    if (!(err instanceof GoogleApiError) || err.status === 401 || err.status === 404) throw err;
+    warning = googleErrorCode(await explainRefusal(at, id, err));
+  }
+  return { data: datasetFromRanges(await readRanges(at, id, TAB_KEYS), locale), warning };
 }
 
 export async function applyMutation(at: string, id: string, m: Mutation): Promise<void> {

@@ -27,10 +27,13 @@ export function isApiDisabled(err: unknown): boolean {
 }
 
 /** Why a Sheets/Drive call failed, in terms the app can explain to the user (see errorReason on the client). */
-export type GoogleErrorCode = "storage" | "rateLimit" | "unavailable" | "access" | "sheet" | "google";
+export type GoogleErrorCode = "storage" | "rateLimit" | "unavailable" | "api" | "lost" | "access" | "sheet" | "google";
 
 export function googleErrorCode(err: GoogleApiError): GoogleErrorCode {
   if (isStorageFull(err)) return "storage";
+  if (isApiDisabled(err)) return "api";
+  // set by explainRefusal: the spreadsheet is out of reach (deleted for good, or the app's access removed)
+  if (err.reason === "fileNotAccessible") return "lost";
   // Sheets answers 429; Drive uses 403 with a rate-limit reason.
   if (err.status === 429 || /rate_?limit|quota/i.test(err.reason ?? "")) return "rateLimit";
   if (err.status >= 500) return "unavailable";

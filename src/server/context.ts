@@ -2,7 +2,7 @@ import "server-only";
 import type { Locale } from "@/lib/types";
 import { GoogleApiError, googleErrorCode, refreshAccessToken } from "./google";
 import { clearSession, readSession, writeSession, type Session } from "./session";
-import { ensureSpreadsheet } from "./sheets";
+import { ensureSpreadsheet, explainRefusal } from "./sheets";
 
 export class AuthError extends Error {}
 
@@ -64,7 +64,7 @@ async function withSession<T>(locale: Locale, fn: (ctx: GoogleContext) => Promis
     } else if (err.status === 404) {
       session = { ...session, sid: await ensureSpreadsheet(session.at, locale, session.name) };
     } else {
-      throw err;
+      throw await explainRefusal(session.at, session.sid, err);
     }
     return await run();
   } finally {

@@ -8,9 +8,17 @@ const BY_CODE: Record<string, MessageKey> = {
   storage: "err.why.storage",
   rateLimit: "err.why.rateLimit",
   unavailable: "err.why.unavailable",
+  api: "err.why.api",
+  lost: "err.why.lost",
   access: "err.why.access",
   sheet: "err.why.sheet",
 };
+
+/** The explanation for a server error code (e.g. a sheet that can be read but not written), if there is one. */
+export function reasonForCode(code: string, t: TFn): string | null {
+  const key = BY_CODE[code];
+  return key ? t(key) : null;
+}
 
 /** A short, translated explanation of why a request failed and what the user can do about it. */
 export function errorReason(err: unknown, t: TFn): string {
