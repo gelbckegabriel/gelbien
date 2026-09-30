@@ -1,24 +1,16 @@
 "use client";
 
-import { useId } from "react";
+import { BRAND, MARK } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
+/** The mark: an 11-sided gold coin with a G stamped in (see lib/brand.ts, shared with the icon files). */
 export function LogoMark({ className }: { className?: string }) {
-  // Unique gradient id per instance: a shared id resolves to whichever copy comes first,
-  // and if that copy is inside a display:none container the gradient doesn't paint.
-  const gid = `gelbien-g-${useId().replace(/:/g, "")}`;
   return (
     <svg viewBox="0 0 64 64" className={cn("h-8 w-8", className)} aria-hidden>
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f6dea0" />
-          <stop offset="0.5" stopColor="#d9b45f" />
-          <stop offset="1" stopColor="#8f6c24" />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="16" fill="#131316" stroke="#ffffff14" />
-      <circle cx="32" cy="32" r="21" fill="none" stroke={`url(#${gid})`} strokeWidth="4" />
-      <path d="M41 25.5a11 11 0 1 0 1.2 9.5H32.5" fill="none" stroke={`url(#${gid})`} strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="0.5" y="0.5" width="63" height="63" rx="15.5" fill={BRAND.ink} stroke="#ffffff1f" />
+      <polygon points={MARK.coin} fill={BRAND.gold} stroke={BRAND.gold} strokeWidth="2" strokeLinejoin="round" />
+      <polygon points={MARK.rim} fill="none" stroke={BRAND.ink} strokeOpacity="0.3" strokeWidth="1" />
+      <path d={MARK.g} fill="none" stroke={BRAND.ink} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
