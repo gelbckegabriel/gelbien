@@ -195,7 +195,8 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
           max={monthlyMax}
           step={10}
           onChange={(v) => set({ monthly: v })}
-          display={t("goals.perMonth", { amount: f.money0(s.monthly) })}
+          prefix={f.currencySymbol}
+          suffix={t("goals.perMonth", { amount: "" })}
         />
         <Slider
           label={t("sim.return")}
@@ -204,7 +205,8 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
           max={12}
           step={0.5}
           onChange={(v) => set({ annualReturn: v })}
-          display={t("goals.perYear", { pct: f.pct1(s.annualReturn / 100) })}
+          suffix={t("goals.perYear", { pct: "%" })}
+          inputMax={50}
         />
         <Slider
           label={t("sim.boost")}
@@ -213,7 +215,7 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
           max={niceMax(Math.max(goal.target - current, 1000), 100)}
           step={100}
           onChange={(v) => set({ boost: v })}
-          display={f.money0(s.boost)}
+          prefix={f.currencySymbol}
         />
         <Slider
           label={t("sim.target")}
@@ -222,7 +224,8 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
           max={niceMax(goal.target * 1.5, targetStep)}
           step={targetStep}
           onChange={(v) => set({ target: v })}
-          display={f.money0(s.target)}
+          prefix={f.currencySymbol}
+          inputMin={1}
         />
         <Slider
           label={t("sim.cut")}
@@ -231,7 +234,8 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
           max={100}
           step={5}
           onChange={(v) => set({ cut: v })}
-          display={f.pct(s.cut / 100)}
+          suffix="%"
+          inputMax={100}
           hint={superfluous > 0 ? t("sim.cutHint", { amount: f.money0(extra), avg: f.money0(superfluous) }) : undefined}
         />
         <Field label={t("sim.date")} hint={t("goals.f.optional")}>

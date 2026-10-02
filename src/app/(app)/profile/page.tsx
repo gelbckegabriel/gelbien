@@ -16,6 +16,7 @@ import { Button, buttonClasses } from "@/components/ui/button";
 import { Card, CardHeader, PageHeader, Stagger } from "@/components/ui/card";
 import { Field, Input, MoneyInput, Segmented, Select } from "@/components/ui/form";
 import { Badge } from "@/components/ui/misc";
+import { Slider } from "@/components/ui/slider";
 import { friendlyAiError, testConnection } from "@/lib/ai/client";
 import { activeAi, ANTHROPIC_MODELS, GEMINI_MODELS, useAi, type AiProvider } from "@/lib/ai/config";
 import { toCsv } from "@/lib/csv";
@@ -150,17 +151,17 @@ function PreferencesCard() {
         <Field label={t("prof.goal")}>
           <MoneyInput value={goal} onChange={setGoal} placeholder="0.00" />
         </Field>
-        <Field label={t("prof.warnAt")} hint={`${Math.round(ds.settings.warnAt * 100)}%`}>
-          <input
-            type="range"
-            min={50}
-            max={100}
-            step={5}
-            value={Math.round(ds.settings.warnAt * 100)}
-            onChange={(e) => saveSettings({ warnAt: Number(e.target.value) / 100 }, true)}
-            className="h-11 w-full accent-[#d9b45f]"
-          />
-        </Field>
+        <Slider
+          label={t("prof.warnAt")}
+          value={Math.round(ds.settings.warnAt * 100)}
+          min={50}
+          max={100}
+          step={5}
+          suffix="%"
+          inputMin={10}
+          inputMax={100}
+          onChange={(v) => saveSettings({ warnAt: v / 100 }, true)}
+        />
         <AnimatePresence>
           {dirty && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex justify-end lg:self-end">

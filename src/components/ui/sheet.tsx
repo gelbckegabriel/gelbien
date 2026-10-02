@@ -63,6 +63,10 @@ export function Sheet({
                 e.preventDefault();
                 target.focus({ preventScroll: true });
               }}
+              // a field that uses Escape itself (e.g. to cancel typing a value) keeps the sheet open
+              onEscapeKeyDown={(e) => {
+                if ((e.target as HTMLElement | null)?.closest?.("[data-escape-local]")) e.preventDefault();
+              }}
             >
               <motion.div
                 className={cn(

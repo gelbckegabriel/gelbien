@@ -82,6 +82,8 @@ export function makeFormatters(locale: Locale, currency: string) {
   return {
     intl,
     currency,
+    /** "$", "R$", "€" — for inputs that show the symbol beside the number */
+    currencySymbol: money0.formatToParts(0).find((p) => p.type === "currency")?.value ?? "$",
     /** $1,234.56 */
     money: (n: number) => money2.format(n),
     /** $1,235 */
