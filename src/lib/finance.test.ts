@@ -9,6 +9,7 @@ import {
   localInsights,
   monthlyCost,
   paceSeries,
+  recentAverages,
   runway,
   subscriptionTotals,
   suggestBudget,
@@ -170,10 +171,10 @@ describe("trend, year matrix, subscriptions and runway", () => {
     expect(monthlyCost({ amount: 120, cycle: "annual" })).toBe(10);
     expect(monthlyCost({ amount: 30, cycle: "quarterly" })).toBe(10);
     const totals = subscriptionTotals([
-      { id: "a", name: "A", category: "", amount: 10, cycle: "monthly", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill" },
-      { id: "b", name: "B", category: "", amount: 120, cycle: "annual", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "subscription" },
-      { id: "c", name: "C", category: "", amount: 15, cycle: "monthly", billingDay: 1, payment: "", status: "trial", trialEnd: "", worthIt: "no", notes: "", nextCharge: "", kind: "subscription" },
-      { id: "d", name: "D", category: "", amount: 99, cycle: "monthly", billingDay: 1, payment: "", status: "cancelled", trialEnd: "", worthIt: "no", notes: "", nextCharge: "", kind: "subscription" },
+      { id: "a", name: "A", category: "", amount: 10, cycle: "monthly", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill", subcategory: "" },
+      { id: "b", name: "B", category: "", amount: 120, cycle: "annual", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "subscription", subcategory: "" },
+      { id: "c", name: "C", category: "", amount: 15, cycle: "monthly", billingDay: 1, payment: "", status: "trial", trialEnd: "", worthIt: "no", notes: "", nextCharge: "", kind: "subscription", subcategory: "" },
+      { id: "d", name: "D", category: "", amount: 99, cycle: "monthly", billingDay: 1, payment: "", status: "cancelled", trialEnd: "", worthIt: "no", notes: "", nextCharge: "", kind: "subscription", subcategory: "" },
     ]);
     expect(totals.activeMonthly).toBe(20);
     expect(totals).toMatchObject({ billsMonthly: 10, subscriptionsMonthly: 10, subscriptionCount: 1 });
@@ -226,6 +227,23 @@ describe("helpers", () => {
   });
 });
 
+describe("recentAverages", () => {
+  it("shows overspending as a negative saving, over the months it averaged", () => {
+    const ds = dataset(
+      [tx({ date: "2026-08-10", amount: 5000, category: "Groceries" }), tx({ date: "2026-09-10", amount: 4000, category: "Groceries" })],
+      { incomes: [{ month: "default", gross: 0, net: 4000, note: "" }] },
+    );
+    expect(recentAverages(ds, "2026-10")).toMatchObject({ saved: -500, income: 4000, spent: 4500, from: "2026-08", to: "2026-09", missingIncome: false });
+  });
+
+  it("flags months without income", () => {
+    const ds = dataset([tx({ date: "2026-08-10", amount: 100, category: "Groceries" }), tx({ date: "2026-09-10", amount: 100, category: "Groceries" })], {
+      incomes: [{ month: "2026-09", gross: 0, net: 3000, note: "" }],
+    });
+    expect(recentAverages(ds, "2026-10")).toMatchObject({ income: 1500, missingIncome: true });
+  });
+});
+
 describe("reducer", () => {
   it("renames categories everywhere", () => {
     const ds = dataset([tx({ date: "2026-09-01", amount: 1, category: "Groceries" })], {
@@ -261,13 +279,18 @@ describe("reducer", () => {
       ["Housing", "Rent"],
       ["Outros", "Aluguel"],
     ]);
+    const withBill = applyMutationToDataset(
+      { ...ds, subscriptions: [{ id: "s", name: "Aluguel", category: "Moradia", amount: 1, cycle: "monthly", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill", subcategory: "Aluguel" }] },
+      { op: "saveCategories", categories: ds.categories, renames: [{ from: "Moradia", to: "Housing" }], subRenames: [{ category: "Moradia", from: "Aluguel", to: "Rent" }] },
+    );
+    expect(withBill.subscriptions.map((s) => [s.category, s.subcategory])).toEqual([["Housing", "Rent"]]);
   });
 
   it("renames a payment method on expenses and recurring payments", () => {
     const base = dataset([tx({ date: "2026-09-01", amount: 1, category: "A", payment: "Crédito" }), tx({ date: "2026-09-02", amount: 1, category: "A", payment: "Pix" })]);
     const ds = {
       ...base,
-      subscriptions: [{ id: "s", name: "Netflix", category: "A", amount: 1, cycle: "monthly" as const, billingDay: 1, payment: "Crédito", status: "active" as const, trialEnd: "", worthIt: "yes" as const, notes: "", nextCharge: "", kind: "subscription" as const }],
+      subscriptions: [{ id: "s", name: "Netflix", category: "A", amount: 1, cycle: "monthly" as const, billingDay: 1, payment: "Crédito", status: "active" as const, trialEnd: "", worthIt: "yes" as const, notes: "", nextCharge: "", kind: "subscription" as const, subcategory: "" }],
     };
     const settings = { ...ds.settings, paymentMethods: ["Credit", "Pix"] };
     const next = applyMutationToDataset(ds, { op: "saveSettings", settings, paymentRenames: [{ from: "Crédito", to: "Credit" }] });

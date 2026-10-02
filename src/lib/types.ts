@@ -83,6 +83,8 @@ export interface Subscription {
   nextCharge: string;
   /** Free trials and "worth it?" only apply to subscriptions */
   kind: SubKind;
+  /** Logged with each charge marked paid; "" for none */
+  subcategory: string;
 }
 
 export interface PaymentStyle {

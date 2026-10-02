@@ -17,6 +17,7 @@ const sub = (patch: Partial<Subscription>): Subscription => ({
   notes: "",
   nextCharge: "",
   kind: "subscription",
+  subcategory: "",
   ...patch,
 });
 
@@ -85,6 +86,8 @@ describe("paid bills", () => {
     const ds = { transactions: [tx({ merchant: "Netflix", subcategory: "Streaming", priority: "superfluous" })], settings: defaultSettings("en") };
     const logged = billTransaction({ sub: netflix, date: "2026-10-18" }, ds);
     expect(logged).toMatchObject({ date: "2026-10-18", amount: 18.99, billId: "s1", subcategory: "Streaming", priority: "superfluous", recurring: true });
+    // the subcategory set on the bill itself wins
+    expect(billTransaction({ sub: sub({ subcategory: "Video streaming" }), date: "2026-10-18" }, ds).subcategory).toBe("Video streaming");
   });
 });
 

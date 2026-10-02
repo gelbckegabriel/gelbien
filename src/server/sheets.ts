@@ -393,7 +393,10 @@ export async function applyMutation(at: string, id: string, m: Mutation): Promis
           .filter((t) => t !== null)
           .map((t) => transactionToRow({ ...t, category: String(rename(t.category)), subcategory: renameSub(t.category, t.subcategory) }));
         updates.budgets = current.budgets.map((r) => [r[0], rename(r[1]) as string, r[2]]);
-        updates.subscriptions = current.subscriptions.map((r) => r.map((c, i) => (i === 2 ? (rename(c) as string) : c)));
+        // category (C) and subcategory (N), the latter keyed by the category's old name
+        updates.subscriptions = current.subscriptions.map((r) =>
+          r.map((c, i) => (i === 2 ? (rename(c) as string) : i === 13 ? renameSub(String(r[2] ?? ""), String(c ?? "")) : c)),
+        );
       }
       return replaceTabs(at, id, updates);
     }

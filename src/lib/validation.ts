@@ -55,6 +55,7 @@ export const subscriptionSchema = z.object({
   nextCharge: z.union([isoDate, z.literal("")]).default(""),
   // optional so backups from before bills and subscriptions were told apart still restore
   kind: z.enum(SUB_KINDS).optional(),
+  subcategory: text(160).default(""),
 }).transform((s) => ({ ...s, kind: s.kind ?? guessKind(s.category) }));
 
 export const settingsSchema = z.object({

@@ -13,6 +13,7 @@ import { useMutate } from "@/lib/data/hooks";
 import { cn, currentMonth } from "@/lib/utils";
 import { axisProps, ChartArea, ChartCard, DataTable, GOLD, INK, TooltipBox } from "../charts/kit";
 import { ACCOUNT_TYPE_ICON, CategoryIcon } from "../icons";
+import { GuardedLink } from "../shell/unsaved";
 import { Button } from "../ui/button";
 import { Card, CardHeader } from "../ui/card";
 import { Select } from "../ui/form";
@@ -21,11 +22,16 @@ import { AnimatedNumber, Delta, EmptyState } from "../ui/misc";
 /** Goal contributions side by side with what the user actually saves each month. */
 export function PlanCard({ ds }: { ds: Dataset }) {
   const { t, f } = useI18n();
-  const avg = Math.max(0, recentAverages(ds, currentMonth()).saved);
+  const r = recentAverages(ds, currentMonth());
+  // income minus spending — negative when spending ran over (shown as is, not as $0)
+  const saved = r.saved;
+  const noIncome = r.income <= 0;
+  const avg = Math.max(0, saved);
   const active = ds.goals.filter((g) => g.status === "active" && !goalPlanFor(ds, g).achieved);
   const allocated = active.reduce((a, g) => a + g.monthlyContribution, 0);
   const scale = Math.max(avg, allocated, 1);
-  const free = avg - allocated;
+  const free = saved - allocated;
+  const range = r.from === r.to ? f.monthShort(r.from) : `${f.monthShort(r.from)} – ${f.monthShort(r.to)}`;
 
   return (
     <Card>
@@ -35,15 +41,39 @@ export function PlanCard({ ds }: { ds: Dataset }) {
           <p className="text-xs text-ink-3">{t("goals.plan.allocatedLabel")}</p>
           <AnimatedNumber value={allocated} format={f.money0} className="mt-1 block text-xl font-semibold text-ink" />
         </div>
-        <div title={t("goals.plan.avgHint")}>
+        <div>
           <p className="text-xs text-ink-3">{t("goals.plan.savedLabel")}</p>
-          <AnimatedNumber value={avg} format={f.money0} className="mt-1 block text-xl font-semibold text-good" />
+          {noIncome ? (
+            <p className="mt-1 text-xl font-semibold text-ink-3">—</p>
+          ) : (
+            <AnimatedNumber value={saved} format={f.money0} className={cn("mt-1 block text-xl font-semibold", saved >= 0 ? "text-good" : "text-bad")} />
+          )}
         </div>
-        <p className={cn("col-span-2 flex items-center gap-1.5 self-end text-sm font-medium sm:col-span-1", free >= 0 ? "text-gold-bright" : "text-bad")}>
-          {free < 0 && <AlertTriangle className="h-4 w-4 shrink-0" />}
-          {free >= 0 ? t("goals.plan.free", { amount: f.money0(free) }) : t("goals.plan.over", { amount: f.money0(-free) })}
-        </p>
+        {!noIncome && (
+          <p className={cn("col-span-2 flex items-center gap-1.5 self-end text-sm font-medium sm:col-span-1", free >= 0 ? "text-gold-bright" : "text-bad")}>
+            {free < 0 && <AlertTriangle className="h-4 w-4 shrink-0" />}
+            {free >= 0 ? t("goals.plan.free", { amount: f.money0(free) }) : t("goals.plan.over", { amount: f.money0(-free) })}
+          </p>
+        )}
       </div>
+      {/* where "you save" comes from, so a surprising number can be checked */}
+      <p className="mt-3 text-xs text-ink-3">
+        {noIncome ? (
+          <>
+            {t("goals.plan.noIncome")}{" "}
+            <GuardedLink href="/budget" className="text-gold hover:underline">
+              {t("nav.budget")} →
+            </GuardedLink>
+          </>
+        ) : (
+          <>
+            {r.months === 0
+              ? t("goals.plan.fromBudget", { income: f.money0(r.income), spent: f.money0(r.spent) })
+              : t("goals.plan.basis", { range, income: f.money0(r.income), spent: f.money0(r.spent) })}
+            {r.missingIncome && r.months > 0 && <span className="text-warn"> {t("goals.plan.someMissing")}</span>}
+          </>
+        )}
+      </p>
 
       <div className="relative mt-5 flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-white/[0.06]">
         {active.map((g, i) => (

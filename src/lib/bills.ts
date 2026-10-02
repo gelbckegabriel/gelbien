@@ -126,7 +126,7 @@ export function billTransaction(c: BillCharge, ds: Pick<Dataset, "transactions" 
     id: uid("t"),
     date: c.date,
     category: sub.category,
-    subcategory: last?.subcategory ?? "",
+    subcategory: sub.subcategory || last?.subcategory || "",
     description: sub.name,
     amount: round2(sub.amount),
     payment: sub.payment || last?.payment || ds.settings.paymentMethods[0] || "",

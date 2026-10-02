@@ -43,7 +43,7 @@ export function applyMutationToDataset(ds: Dataset, m: Mutation): Dataset {
         categories: m.categories,
         transactions: ds.transactions.map((t) => ({ ...t, category: rename(t.category), subcategory: renameSub(t.category, t.subcategory) })),
         budgets: ds.budgets.map((b) => ({ ...b, category: rename(b.category) })),
-        subscriptions: ds.subscriptions.map((s) => ({ ...s, category: rename(s.category) })),
+        subscriptions: ds.subscriptions.map((s) => ({ ...s, category: rename(s.category), subcategory: renameSub(s.category, s.subcategory) })),
       };
     }
     case "saveBudget": {

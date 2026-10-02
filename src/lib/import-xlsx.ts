@@ -270,6 +270,7 @@ export function importMoneySheet(sheets: SheetData[], locale: Locale, now = new 
           notes: text(row[c.notes]),
           nextCharge: "",
           kind: guessKind(text(row[c.category])),
+          subcategory: "",
         });
       });
     }

@@ -297,13 +297,21 @@ export function yearMatrix(ds: Dataset, year: number) {
 export function recentAverages(ds: Dataset, month: string, n = 3) {
   const points = trend(ds, addMonths(month, -1), 12).filter((p) => p.spent > 0).slice(-n);
   if (!points.length) {
+    // no full month recorded yet: this month's plan stands in
     const s = summarizeMonth(ds, month);
-    return { spent: s.budgetTotal || s.total, saved: s.income.net - (s.budgetTotal || s.total), months: 0 };
+    const spent = s.budgetTotal || s.total;
+    return { spent, saved: s.income.net - spent, income: s.income.net, months: 0, from: month, to: month, missingIncome: s.income.net <= 0 };
   }
   return {
     spent: round2(sum(points, (p) => p.spent) / points.length),
     saved: round2(sum(points, (p) => p.saved) / points.length),
+    income: round2(sum(points, (p) => p.income) / points.length),
     months: points.length,
+    /** the months averaged */
+    from: points[0].month,
+    to: points[points.length - 1].month,
+    /** some of them have no income set, so the average saving is understated */
+    missingIncome: points.some((p) => p.income <= 0),
   };
 }
 

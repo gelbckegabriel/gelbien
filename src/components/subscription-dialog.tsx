@@ -9,7 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import { CYCLES, SUB_KINDS, SUB_STATUSES, WORTH_IT, type Cycle, type Dataset, type SubKind, type SubStatus, type Subscription, type WorthIt } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { parseAmount, round2, uid } from "@/lib/utils";
-import { CategorySelect, PaymentSelect } from "./pickers";
+import { CategorySelect, PaymentSelect, SubcategorySelect } from "./pickers";
 import { Button } from "./ui/button";
 import { Field, Input, MoneyInput, Segmented, Select, Textarea } from "./ui/form";
 import { Sheet } from "./ui/sheet";
@@ -46,18 +46,20 @@ function SubscriptionForm({ ds, open, editing, onClose }: { ds: Dataset; open: b
         notes: "",
         nextCharge: "",
         kind: "bill",
+        subcategory: "",
       },
   );
   const [amount, setAmount] = useState(editing ? String(editing.amount) : "");
   const set = (patch: Partial<Subscription>) => setS((cur) => ({ ...cur, ...patch }));
   const value = parseAmount(amount);
   const isSub = s.kind === "subscription";
+  const currentCat = ds.categories.find((c) => c.name === s.category);
   const setKind = (kind: SubKind) =>
     set({
       kind,
       // free trials only exist for subscriptions
       ...(kind === "bill" && s.status === "trial" ? { status: "active" as const } : {}),
-      ...(categoryPicked.current ? {} : { category: defaultCategory(kind) }),
+      ...(categoryPicked.current ? {} : { category: defaultCategory(kind), subcategory: "" }),
     });
 
   const save = async () => {
@@ -130,13 +132,26 @@ function SubscriptionForm({ ds, open, editing, onClose }: { ds: Dataset; open: b
             value={s.category}
             onChange={(category) => {
               categoryPicked.current = true;
-              set({ category });
+              set({ category, subcategory: "" });
             }}
             categories={ds.categories.filter((c) => !c.archived || c.name === s.category)}
             placeholder={t("split.pickCategory")}
             aria-label={t("form.category")}
           />
         </Field>
+        {/* logged with every charge marked paid */}
+        {currentCat && currentCat.subcategories.length > 0 && (
+          <Field label={t("form.subcategory")} hint={t("common.optional")}>
+            <SubcategorySelect
+              value={s.subcategory}
+              onChange={(subcategory) => set({ subcategory })}
+              category={currentCat}
+              anyLabel={t("split.noSub")}
+              placeholder={t("split.anySub")}
+              aria-label={t("form.subcategory")}
+            />
+          </Field>
+        )}
         {/* Monthly bills repeat on a day of the month; longer (or weekly) cycles need one known charge date */}
         {s.cycle === "monthly" ? (
           <Field label={t("budget.subs.day")}>

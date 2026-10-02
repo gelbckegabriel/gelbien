@@ -100,6 +100,8 @@ export function DueBills({ ds, className }: { ds: Dataset; className?: string })
                   <span className="block truncate text-sm text-ink">{c.sub.name}</span>
                   <span className="block truncate text-xs text-ink-3">
                     {when(c.date)} · <span className="tabular">{f.money(c.sub.amount)}</span>
+                    {/* what "Paid" logs it under */}
+                    {c.sub.subcategory && ` · ${c.sub.subcategory}`}
                   </span>
                 </span>
                 <button onClick={() => skip(c)} className="rounded-lg p-2 text-ink-3 hover:bg-white/5 hover:text-ink" aria-label={t("bills.skip", { name: c.sub.name })} title={t("bills.skip", { name: c.sub.name })}>
@@ -155,7 +157,7 @@ export function UpcomingBills({ ds, className }: { ds: Dataset; className?: stri
                   <span className="block truncate text-sm text-ink">{c.sub.name}</span>
                   <span className="flex items-center gap-1.5 truncate text-xs text-ink-3">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: cat?.color ?? "#6f7fe0" }} />
-                    <span className="truncate">{c.sub.category}</span>
+                    <span className="truncate">{c.sub.subcategory ? `${c.sub.category} · ${c.sub.subcategory}` : c.sub.category}</span>
                   </span>
                 </span>
                 <span className="tabular shrink-0 text-sm font-medium text-ink">{f.money(c.sub.amount)}</span>
