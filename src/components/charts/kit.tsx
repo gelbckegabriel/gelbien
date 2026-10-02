@@ -194,7 +194,8 @@ export function StatTile({
   value: number;
   format: (n: number) => string;
   sub?: React.ReactNode;
-  delta?: { value: number; goodWhenUp: boolean; format: (n: number) => string; label?: string };
+  /** `showLabel`: keep the label on phones too (hidden there by default, where tiles are narrow) */
+  delta?: { value: number; goodWhenUp: boolean; format: (n: number) => string; label?: string; showLabel?: boolean };
   icon?: React.ReactNode;
   tone?: "good" | "bad" | "warn";
   className?: string;
@@ -217,7 +218,7 @@ export function StatTile({
         {delta && (
           <span className="flex min-w-0 max-w-full items-center gap-1 whitespace-nowrap">
             <Delta value={delta.value} goodWhenUp={delta.goodWhenUp} format={delta.format} />
-            {delta.label && <span className="hidden truncate sm:inline">{delta.label}</span>}
+            {delta.label && <span className={cn("truncate", !delta.showLabel && "hidden sm:inline")}>{delta.label}</span>}
           </span>
         )}
         {/* Narrow tiles wrap between the " · " parts, never inside one (e.g. "Reserve" / "$18,000"). */}

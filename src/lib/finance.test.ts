@@ -340,4 +340,52 @@ describe("month review", () => {
     expect(r.over).toEqual([{ name: "Groceries", spent: 700, budget: 600, amount: 100 }]);
     expect(r.under).toEqual([{ name: "Leisure", spent: 100, budget: 300, amount: 200 }]);
   });
+
+  it("suggests what to change from patterns across the last months", () => {
+    const months = ["2026-06", "2026-07", "2026-08"];
+    const ds = dataset(
+      [
+        // over the limit every month: the limit is unrealistic
+        ...[650, 680, 700].map((amount, i) => tx({ date: `${months[i]}-03`, amount, category: "Groceries" })),
+        // over once: a one-off
+        ...[100, 100].map((amount, i) => tx({ date: `${months[i]}-05`, amount, category: "Leisure" })),
+        tx({ date: "2026-08-05", amount: 330, category: "Leisure", description: "Concert" }),
+        tx({ date: "2026-08-06", amount: 70, category: "Leisure" }),
+        // barely touched
+        ...[40, 50, 60].map((amount, i) => tx({ date: `${months[i]}-07`, amount, category: "Personal care" })),
+        // no limit
+        tx({ date: "2026-08-08", amount: 120, category: "Gifts" }),
+      ],
+      {
+        budgets: [
+          { month: "default", category: "Groceries", amount: 600 },
+          { month: "default", category: "Leisure", amount: 300 },
+          { month: "default", category: "Personal care", amount: 200 },
+        ],
+      },
+    );
+    const r = monthReview(ds, "2026-08", "2026-09-28");
+    const byKind = Object.fromEntries(r.suggestions.map((s) => [s.kind, s]));
+    expect(byKind.raiseLimit).toMatchObject({ category: "Groceries", months: 3, suggested: 680 });
+    expect(byKind.overspent).toMatchObject({ category: "Leisure", over: 100, biggest: { description: "Concert" } });
+    expect(byKind.lowerLimit).toMatchObject({ category: "Personal care", suggested: 60 });
+    expect(byKind.unplanned).toMatchObject({ categories: ["Gifts"], spent: 120 });
+    // problems first, then opportunities; with overspending there's no "well done"
+    expect(r.suggestions.map((s) => s.kind)).toEqual(["raiseLimit", "overspent", "lowerLimit", "unplanned"]);
+    expect(byKind.wellDone).toBeUndefined();
+    // Leisure jumped against the two months before
+    expect(r.movers.find((m) => m.name === "Leisure")).toMatchObject({ spent: 400, usual: 100, delta: 300 });
+  });
+
+  it("says well done on a calm month, and folds small categories into one row", () => {
+    const names = ["Housing", "Utilities", "Groceries", "Eating out", "Transportation", "Health", "Personal care", "Gifts"];
+    const ds = dataset(
+      names.map((category, i) => tx({ date: "2026-08-03", amount: 100 - i * 10, category })),
+      { budgets: [{ month: "default", category: "Housing", amount: 2000 }] },
+    );
+    const r = monthReview(ds, "2026-08", "2026-09-28");
+    expect(r.suggestions.at(-1)).toMatchObject({ kind: "wellDone", under: 1480 });
+    expect(r.categories).toHaveLength(7);
+    expect(r.categories[6]).toMatchObject({ rest: true, spent: 70 });
+  });
 });
