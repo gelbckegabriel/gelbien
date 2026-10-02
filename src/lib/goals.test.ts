@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { defaultSettings } from "./defaults";
 import {
   accountsMonthlyGrowth,
   checkInStatus,
@@ -12,8 +11,10 @@ import {
   planGoal,
   projectBalance,
   requiredMonthly,
+  savingsPlan,
 } from "./goals";
-import type { Account, BalanceSnapshot, Goal } from "./types";
+import { defaultCategories, defaultSettings } from "./defaults";
+import type { Account, BalanceSnapshot, Dataset, Goal, Transaction } from "./types";
 
 const acct = (id: string, type: Account["type"] = "savings"): Account => ({ id, name: id, institution: "", type, color: "#000", archived: false, notes: "" });
 const goal = (patch: Partial<Goal>): Goal => ({
@@ -121,5 +122,38 @@ describe("accounts", () => {
     expect(done.due).toBe(false);
     expect(done.nextDate).toBe("2026-10-01");
     expect(checkInStatus({ accounts: [], balances: [], settings }, "2026-09-26").due).toBe(false);
+  });
+});
+
+describe("savingsPlan", () => {
+  const spend = (date: string, amount: number): Transaction => ({
+    id: date, date, category: "Groceries", subcategory: "", description: "", amount, payment: "", type: "variable", priority: "important",
+    merchant: "", recurring: false, notes: "", receiptUrl: "", createdAt: "", updatedAt: "", group: "", billId: "",
+  });
+  const ds = (extra: Partial<Dataset>): Dataset => ({
+    transactions: [], categories: defaultCategories("en"), budgets: [], incomes: [], subscriptions: [], accounts: [], balances: [],
+    goals: [goal({ id: "car", monthlyContribution: 1100, target: 30000 }), goal({ id: "home", monthlyContribution: 900, target: 50000 })],
+    settings: defaultSettings("en"), meta: { source: "demo", syncedAt: "" }, ...extra,
+  });
+
+  it("weighs goals against planned savings, with what was actually saved alongside", () => {
+    const plan = savingsPlan(
+      ds({
+        incomes: [{ month: "default", gross: 0, net: 4980, note: "" }],
+        budgets: [{ month: "default", category: "Housing", amount: 2791 }],
+        // overspent both months: 5985 spent on 4980 income
+        transactions: [spend("2026-08-05", 5985), spend("2026-09-05", 5985)],
+      }),
+      "2026-10",
+      "2026-10-02",
+    );
+    expect(plan).toMatchObject({ allocated: 2000, planned: { saved: 2189 }, basis: 2189, free: 189 });
+    expect(plan.actual).toMatchObject({ saved: -1005, from: "2026-08", to: "2026-09" });
+  });
+
+  it("falls back on what was actually saved without a budget, and has nothing to go on without income", () => {
+    const history = { incomes: [{ month: "default", gross: 0, net: 3000, note: "" }], transactions: [spend("2026-09-05", 2500)] };
+    expect(savingsPlan(ds(history), "2026-10", "2026-10-02")).toMatchObject({ planned: null, basis: 500, free: -1500 });
+    expect(savingsPlan(ds({}), "2026-10", "2026-10-02")).toMatchObject({ basis: null, free: null });
   });
 });

@@ -4,6 +4,7 @@
  * Money growth model: an amount `current` today, `monthly` added at the end of
  * every month, compounding monthly at the rate equivalent to `annualReturn` %.
  */
+import { recentAverages, summarizeMonth } from "./finance";
 import type { Account, BalanceSnapshot, Dataset, Goal } from "./types";
 import { addMonths, currentMonth, daysInMonth, monthOf, monthRange, round2, todayISO } from "./utils";
 
@@ -244,4 +245,21 @@ export function avgSuperfluous(ds: Pick<Dataset, "transactions">, today = todayI
   let total = 0;
   for (const t of ds.transactions) if (t.priority === "superfluous" && months.includes(monthOf(t.date))) total += t.amount;
   return round2(Math.max(0, total / n));
+}
+
+/**
+ * Goal contributions against what's there to save each month. The yardstick is the budget's
+ * planned savings (income − planned spending), the number the user set out to save; without a
+ * budget, what was actually saved lately. The actual average comes along either way, as a check.
+ */
+export function savingsPlan(ds: Dataset, month = currentMonth(), today = todayISO()) {
+  const active = ds.goals.filter((g) => g.status === "active" && !goalPlanFor(ds, g, today).achieved);
+  const allocated = round2(active.reduce((a, g) => a + g.monthlyContribution, 0));
+  const s = summarizeMonth(ds, month);
+  const planned = s.budgetTotal > 0 && s.income.net > 0 ? { saved: round2(s.income.net - s.budgetTotal), income: s.income.net, spending: s.budgetTotal } : null;
+  const r = recentAverages(ds, month);
+  // full months only: with none, recentAverages falls back on the plan, which isn't "actual"
+  const actual = r.months > 0 && r.income > 0 ? r : null;
+  const basis = planned?.saved ?? actual?.saved ?? null;
+  return { active, allocated, planned, actual, basis, free: basis === null ? null : round2(basis - allocated) };
 }

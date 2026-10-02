@@ -3,8 +3,7 @@
 import { AlertTriangle, BellRing, CalendarPlus, Landmark, Plus } from "lucide-react";
 import { motion } from "motion/react";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { recentAverages } from "@/lib/finance";
-import { checkInStatus, goalPlanFor, latestBalances, netWorth, netWorthSeries, signedBalance } from "@/lib/goals";
+import { checkInStatus, latestBalances, netWorth, netWorthSeries, savingsPlan, signedBalance } from "@/lib/goals";
 import { downloadFile } from "@/lib/files";
 import { monthlyReminderIcs } from "@/lib/ics";
 import { useI18n } from "@/lib/i18n";
@@ -19,19 +18,16 @@ import { Card, CardHeader } from "../ui/card";
 import { Select } from "../ui/form";
 import { AnimatedNumber, Delta, EmptyState } from "../ui/misc";
 
-/** Goal contributions side by side with what the user actually saves each month. */
+/** Goal contributions next to planned savings (without a budget: what's actually saved), with the actual average as a check. */
 export function PlanCard({ ds }: { ds: Dataset }) {
   const { t, f } = useI18n();
-  const r = recentAverages(ds, currentMonth());
-  // income minus spending — negative when spending ran over (shown as is, not as $0)
-  const saved = r.saved;
-  const noIncome = r.income <= 0;
-  const avg = Math.max(0, saved);
-  const active = ds.goals.filter((g) => g.status === "active" && !goalPlanFor(ds, g).achieved);
-  const allocated = active.reduce((a, g) => a + g.monthlyContribution, 0);
-  const scale = Math.max(avg, allocated, 1);
-  const free = saved - allocated;
-  const range = r.from === r.to ? f.monthShort(r.from) : `${f.monthShort(r.from)} – ${f.monthShort(r.to)}`;
+  const { active, allocated, planned, actual, basis, free } = savingsPlan(ds);
+  const marker = basis !== null && basis > 0 ? basis : 0;
+  const scale = Math.max(marker, allocated, 1);
+  const range = actual ? (actual.from === actual.to ? f.monthShort(actual.from) : `${f.monthShort(actual.from)} – ${f.monthShort(actual.to)}`) : "";
+  const perMonth = (n: number) => t("budget.subs.perMonth", { amount: f.money0(n) });
+  // saving less than planned: spending has run over the budget
+  const shortfall = planned && actual ? planned.saved - actual.saved : 0;
 
   return (
     <Card>
@@ -42,38 +38,22 @@ export function PlanCard({ ds }: { ds: Dataset }) {
           <AnimatedNumber value={allocated} format={f.money0} className="mt-1 block text-xl font-semibold text-ink" />
         </div>
         <div>
-          <p className="text-xs text-ink-3">{t("goals.plan.savedLabel")}</p>
-          {noIncome ? (
+          <p className="text-xs text-ink-3">{planned ? t("goals.plan.plannedLabel") : t("goals.plan.savedLabel")}</p>
+          {basis === null ? (
             <p className="mt-1 text-xl font-semibold text-ink-3">—</p>
           ) : (
-            <AnimatedNumber value={saved} format={f.money0} className={cn("mt-1 block text-xl font-semibold", saved >= 0 ? "text-good" : "text-bad")} />
+            <AnimatedNumber value={basis} format={f.money0} className={cn("mt-1 block text-xl font-semibold", basis >= 0 ? "text-good" : "text-bad")} />
           )}
         </div>
-        {!noIncome && (
+        {free !== null && (
           <p className={cn("col-span-2 flex items-center gap-1.5 self-end text-sm font-medium sm:col-span-1", free >= 0 ? "text-gold-bright" : "text-bad")}>
             {free < 0 && <AlertTriangle className="h-4 w-4 shrink-0" />}
-            {free >= 0 ? t("goals.plan.free", { amount: f.money0(free) }) : t("goals.plan.over", { amount: f.money0(-free) })}
+            {free >= 0
+              ? t("goals.plan.free", { amount: f.money0(free) })
+              : t(planned ? "goals.plan.overPlan" : "goals.plan.over", { amount: f.money0(-free) })}
           </p>
         )}
       </div>
-      {/* where "you save" comes from, so a surprising number can be checked */}
-      <p className="mt-3 text-xs text-ink-3">
-        {noIncome ? (
-          <>
-            {t("goals.plan.noIncome")}{" "}
-            <GuardedLink href="/budget" className="text-gold hover:underline">
-              {t("nav.budget")} →
-            </GuardedLink>
-          </>
-        ) : (
-          <>
-            {r.months === 0
-              ? t("goals.plan.fromBudget", { income: f.money0(r.income), spent: f.money0(r.spent) })
-              : t("goals.plan.basis", { range, income: f.money0(r.income), spent: f.money0(r.spent) })}
-            {r.missingIncome && r.months > 0 && <span className="text-warn"> {t("goals.plan.someMissing")}</span>}
-          </>
-        )}
-      </p>
 
       <div className="relative mt-5 flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-white/[0.06]">
         {active.map((g, i) => (
@@ -87,8 +67,8 @@ export function PlanCard({ ds }: { ds: Dataset }) {
             transition={{ type: "spring", stiffness: 90, damping: 20, delay: i * 0.05 }}
           />
         ))}
-        {/* marker for what you actually save */}
-        {avg > 0 && <div className="absolute inset-y-0 w-0.5 bg-ink" style={{ left: `calc(${(avg / scale) * 100}% - 1px)` }} />}
+        {/* marker for what there is to save */}
+        {marker > 0 && <div className="absolute inset-y-0 w-0.5 bg-ink" style={{ left: `calc(${(marker / scale) * 100}% - 1px)` }} />}
       </div>
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
         {active.map((g) => (
@@ -97,12 +77,37 @@ export function PlanCard({ ds }: { ds: Dataset }) {
             {g.name} <span className="tabular text-ink-3">{f.money0(g.monthlyContribution)}</span>
           </li>
         ))}
-        {avg > 0 && (
+        {marker > 0 && (
           <li className="inline-flex items-center gap-1.5 text-xs text-ink-2">
-            <span className="h-3 w-0.5 bg-ink" /> {t("goals.plan.avgSaved", { amount: f.money0(avg) })}
+            <span className="h-3 w-0.5 bg-ink" /> {t(planned ? "goals.plan.plannedMarker" : "goals.plan.avgSaved", { amount: f.money0(marker) })}
           </li>
         )}
       </ul>
+
+      {/* where the numbers come from, and how the plan holds up against what really happened */}
+      <div className="mt-4 space-y-1 border-t border-line/70 pt-3 text-xs text-ink-3">
+        {basis === null ? (
+          <p>
+            {t("goals.plan.noIncome")}{" "}
+            <GuardedLink href="/budget" className="text-gold hover:underline">
+              {t("nav.budget")} →
+            </GuardedLink>
+          </p>
+        ) : (
+          <>
+            {planned && <p>{t("goals.plan.planBasis", { income: f.money0(planned.income), spending: f.money0(planned.spending) })}</p>}
+            {actual && (
+              <p>
+                {planned ? t("goals.plan.actualLabel") : null}{" "}
+                {planned && <span className={cn("tabular font-medium", actual.saved >= 0 ? "text-good" : "text-bad")}>{perMonth(actual.saved)}</span>}{" "}
+                {t(planned ? "goals.plan.actualBasis" : "goals.plan.basis", { range, income: f.money0(actual.income), spent: f.money0(actual.spent) })}
+                {shortfall > 0 && <span className="text-warn"> {t("goals.plan.belowPlan", { amount: perMonth(shortfall) })}</span>}
+                {actual.missingIncome && <span className="text-warn"> {t("goals.plan.someMissing")}</span>}
+              </p>
+            )}
+          </>
+        )}
+      </div>
     </Card>
   );
 }
