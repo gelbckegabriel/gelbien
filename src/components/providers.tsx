@@ -6,6 +6,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { MotionConfig } from "motion/react";
 import { useState } from "react";
 import { Toaster } from "sonner";
+import { restoreCache } from "@/lib/data/upgrade";
 
 const WEEK = 1000 * 60 * 60 * 24 * 7;
 export const CACHE_KEY = "gelbien.cache";
@@ -26,6 +27,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       storage: typeof window === "undefined" ? noopStorage : window.localStorage,
       key: CACHE_KEY,
       throttleTime: 1000,
+      // a copy that can't be read is dropped (and the sheet re-fetched), never shown half-broken
+      deserialize: restoreCache,
     }),
   );
 
@@ -35,7 +38,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       persistOptions={{
         persister,
         maxAge: WEEK,
-        // bumped when the dataset shape changes (v4: splits, bills; v5: merchant on recurring expenses)
+        // Added fields need no bump (restoreCache fills them in): bump it only for a change an older copy
+        // can't be upgraded from, like a field renamed or repurposed. (v4: splits, bills; v5: recurring merchant)
         buster: "v5",
         dehydrateOptions: {
           // Cache the Google-backed data (for instant start-up); demo data already lives in localStorage.

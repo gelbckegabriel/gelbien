@@ -371,7 +371,7 @@ function DataCard() {
     try {
       const parsed = datasetSchema.parse(JSON.parse(await file.text()));
       if (!window.confirm(t("prof.data.restoreConfirm"))) return;
-      mutate.mutate({ op: "replaceAll", data: parsed as Omit<Dataset, "meta"> });
+      mutate.mutate({ op: "replaceAll", data: parsed });
       toast.success(t("prof.data.importDone"));
     } catch (err) {
       toast.error(t("prof.data.importFail", { error: (err as Error).message.slice(0, 120) }));

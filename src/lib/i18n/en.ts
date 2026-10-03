@@ -684,6 +684,9 @@ const en = {
   "ci.next": "Next check-in {date}",
 
   "err.load": "Couldn't load your data",
+  "err.crash.title": "This page ran into a problem",
+  "err.crash.body": "Clearing this browser's copy of your data and loading it fresh usually fixes it.",
+  "err.crash.recovering": "Loading the latest version…",
   "err.session": "Your Google session expired. Please sign in again.",
   "err.notSaved": "Your changes weren't saved",
   "err.kept": "Your edits are still here so you can try again.",

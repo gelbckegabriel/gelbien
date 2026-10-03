@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { guessKind } from "./defaults";
-import { ACCOUNT_TYPES, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PRIORITIES, SUB_KINDS, SUB_STATUSES, WORTH_IT, type Mutation } from "./types";
+import { ACCOUNT_TYPES, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PRIORITIES, SUB_KINDS, SUB_STATUSES, WORTH_IT, type Dataset, type Mutation } from "./types";
 
 const text = (max = 500) => z.string().max(max);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -112,6 +112,13 @@ export const datasetSchema = z.object({
   goals: z.array(goalSchema).max(200).default([]),
   settings: settingsSchema,
 });
+
+// The schemas must match the app's types field for field: one a schema doesn't know is silently
+// dropped from what gets saved, and one it requires breaks restoring older backups (give new fields a
+// .default()). This stops compiling when the two drift apart.
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+type Assert<T extends true> = T;
+export type SchemasMatchTypes = Assert<Same<z.output<typeof datasetSchema>, Omit<Dataset, "meta">>>;
 
 export const mutationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("addTransaction"), tx: transactionSchema }),

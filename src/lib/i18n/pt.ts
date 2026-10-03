@@ -686,6 +686,9 @@ const pt: Messages = {
   "ci.next": "Próximo check-in {date}",
 
   "err.load": "Não foi possível carregar seus dados",
+  "err.crash.title": "Esta página encontrou um problema",
+  "err.crash.body": "Limpar a cópia dos seus dados neste navegador e carregá-los de novo costuma resolver.",
+  "err.crash.recovering": "Carregando a versão mais recente…",
   "err.session": "Sua sessão do Google expirou. Entre novamente.",
   "err.notSaved": "Suas alterações não foram salvas",
   "err.kept": "Suas edições continuam aqui para você tentar de novo.",

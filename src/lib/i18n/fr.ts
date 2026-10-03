@@ -686,6 +686,9 @@ const fr: Messages = {
   "ci.next": "Prochain bilan {date}",
 
   "err.load": "Impossible de charger vos données",
+  "err.crash.title": "Cette page a rencontré un problème",
+  "err.crash.body": "Vider la copie de vos données dans ce navigateur et les recharger règle généralement le problème.",
+  "err.crash.recovering": "Chargement de la dernière version…",
   "err.session": "Votre session Google a expiré. Veuillez vous reconnecter.",
   "err.notSaved": "Vos modifications n'ont pas été enregistrées",
   "err.kept": "Vos modifications sont conservées pour que vous puissiez réessayer.",

@@ -1,9 +1,9 @@
 "use client";
 
-import { guessKind } from "../defaults";
 import { buildDemoDataset } from "../demo";
 import type { Dataset, Locale, Mutation, SessionInfo } from "../types";
 import { applyMutationToDataset } from "./reducer";
+import { upgradeDataset } from "./upgrade";
 
 export class ApiError extends Error {
   constructor(
@@ -36,7 +36,7 @@ export interface DataSource {
 
 export function googleSource(locale: Locale): DataSource {
   return {
-    load: async () => normalizeDataset(await json<Dataset>(await fetch(`/api/data?locale=${locale}`, { cache: "no-store" }))),
+    load: async () => upgradeDataset(await json<Dataset>(await fetch(`/api/data?locale=${locale}`, { cache: "no-store" }))),
     apply: async (m) =>
       json<{ syncedAt: string }>(
         await fetch(`/api/data?locale=${locale}`, {
@@ -51,23 +51,10 @@ export function googleSource(locale: Locale): DataSource {
 const DEMO_KEY = "gelbien.demo.v1";
 export const MODE_KEY = "gelbien.mode";
 
-/** Fill in fields added after a dataset was stored (e.g. accounts/goals), so older copies keep working. */
-export function normalizeDataset(ds: Dataset): Dataset {
-  return {
-    ...ds,
-    transactions: ds.transactions.map((t) => ({ ...t, group: t.group ?? "", billId: t.billId ?? "" })),
-    subscriptions: ds.subscriptions.map((s) => ({ ...s, nextCharge: s.nextCharge ?? "", kind: s.kind ?? guessKind(s.category), subcategory: s.subcategory ?? "", merchant: s.merchant ?? "" })),
-    accounts: ds.accounts ?? [],
-    balances: ds.balances ?? [],
-    goals: ds.goals ?? [],
-    settings: { ...ds.settings, checkInDay: ds.settings?.checkInDay ?? 1, paymentStyles: ds.settings?.paymentStyles ?? {} },
-  };
-}
-
 export function readDemo(): Dataset | null {
   try {
     const raw = localStorage.getItem(DEMO_KEY);
-    return raw ? normalizeDataset(JSON.parse(raw) as Dataset) : null;
+    return raw ? upgradeDataset(JSON.parse(raw) as Dataset) : null;
   } catch {
     return null;
   }
