@@ -114,12 +114,12 @@ export function RichSelect({
           position="popper"
           sideOffset={6}
           collisionPadding={12}
-          className="z-[60] max-h-[min(var(--radix-select-content-available-height),24rem)] w-[var(--radix-select-trigger-width)] min-w-56 origin-[var(--radix-select-content-transform-origin)] overflow-hidden rounded-2xl border border-line-strong bg-[#16161b] shadow-2xl shadow-black/60 animate-pop-in motion-reduce:animate-none"
+          className="z-[60] max-h-[min(var(--radix-select-content-available-height),24rem)] w-[var(--radix-select-trigger-width)] min-w-56 origin-[var(--radix-select-content-transform-origin)] overflow-hidden rounded-2xl border border-line-strong bg-[#16161b] shadow-2xl shadow-black/60 data-[side=bottom]:animate-pop-in data-[side=top]:animate-pop-in-up motion-reduce:animate-none"
         >
           <SelectPrimitive.ScrollUpButton className="flex h-6 items-center justify-center text-ink-3">
             <ChevronUp className="h-4 w-4" />
           </SelectPrimitive.ScrollUpButton>
-          <SelectPrimitive.Viewport className="p-1.5">
+          <SelectPrimitive.Viewport className="rise-list p-1.5">
             {noneLabel && item({ value: NONE, label: noneLabel, icon: noneIcon })}
             {options.map(item)}
           </SelectPrimitive.Viewport>
@@ -292,7 +292,7 @@ export function MonthField({ value, onChange, min, className }: { value: string;
       </Popover.Trigger>
       <Popover.Portal>
         {/* above the Sheet (z-50) these fields live in */}
-        <Popover.Content sideOffset={8} align="start" collisionPadding={16} className="z-[60] w-72 rounded-2xl border border-line-strong bg-[#16161b] p-3 shadow-2xl shadow-black/60">
+        <Popover.Content sideOffset={8} align="start" collisionPadding={16} className="z-[60] w-72 origin-[var(--radix-popover-content-transform-origin)] rounded-2xl border border-line-strong bg-[#16161b] p-3 shadow-2xl shadow-black/60 data-[side=bottom]:animate-pop-in data-[side=top]:animate-pop-in-up motion-reduce:animate-none">
           <MonthGrid
             year={year}
             onYear={setYear}

@@ -54,7 +54,7 @@ describe("sheet schema", () => {
           monthlyContribution: 150, annualReturn: 0, status: "paused", order: 1, notes: "Brazil", createdAt: "",
         },
       ],
-      settings: { ...defaultSettings("en"), reserve: 15000, checkInDay: 5, paymentStyles: { Credit: { icon: "Gift", color: "#d55181" } } },
+      settings: { ...defaultSettings("en"), reserve: 15000, checkInDay: 5, tourSeen: 1, paymentStyles: { Credit: { icon: "Gift", color: "#d55181" } } },
     };
     const back = datasetFromRanges(datasetToRanges(data), "en");
     expect(back).toEqual(data);

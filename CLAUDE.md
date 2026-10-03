@@ -12,6 +12,8 @@ Personal-finance app (Next.js 16 App Router, React 19, Tailwind v4). One deploym
 - Analytics are pure functions in `src/lib/finance.ts` (unit-tested). Charts in `src/components/charts/*` follow the dataviz rules: categorical palette validated for CVD, fold to top 6 + "everything else", table view for every chart, no dual axes.
 - AI is bring-your-own-key, called from the browser (`src/lib/ai/client.ts`): Anthropic (default `claude-opus-5`) or Gemini free tier. Output schemas are deliberately lenient; values are matched to real names in code.
 - All UI strings go through `t()`; keep `src/lib/i18n/{en,pt,fr}.ts` in sync (pt/fr are typed against en).
+- The user guide (`/guide`, readable signed out) is long-form text in `src/lib/i18n/guide/{en,pt,fr}.ts`; the welcome tour (`src/components/welcome-tour.tsx`, text under `tour.*` in the message files) runs once per account, remembered by `settings.tourSeen`. When a page's behaviour or labels change, update its guide section and tour step in all three languages; bump `TOUR_VERSION` only if the tour should be shown again to everyone.
 - `cn()` uses tailwind-merge — pass overrides via `className`, don't fight base classes.
+- Motion is one shared language: tokens/variants in `src/lib/motion.ts`, CSS utilities in `globals.css` (`animate-pop-in`/`-up` for Radix popovers, `rise-in` for sheet contents, `rise-list` for menu lists). `Sheet` unfolds from the last tap (`tapOrigin`); pages slide in from the direction of the nav (`(app)/template.tsx`). Reuse these for new UI, and keep a plain fallback for reduced motion.
 
 Checks: `npm run typecheck && npm run lint && npm test && npm run build`.

@@ -33,6 +33,11 @@ interface UiState {
   review: { open: boolean; month: string };
   openReview: (month: string) => void;
   closeReview: () => void;
+  /** The welcome tour (welcome-tour.tsx) */
+  tour: { open: boolean; step: number };
+  openTour: () => void;
+  setTourStep: (step: number) => void;
+  closeTour: () => void;
 }
 
 export const useUi = create<UiState>()(
@@ -61,6 +66,10 @@ export const useUi = create<UiState>()(
       review: { open: false, month: currentMonth() },
       openReview: (month) => set({ review: { open: true, month } }),
       closeReview: () => set((s) => ({ review: { ...s.review, open: false } })),
+      tour: { open: false, step: 0 },
+      openTour: () => set({ tour: { open: true, step: 0 } }),
+      setTourStep: (step) => set((s) => ({ tour: { ...s.tour, step } })),
+      closeTour: () => set((s) => ({ tour: { ...s.tour, open: false } })),
     }),
     { name: "gelbien.ui", partialize: (s) => ({ demo: s.demo }) },
   ),

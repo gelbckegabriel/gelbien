@@ -47,7 +47,8 @@
 
   --animate-shimmer: shimmer 2.2s linear infinite;
   --animate-float: float 6s ease-in-out infinite;
-  --animate-pop-in: pop-in 140ms ease-out;
+  --animate-pop-in: pop-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop-in-up: pop-in-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 
   @keyframes shimmer {
     0% { background-position: -200% 0; }
@@ -57,9 +58,25 @@
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-6px); }
   }
-  /* menus and pickers opening from their field */
+  /* menus and pickers unrolling from their field (downwards, or upwards when there's no room below).
+     The clip ends well outside the box so the drop shadow isn't cut off. */
   @keyframes pop-in {
-    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    0% { opacity: 0; transform: translateY(-8px) scale(0.9); clip-path: inset(0 0 100% 0 round 1rem); }
+    35% { opacity: 1; }
+    100% { opacity: 1; transform: none; clip-path: inset(-4rem -4rem -4rem -4rem round 1rem); }
+  }
+  @keyframes pop-in-up {
+    0% { opacity: 0; transform: translateY(8px) scale(0.9); clip-path: inset(100% 0 0 0 round 1rem); }
+    35% { opacity: 1; }
+    100% { opacity: 1; transform: none; clip-path: inset(-4rem -4rem -4rem -4rem round 1rem); }
+  }
+  /* one row of a panel arriving: rises, fades in, comes into focus. Uses `translate` so it never
+     fights a transform that motion is animating on the same element. */
+  @keyframes rise-in {
+    from { opacity: 0; translate: 0 12px; filter: blur(5px); }
+  }
+  @keyframes rise-in-small {
+    from { opacity: 0; translate: 0 6px; scale: 0.94; }
   }
 }
 
@@ -168,7 +185,46 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   outline: none;
 }
 
+/*
+ * Cascades: the children of a .rise-in container (or of its only child, e.g. a form's wrapper) arrive
+ * one after another — sheet contents. .rise-list does the same, faster and lighter, for lists and grids
+ * inside menus. Each child's place in the order comes from --rise-i.
+ */
+@property --rise-i {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 12;
+}
+.rise-in > :not(:only-child),
+.rise-in > :only-child > * {
+  animation: rise-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--rise-delay, 90ms) + var(--rise-i) * 45ms);
+}
+.rise-list > * {
+  animation: rise-in-small 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--rise-delay, 80ms) + var(--rise-i) * 22ms);
+}
+:is(.rise-in, .rise-list) > :nth-child(1), .rise-in > :only-child > :nth-child(1) { --rise-i: 0; }
+:is(.rise-in, .rise-list) > :nth-child(2), .rise-in > :only-child > :nth-child(2) { --rise-i: 1; }
+:is(.rise-in, .rise-list) > :nth-child(3), .rise-in > :only-child > :nth-child(3) { --rise-i: 2; }
+:is(.rise-in, .rise-list) > :nth-child(4), .rise-in > :only-child > :nth-child(4) { --rise-i: 3; }
+:is(.rise-in, .rise-list) > :nth-child(5), .rise-in > :only-child > :nth-child(5) { --rise-i: 4; }
+:is(.rise-in, .rise-list) > :nth-child(6), .rise-in > :only-child > :nth-child(6) { --rise-i: 5; }
+:is(.rise-in, .rise-list) > :nth-child(7), .rise-in > :only-child > :nth-child(7) { --rise-i: 6; }
+:is(.rise-in, .rise-list) > :nth-child(8), .rise-in > :only-child > :nth-child(8) { --rise-i: 7; }
+:is(.rise-in, .rise-list) > :nth-child(9), .rise-in > :only-child > :nth-child(9) { --rise-i: 8; }
+:is(.rise-in, .rise-list) > :nth-child(10), .rise-in > :only-child > :nth-child(10) { --rise-i: 9; }
+:is(.rise-in, .rise-list) > :nth-child(11), .rise-in > :only-child > :nth-child(11) { --rise-i: 10; }
+:is(.rise-in, .rise-list) > :nth-child(12), .rise-in > :only-child > :nth-child(12) { --rise-i: 11; }
+
 @media (prefers-reduced-motion: reduce) {
+  /* their delays would keep things hidden for a moment even with the durations cut below */
+  .rise-in > *,
+  .rise-in > :only-child > *,
+  .rise-list > * {
+    animation: none;
+  }
+
   *,
   *::before,
   *::after {

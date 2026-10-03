@@ -270,6 +270,7 @@ export function rowsToSettings(rows: Row[], fallbackLocale: Locale): Settings {
     const d = Math.round(num(kv.get("checkInDay")));
     if (d >= 1 && d <= 28) parsed.checkInDay = d;
   }
+  if (kv.has("tourSeen")) parsed.tourSeen = Math.max(0, Math.round(num(kv.get("tourSeen"))));
   if (kv.has("paymentStyles")) {
     try {
       const styles = JSON.parse(str(kv.get("paymentStyles")));
@@ -297,6 +298,7 @@ export function settingsToRows(s: Settings): Row[] {
     ["savingsGoal", s.savingsGoal],
     ["warnAt", s.warnAt],
     ["checkInDay", s.checkInDay],
+    ["tourSeen", s.tourSeen],
     ["paymentMethods", JSON.stringify(s.paymentMethods)],
     ["paymentStyles", JSON.stringify(s.paymentStyles)],
   ];

@@ -41,8 +41,9 @@ export function MonthPicker({ className }: { className?: string }) {
           if (o) setYear(Number(month.slice(0, 4)));
         }}
       >
-        <Popover.Trigger className="relative flex h-8 min-w-[7.5rem] items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg px-2 text-sm font-medium text-ink hover:bg-white/5 sm:min-w-[9.5rem]">
-          <CalendarDays className="h-4 w-4 text-gold" />
+        <Popover.Trigger className="relative flex h-8 min-w-[6.5rem] items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg px-2 text-sm font-medium text-ink hover:bg-white/5 min-[360px]:min-w-[7.5rem] sm:min-w-[9.5rem]">
+          {/* the smallest phones need the room for the month itself */}
+          <CalendarDays className="h-4 w-4 text-gold max-[359px]:hidden" />
           <AnimatePresence mode="popLayout" initial={false} custom={dir}>
             <motion.span
               key={month}
@@ -61,7 +62,7 @@ export function MonthPicker({ className }: { className?: string }) {
           </AnimatePresence>
         </Popover.Trigger>
         <Popover.Portal>
-          <Popover.Content sideOffset={8} align="center" className="z-50 w-72 rounded-2xl border border-line-strong bg-[#16161b] p-3 shadow-2xl shadow-black/60">
+          <Popover.Content sideOffset={8} align="center" className="z-50 w-72 origin-[var(--radix-popover-content-transform-origin)] rounded-2xl border border-line-strong bg-[#16161b] p-3 shadow-2xl shadow-black/60 data-[side=bottom]:animate-pop-in data-[side=top]:animate-pop-in-up motion-reduce:animate-none">
             <MonthGrid
               year={year}
               onYear={setYear}

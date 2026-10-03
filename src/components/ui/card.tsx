@@ -3,14 +3,15 @@
 import { motion, type HTMLMotionProps } from "motion/react";
 import { cn } from "@/lib/utils";
 
+// Cards cascade onto every page: each rises a little, settles from slightly smaller with a soft spring
 export const fadeUp = {
-  hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 260, damping: 28 } },
+  hidden: { opacity: 0, y: 22, scale: 0.97 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24, opacity: { duration: 0.3 } } },
 };
 
 export const stagger = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.05, delayChildren: 0.03 } },
+  show: { transition: { staggerChildren: 0.06, delayChildren: 0.06 } },
 };
 
 export function Card({ className, children, ...props }: HTMLMotionProps<"section">) {

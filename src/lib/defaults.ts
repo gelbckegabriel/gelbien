@@ -355,6 +355,7 @@ export function defaultSettings(locale: Locale): Settings {
     paymentStyles: {},
     warnAt: 0.85,
     checkInDay: 1,
+    tourSeen: 0,
   };
 }
 

@@ -69,6 +69,7 @@ export const settingsSchema = z.object({
   warnAt: z.number().gt(0).lte(1),
   // optional so backups made before Goals existed still restore
   checkInDay: z.number().int().min(1).max(28).default(1),
+  tourSeen: z.number().int().min(0).max(1000).default(0),
 });
 
 export const accountSchema = z.object({

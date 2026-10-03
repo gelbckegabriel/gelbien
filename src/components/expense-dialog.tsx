@@ -553,8 +553,6 @@ function ExpenseForm({
             setAiNote(null);
           }}
         />
-        <input ref={fileInput} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
-        <input ref={cameraInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
         <AnimatePresence>
           {aiNote && (
             <motion.p
@@ -659,10 +657,24 @@ function ExpenseForm({
                       "relative flex flex-col items-center gap-1.5 rounded-2xl border px-1.5 py-2.5 text-center transition-colors",
                       active ? "border-transparent" : "border-line bg-surface-2/60 hover:border-line-strong",
                     )}
-                    style={active ? { background: `${c.color}26`, boxShadow: `inset 0 0 0 1.5px ${c.color}` } : undefined}
                   >
-                    <CategoryIcon icon={c.icon} color={c.color} size="sm" />
-                    <span className={cn("line-clamp-2 text-[11px] leading-tight", active ? "text-ink" : "text-ink-2")}>{c.name}</span>
+                    {/* the highlight glides from the last category picked to this one */}
+                    {active && (
+                      <motion.span
+                        layoutId="expense-category"
+                        className="absolute inset-0 rounded-2xl"
+                        style={{ background: `${c.color}26`, boxShadow: `inset 0 0 0 1.5px ${c.color}` }}
+                        transition={{ type: "spring", stiffness: 480, damping: 34 }}
+                      />
+                    )}
+                    <motion.span
+                      className="relative"
+                      animate={active ? { scale: [1, 1.22, 1], rotate: [0, -8, 0] } : { scale: 1, rotate: 0 }}
+                      transition={{ duration: 0.4, ease: "easeOut" }}
+                    >
+                      <CategoryIcon icon={c.icon} color={c.color} size="sm" />
+                    </motion.span>
+                    <span className={cn("relative line-clamp-2 text-[11px] leading-tight", active ? "text-ink" : "text-ink-2")}>{c.name}</span>
                   </motion.button>
                 );
               })}
@@ -695,11 +707,18 @@ function ExpenseForm({
                       type="button"
                       onClick={() => set({ subcategory: active ? "" : s })}
                       className={cn(
-                        "rounded-full border px-3 py-1.5 text-[13px] transition-colors",
-                        active ? "border-gold/50 bg-gold-soft text-gold-bright" : "border-line bg-surface-2/60 text-ink-2 hover:border-line-strong hover:text-ink",
+                        "relative rounded-full border px-3 py-1.5 text-[13px] transition-colors",
+                        active ? "border-transparent text-gold-bright" : "border-line bg-surface-2/60 text-ink-2 hover:border-line-strong hover:text-ink",
                       )}
                     >
-                      {s}
+                      {active && (
+                        <motion.span
+                          layoutId="expense-subcategory"
+                          className="absolute inset-0 rounded-full border border-gold/50 bg-gold-soft"
+                          transition={{ type: "spring", stiffness: 480, damping: 34 }}
+                        />
+                      )}
+                      <span className="relative">{s}</span>
                     </button>
                   );
                 })}
@@ -793,6 +812,9 @@ function ExpenseForm({
             )}
           </AnimatePresence>
         </div>
+        {/* last, so these never-visible inputs don't hold up the sections cascading in above */}
+        <input ref={fileInput} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+        <input ref={cameraInput} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
       </div>
     </Sheet>
   );

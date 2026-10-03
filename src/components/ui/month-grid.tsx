@@ -37,7 +37,8 @@ export function MonthGrid({
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
-      <div className="grid grid-cols-3 gap-1.5">
+      {/* the months cascade in, and again when the year changes */}
+      <div key={year} className="rise-list grid grid-cols-3 gap-1.5">
         {Array.from({ length: 12 }, (_, i) => {
           const m = `${year}-${String(i + 1).padStart(2, "0")}`;
           const selected = m === value;

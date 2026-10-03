@@ -1,26 +1,30 @@
 "use client";
 
-import { CloudCheck, FileUp, MessageCircle, RefreshCw } from "lucide-react";
+import { CircleHelp, CloudCheck, FileUp, MessageCircle, RefreshCw } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useDataset, useMode, useRefresh } from "@/lib/data/hooks";
 import { receiptFromTransfer } from "@/lib/files";
-import { useI18n, usePrefs } from "@/lib/i18n";
+import { LOCALES, useI18n, usePrefs } from "@/lib/i18n";
+import type { Locale } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { useHydrated } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
 import { ExpenseDialog } from "../expense-dialog";
-import { LogoMark } from "../logo";
+import { Logo, LogoMark } from "../logo";
 import { MonthReviewSheet } from "../month-review";
 import { SubscriptionDialog } from "../subscription-dialog";
+import { buttonClasses } from "../ui/button";
 import { Skeleton } from "../ui/misc";
+import { WelcomeTour } from "../welcome-tour";
 import { MonthPicker } from "./month-picker";
 import { BottomNav, DesktopFab, Sidebar } from "./nav";
 import { LoadError, WriteBlocked } from "./load-error";
 import { GuardedLink, UnsavedDialog } from "./unsaved";
-import { UserChip } from "./user-chip";
+import { AccountMenu, guideHref } from "./user-chip";
 
 function SyncIndicator() {
   const { isFetching, data } = useDataset();
@@ -40,13 +44,31 @@ function SyncIndicator() {
   );
 }
 
+/** Computers: the guide at this page's section. (On phones it's in the account menu, where there's room.) */
+function HelpButton() {
+  const { t } = useI18n();
+  const pathname = usePathname();
+  if (pathname === "/guide") return null;
+  return (
+    <GuardedLink
+      href={guideHref(pathname)}
+      className="grid h-9 w-9 place-items-center rounded-xl text-ink-3 transition hover:bg-white/5 hover:text-ink"
+      aria-label={t("guide.help")}
+      title={t("guide.help")}
+    >
+      <CircleHelp className="h-[18px] w-[18px]" />
+    </GuardedLink>
+  );
+}
+
 function TopBar() {
   const { mode } = useMode();
   const { t } = useI18n();
   return (
     <header className="sticky top-0 z-20 border-b border-line/60 bg-bg/70 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
-        <GuardedLink href="/dashboard" className="lg:hidden" aria-label="Gelbien">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
+        {/* the smallest phones (under 360px) need the room; the dashboard is in the bottom bar anyway */}
+        <GuardedLink href="/dashboard" className="lg:hidden max-[359px]:hidden" aria-label="Gelbien">
           <LogoMark />
         </GuardedLink>
         <MonthPicker className="mx-auto lg:mx-0" />
@@ -56,12 +78,16 @@ function TopBar() {
               {t("common.demo")}
             </GuardedLink>
           )}
-          <SyncIndicator />
+          {/* phones keep just Chat and the account menu here, so the bar never gets wider than the screen */}
+          <div className="hidden items-center gap-1 lg:flex">
+            <SyncIndicator />
+            <HelpButton />
+          </div>
           <GuardedLink href="/chat" className="grid h-9 w-9 place-items-center rounded-xl text-ink-3 transition hover:bg-white/5 hover:text-ink lg:hidden" aria-label={t("nav.chat")}>
             <MessageCircle className="h-[18px] w-[18px]" />
           </GuardedLink>
           <div className="lg:hidden">
-            <UserChip compact />
+            <AccountMenu />
           </div>
         </div>
       </div>
@@ -173,6 +199,41 @@ function GlobalReceiptCapture() {
   );
 }
 
+/** The guide for someone not signed in yet (linked from the login page): just the text, a language switch and a way in. */
+function PublicShell({ children }: { children: React.ReactNode }) {
+  const { t, locale } = useI18n();
+  const setLocale = usePrefs((s) => s.setLocale);
+  return (
+    <div className="relative min-h-dvh">
+      <div className="app-aura" />
+      <header className="sticky top-0 z-20 border-b border-line/60 bg-bg/70 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
+          <Link href="/login" aria-label="Gelbien">
+            <Logo />
+          </Link>
+          <div className="ml-auto flex items-center gap-2">
+            <div className="flex rounded-lg border border-line p-0.5">
+              {(Object.keys(LOCALES) as Locale[]).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLocale(l)}
+                  className={cn("rounded-md px-2 py-1 text-xs font-medium uppercase", l === locale ? "bg-gold-soft text-gold-bright" : "text-ink-3 hover:text-ink")}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+            <Link href="/login" className={buttonClasses("primary", "sm")}>
+              {t("guide.public.cta")}
+            </Link>
+          </div>
+        </div>
+      </header>
+      <main className="relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">{children}</main>
+    </div>
+  );
+}
+
 function Splash() {
   return (
     <div className="grid min-h-dvh place-items-center">
@@ -208,12 +269,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const ds = useDataset();
   const refresh = useRefresh();
   const pathname = usePathname();
-  // Profile works without the data (sign out, clear the cache, AI keys): the way out when loading fails
-  const standalone = pathname === "/profile";
+  // Profile works without the data (sign out, clear the cache, AI keys): the way out when loading fails.
+  // The guide is only text, so it doesn't wait for the data either — and can be read before signing in.
+  const standalone = pathname === "/profile" || pathname === "/guide";
+  const isPublic = pathname === "/guide";
 
   useEffect(() => {
-    if (hydrated && mode === "signedOut") router.replace("/login");
-  }, [hydrated, mode, router]);
+    if (hydrated && mode === "signedOut" && !isPublic) router.replace("/login");
+  }, [hydrated, mode, router, isPublic]);
 
   useEffect(() => {
     const err = ds.error as { status?: number } | null;
@@ -221,7 +284,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (err?.status === 401) router.replace("/login?error=expired");
   }, [ds.error, router]);
 
-  if (!hydrated || mode === "loading" || mode === "signedOut") return <Splash />;
+  if (!hydrated || mode === "loading") return <Splash />;
+  if (mode === "signedOut") return isPublic ? <PublicShell>{children}</PublicShell> : <Splash />;
 
   const ready = !!ds.data;
   return (
@@ -260,6 +324,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SubscriptionDialog />
           <MonthReviewSheet />
           <UnsavedDialog />
+          <WelcomeTour />
         </>
       )}
     </div>

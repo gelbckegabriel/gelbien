@@ -397,9 +397,9 @@ function IconPicker({
         <CategoryIcon icon={value.icon} color={value.color} size={size} />
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content sideOffset={8} align="start" className="z-50 w-72 rounded-2xl border border-line-strong bg-[#16161b] p-4 shadow-2xl shadow-black/60">
+        <Popover.Content sideOffset={8} align="start" className="z-50 w-72 origin-[var(--radix-popover-content-transform-origin)] rounded-2xl border border-line-strong bg-[#16161b] p-4 shadow-2xl shadow-black/60 data-[side=bottom]:animate-pop-in data-[side=top]:animate-pop-in-up motion-reduce:animate-none">
           <p className="mb-2 text-xs font-medium text-ink-3">{t("cfg.color")}</p>
-          <div className="grid grid-cols-7 gap-2">
+          <div className="rise-list grid grid-cols-7 gap-2">
             {CATEGORY_COLORS.map((c) => (
               <button
                 key={c}
@@ -411,7 +411,7 @@ function IconPicker({
             ))}
           </div>
           <p className="mb-2 mt-4 text-xs font-medium text-ink-3">{t("cfg.icon")}</p>
-          <div className="grid grid-cols-8 gap-1">
+          <div className="rise-list grid grid-cols-8 gap-1 [--rise-delay:160ms]">
             {icons.map((name) => {
               const Icon = ICONS[name];
               return (

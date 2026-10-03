@@ -11,11 +11,12 @@ export function SaveBar({ show, label, onSave, onReset }: { show: boolean; label
   return (
     <AnimatePresence>
       {show && (
+        // rises and opens out from its middle; the clip ends outside the bar so the shadow shows
         <motion.div
-          initial={{ y: 80, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
+          initial={{ y: 80, opacity: 0, clipPath: "inset(0% 50% 0% 50% round 1rem)" }}
+          animate={{ y: 0, opacity: 1, clipPath: "inset(-3rem -3rem -3rem -3rem round 1rem)" }}
           exit={{ y: 80, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 420, damping: 34 }}
+          transition={{ type: "spring", stiffness: 420, damping: 34, clipPath: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } }}
           className="fixed inset-x-4 bottom-24 z-30 mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-gold/30 bg-[#1a1812]/95 px-4 py-3 shadow-2xl shadow-black/60 backdrop-blur lg:bottom-8 lg:left-64"
         >
           <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-gold" />

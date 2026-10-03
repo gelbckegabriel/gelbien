@@ -1,7 +1,8 @@
 "use client";
 
-import { Camera, FolderLock, Gauge, Sparkles } from "lucide-react";
+import { BookOpen, Camera, FolderLock, Gauge, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { Logo } from "@/components/logo";
@@ -187,6 +188,9 @@ function LoginInner() {
                 <Sparkles className="h-4 w-4 text-gold" /> {t("login.demo")}
               </Button>
               <p className="text-center text-xs text-ink-3">{t("login.demoHint")}</p>
+              <Link href="/guide" className="flex items-center justify-center gap-1.5 pt-1 text-[13px] font-medium text-gold hover:underline">
+                <BookOpen className="h-4 w-4" /> {t("guide.title")}
+              </Link>
             </div>
 
             {!configured && <p className="mt-6 rounded-xl border border-line bg-surface-2 px-4 py-3 text-xs text-ink-3">{t("login.notConfigured")}</p>}

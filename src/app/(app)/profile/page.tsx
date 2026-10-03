@@ -358,7 +358,7 @@ function DataCard() {
             accounts: ds.accounts,
             balances: ds.balances,
             goals: ds.goals,
-            settings: { ...pending.data.settings, locale: ds.settings.locale, currency: ds.settings.currency, checkInDay: ds.settings.checkInDay },
+            settings: { ...pending.data.settings, locale: ds.settings.locale, currency: ds.settings.currency, checkInDay: ds.settings.checkInDay, tourSeen: ds.settings.tourSeen },
           }
         : mergeImport(current, pending.data);
     const preview = pending;

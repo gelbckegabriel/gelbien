@@ -109,6 +109,8 @@ export interface Settings {
   warnAt: number;
   /** Day of the month (1-28) when balances should be checked in */
   checkInDay: number;
+  /** Version of the welcome tour this user last finished or skipped (see welcome-tour.tsx); 0 = never seen */
+  tourSeen: number;
 }
 
 /** A bank account, card, investment or cash pot whose balance is checked in monthly. */
