@@ -35,8 +35,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       persistOptions={{
         persister,
         maxAge: WEEK,
-        // bumped when the dataset shape changes (v4: splits, bills)
-        buster: "v4",
+        // bumped when the dataset shape changes (v4: splits, bills; v5: merchant on recurring expenses)
+        buster: "v5",
         dehydrateOptions: {
           // Cache the Google-backed data (for instant start-up); demo data already lives in localStorage.
           // A cached "signed out" answer must never be trusted after an OAuth round-trip, so only

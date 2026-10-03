@@ -36,7 +36,7 @@ export interface DataSource {
 
 export function googleSource(locale: Locale): DataSource {
   return {
-    load: async () => json<Dataset>(await fetch(`/api/data?locale=${locale}`, { cache: "no-store" })),
+    load: async () => normalizeDataset(await json<Dataset>(await fetch(`/api/data?locale=${locale}`, { cache: "no-store" }))),
     apply: async (m) =>
       json<{ syncedAt: string }>(
         await fetch(`/api/data?locale=${locale}`, {

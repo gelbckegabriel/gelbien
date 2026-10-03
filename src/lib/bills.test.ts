@@ -84,6 +84,12 @@ describe("paid bills", () => {
     expect(paidBy(rent, "2026-10-01", [sep, oct])?.id).toBe("oct");
   });
 
+  it("copes with a bill cached before it had a merchant", () => {
+    const old = { ...sub({}), merchant: undefined } as unknown as Subscription;
+    expect(paidBy(old, "2026-09-18", [tx({ merchant: "Netflix", date: "2026-09-18" })])).toBeTruthy();
+    expect(paidBy(old, "2026-09-18", [tx({ merchant: "Spotify", date: "2026-09-18" })])).toBeUndefined();
+  });
+
   it("also recognizes the bill's merchant on an expense typed by hand", () => {
     const phone = sub({ name: "Phone plan", category: "Utilities", merchant: "Koodo", billingDay: 11 });
     expect(paidBy(phone, "2026-09-11", [tx({ merchant: "koodo", category: "Utilities", date: "2026-09-10" })])).toBeTruthy();

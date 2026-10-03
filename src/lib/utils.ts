@@ -103,8 +103,9 @@ export function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-export function normalize(s: string): string {
-  return s
+// tolerates a missing value: a field added later can be absent from data cached by an older version
+export function normalize(s: string | null | undefined): string {
+  return (s ?? "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
