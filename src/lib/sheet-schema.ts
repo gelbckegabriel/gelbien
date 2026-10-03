@@ -43,7 +43,7 @@ export const TABS = {
   income: { title: "Income", headers: ["month", "gross", "net", "note"] },
   subscriptions: {
     title: "Subscriptions",
-    headers: ["id", "name", "category", "amount", "cycle", "billingDay", "payment", "status", "trialEnd", "worthIt", "notes", "nextCharge", "kind", "subcategory"],
+    headers: ["id", "name", "category", "amount", "cycle", "billingDay", "payment", "status", "trialEnd", "worthIt", "notes", "nextCharge", "kind", "subcategory", "merchant"],
   },
   settings: { title: "Settings", headers: ["key", "value"] },
   accounts: { title: "Accounts", headers: ["id", "name", "institution", "type", "color", "archived", "notes"] },
@@ -189,11 +189,12 @@ export function rowToSubscription(r: Row): Subscription | null {
     // rows from before bills and subscriptions were told apart
     kind: oneOf<SubKind>(r[12], SUB_KINDS, guessKind(str(r[2]))),
     subcategory: str(r[13]),
+    merchant: str(r[14]),
   };
 }
 
 export const subscriptionToRow = (s: Subscription): Row => [
-  s.id, s.name, s.category, s.amount, s.cycle, s.billingDay ?? "", s.payment, s.status, s.trialEnd, s.worthIt, s.notes, s.nextCharge, s.kind, s.subcategory,
+  s.id, s.name, s.category, s.amount, s.cycle, s.billingDay ?? "", s.payment, s.status, s.trialEnd, s.worthIt, s.notes, s.nextCharge, s.kind, s.subcategory, s.merchant,
 ];
 
 export function rowToAccount(r: Row): Account | null {

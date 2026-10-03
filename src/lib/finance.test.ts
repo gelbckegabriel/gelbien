@@ -171,10 +171,10 @@ describe("trend, year matrix, subscriptions and runway", () => {
     expect(monthlyCost({ amount: 120, cycle: "annual" })).toBe(10);
     expect(monthlyCost({ amount: 30, cycle: "quarterly" })).toBe(10);
     const totals = subscriptionTotals([
-      { id: "a", name: "A", category: "", amount: 10, cycle: "monthly", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill", subcategory: "" },
-      { id: "b", name: "B", category: "", amount: 120, cycle: "annual", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "subscription", subcategory: "" },
-      { id: "c", name: "C", category: "", amount: 15, cycle: "monthly", billingDay: 1, payment: "", status: "trial", trialEnd: "", worthIt: "no", notes: "", nextCharge: "", kind: "subscription", subcategory: "" },
-      { id: "d", name: "D", category: "", amount: 99, cycle: "monthly", billingDay: 1, payment: "", status: "cancelled", trialEnd: "", worthIt: "no", notes: "", nextCharge: "", kind: "subscription", subcategory: "" },
+      { id: "a", name: "A", category: "", amount: 10, cycle: "monthly", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill", subcategory: "", merchant: "" },
+      { id: "b", name: "B", category: "", amount: 120, cycle: "annual", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "subscription", subcategory: "", merchant: "" },
+      { id: "c", name: "C", category: "", amount: 15, cycle: "monthly", billingDay: 1, payment: "", status: "trial", trialEnd: "", worthIt: "no", notes: "", nextCharge: "", kind: "subscription", subcategory: "", merchant: "" },
+      { id: "d", name: "D", category: "", amount: 99, cycle: "monthly", billingDay: 1, payment: "", status: "cancelled", trialEnd: "", worthIt: "no", notes: "", nextCharge: "", kind: "subscription", subcategory: "", merchant: "" },
     ]);
     expect(totals.activeMonthly).toBe(20);
     expect(totals).toMatchObject({ billsMonthly: 10, subscriptionsMonthly: 10, subscriptionCount: 1 });
@@ -280,7 +280,7 @@ describe("reducer", () => {
       ["Outros", "Aluguel"],
     ]);
     const withBill = applyMutationToDataset(
-      { ...ds, subscriptions: [{ id: "s", name: "Aluguel", category: "Moradia", amount: 1, cycle: "monthly", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill", subcategory: "Aluguel" }] },
+      { ...ds, subscriptions: [{ id: "s", name: "Aluguel", category: "Moradia", amount: 1, cycle: "monthly", billingDay: 1, payment: "", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill", subcategory: "Aluguel", merchant: "" }] },
       { op: "saveCategories", categories: ds.categories, renames: [{ from: "Moradia", to: "Housing" }], subRenames: [{ category: "Moradia", from: "Aluguel", to: "Rent" }] },
     );
     expect(withBill.subscriptions.map((s) => [s.category, s.subcategory])).toEqual([["Housing", "Rent"]]);
@@ -290,7 +290,7 @@ describe("reducer", () => {
     const base = dataset([tx({ date: "2026-09-01", amount: 1, category: "A", payment: "Crédito" }), tx({ date: "2026-09-02", amount: 1, category: "A", payment: "Pix" })]);
     const ds = {
       ...base,
-      subscriptions: [{ id: "s", name: "Netflix", category: "A", amount: 1, cycle: "monthly" as const, billingDay: 1, payment: "Crédito", status: "active" as const, trialEnd: "", worthIt: "yes" as const, notes: "", nextCharge: "", kind: "subscription" as const, subcategory: "" }],
+      subscriptions: [{ id: "s", name: "Netflix", category: "A", amount: 1, cycle: "monthly" as const, billingDay: 1, payment: "Crédito", status: "active" as const, trialEnd: "", worthIt: "yes" as const, notes: "", nextCharge: "", kind: "subscription" as const, subcategory: "", merchant: "" }],
     };
     const settings = { ...ds.settings, paymentMethods: ["Credit", "Pix"] };
     const next = applyMutationToDataset(ds, { op: "saveSettings", settings, paymentRenames: [{ from: "Crédito", to: "Credit" }] });

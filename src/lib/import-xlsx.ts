@@ -271,6 +271,7 @@ export function importMoneySheet(sheets: SheetData[], locale: Locale, now = new 
           nextCharge: "",
           kind: guessKind(text(row[c.category])),
           subcategory: "",
+          merchant: "",
         });
       });
     }

@@ -85,6 +85,8 @@ export interface Subscription {
   kind: SubKind;
   /** Logged with each charge marked paid; "" for none */
   subcategory: string;
+  /** Who charges it (landlord, utility, app store) — logged with each charge marked paid; "" when not set */
+  merchant: string;
 }
 
 export interface PaymentStyle {

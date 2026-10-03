@@ -56,7 +56,7 @@ export function normalizeDataset(ds: Dataset): Dataset {
   return {
     ...ds,
     transactions: ds.transactions.map((t) => ({ ...t, group: t.group ?? "", billId: t.billId ?? "" })),
-    subscriptions: ds.subscriptions.map((s) => ({ ...s, nextCharge: s.nextCharge ?? "", kind: s.kind ?? guessKind(s.category), subcategory: s.subcategory ?? "" })),
+    subscriptions: ds.subscriptions.map((s) => ({ ...s, nextCharge: s.nextCharge ?? "", kind: s.kind ?? guessKind(s.category), subcategory: s.subcategory ?? "", merchant: s.merchant ?? "" })),
     accounts: ds.accounts ?? [],
     balances: ds.balances ?? [],
     goals: ds.goals ?? [],

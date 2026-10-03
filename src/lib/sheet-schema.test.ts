@@ -34,7 +34,7 @@ describe("sheet schema", () => {
       budgets: [{ month: "default", category: "Groceries", amount: 500 }],
       incomes: [{ month: "default", gross: 6000, net: 4800, note: "" }],
       subscriptions: [
-        { id: "s1", name: "Spotify", category: "Subscriptions", amount: 11.99, cycle: "monthly", billingDay: 5, payment: "Credit", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "2026-10-05", kind: "subscription", subcategory: "Music streaming" },
+        { id: "s1", name: "Spotify", category: "Subscriptions", amount: 11.99, cycle: "monthly", billingDay: 5, payment: "Credit", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "2026-10-05", kind: "subscription", subcategory: "Music streaming", merchant: "Spotify AB" },
       ],
       accounts: [
         { id: "a1", name: "HISA", institution: "Neo Financial", type: "savings", color: "#199e70", archived: false, notes: "" },

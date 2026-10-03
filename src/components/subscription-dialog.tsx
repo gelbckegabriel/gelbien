@@ -1,10 +1,10 @@
 "use client";
 
 import { Receipt, Repeat, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useDataset, useMutate, useSaving } from "@/lib/data/hooks";
-import { monthlyCost } from "@/lib/finance";
+import { knownMerchants, monthlyCost } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
 import { CYCLES, SUB_KINDS, SUB_STATUSES, WORTH_IT, type Cycle, type Dataset, type SubKind, type SubStatus, type Subscription, type WorthIt } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
@@ -47,8 +47,10 @@ function SubscriptionForm({ ds, open, editing, onClose }: { ds: Dataset; open: b
         nextCharge: "",
         kind: "bill",
         subcategory: "",
+        merchant: "",
       },
   );
+  const merchants = useMemo(() => knownMerchants(ds.transactions).slice(0, 200), [ds.transactions]);
   const [amount, setAmount] = useState(editing ? String(editing.amount) : "");
   const set = (patch: Partial<Subscription>) => setS((cur) => ({ ...cur, ...patch }));
   const value = parseAmount(amount);
@@ -64,7 +66,7 @@ function SubscriptionForm({ ds, open, editing, onClose }: { ds: Dataset; open: b
 
   const save = async () => {
     if (!s.name.trim() || !value || saving) return;
-    const sub = { ...s, name: s.name.trim(), amount: round2(value), trialEnd: isSub && s.status === "trial" ? s.trialEnd : "" };
+    const sub = { ...s, name: s.name.trim(), merchant: s.merchant.trim(), amount: round2(value), trialEnd: isSub && s.status === "trial" ? s.trialEnd : "" };
     if (!(await run(() => mutate.save({ op: "upsertSubscription", sub })))) return;
     toast.success(t("budget.subs.saved"));
     onClose();
@@ -112,8 +114,17 @@ function SubscriptionForm({ ds, open, editing, onClose }: { ds: Dataset; open: b
             ),
           }))}
         />
-        <Field label={t("budget.subs.name")} className="sm:col-span-2">
+        <Field label={t("budget.subs.name")}>
           <Input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder={t(`budget.subs.namePh.${s.kind}`)} data-autofocus maxLength={120} />
+        </Field>
+        {/* logged with every charge marked paid, instead of the name */}
+        <Field label={t("form.merchant")} hint={t("budget.subs.merchantHint")} htmlFor="sub-merchant">
+          <Input id="sub-merchant" list="gelbien-sub-merchants" value={s.merchant} onChange={(e) => set({ merchant: e.target.value })} placeholder={t("budget.subs.merchantPh")} maxLength={120} />
+          <datalist id="gelbien-sub-merchants">
+            {merchants.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
         </Field>
         <Field label={t("budget.subs.amount")} hint={value ? `${f.money(monthlyCost({ amount: value, cycle: s.cycle }))} / ${t("cycle.monthly").toLowerCase()}` : undefined}>
           <MoneyInput value={amount} onChange={setAmount} placeholder="0.00" />

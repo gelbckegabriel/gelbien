@@ -52,6 +52,16 @@ function fromPaymentDrafts(list: PaymentDraft[]) {
   };
 }
 
+/** `list` with the item keyed `key` swapped with its neighbour in direction `dir` */
+function moveItem<T extends { key: string }>(list: T[], key: string, dir: -1 | 1): T[] {
+  const i = list.findIndex((x) => x.key === key);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return list;
+  const next = [...list];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+
 const toDraft = (cats: Category[]): Draft[] =>
   [...cats].sort((a, b) => a.order - b.order).map((c) => ({ ...c, subcategories: [...c.subcategories], key: uid("c"), original: c.name }));
 
@@ -102,15 +112,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
   const duplicate = (name: string, key: string) => cats.some((c) => c.key !== key && normalize(c.name) === normalize(name));
 
   const update = (key: string, patch: Partial<Draft>) => setCats((list) => list.map((c) => (c.key === key ? { ...c, ...patch } : c)));
-  const move = (key: string, dir: -1 | 1) =>
-    setCats((list) => {
-      const i = list.findIndex((c) => c.key === key);
-      const j = i + dir;
-      if (j < 0 || j >= list.length) return list;
-      const next = [...list];
-      [next[i], next[j]] = [next[j], next[i]];
-      return next;
-    });
+  const move = (key: string, dir: -1 | 1) => setCats((list) => moveItem(list, key, dir));
 
   const addCategory = () => {
     const used = new Set(cats.map((c) => c.color));
@@ -160,6 +162,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
     setNewPayment("");
   };
   const updatePayment = (key: string, patch: Partial<PaymentDraft>) => setPayments((list) => list.map((p) => (p.key === key ? { ...p, ...patch } : p)));
+  const movePayment = (key: string, dir: -1 | 1) => setPayments((list) => moveItem(list, key, dir));
 
   return (
     <div>
@@ -257,7 +260,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
             <CardHeader title={t("cfg.payments.title")} subtitle={t("cfg.payments.subtitle")} />
             <ul className="space-y-1.5">
               <AnimatePresence initial={false}>
-                {payments.map((p) => {
+                {payments.map((p, i) => {
                   const look = p.style ?? paymentLook(p.name);
                   const renamed = !!p.original && p.original !== p.name.trim();
                   return (
@@ -283,6 +286,15 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
                           maxLength={60}
                         />
                         {renamed && <p className="px-2 text-[11px] text-gold">{t("cfg.payments.renameHint")}</p>}
+                      </div>
+                      {/* the order of every payment picker; stacked in the narrow side column, roomier for fingers on phones */}
+                      <div className="flex shrink-0 items-center lg:flex-col">
+                        <Button size="icon-sm" variant="ghost" onClick={() => movePayment(p.key, -1)} disabled={i === 0} aria-label={t("cfg.moveUp")} className="w-7 rounded-md lg:h-4 lg:w-6">
+                          <ArrowUp className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
+                        </Button>
+                        <Button size="icon-sm" variant="ghost" onClick={() => movePayment(p.key, 1)} disabled={i === payments.length - 1} aria-label={t("cfg.moveDown")} className="w-7 rounded-md lg:h-4 lg:w-6">
+                          <ArrowDown className="h-4 w-4 lg:h-3.5 lg:w-3.5" />
+                        </Button>
                       </div>
                       <button onClick={() => setPayments((list) => list.filter((x) => x.key !== p.key))} className="text-ink-3 hover:text-bad" aria-label={t("common.delete")}>
                         <X className="h-4 w-4" />

@@ -4,7 +4,7 @@ import { AlertTriangle, CalendarClock, ChevronRight, ClipboardCheck, Copy, Plus,
 import { motion } from "motion/react";
 import { useMemo } from "react";
 import { toast } from "sonner";
-import { useSkippedBills } from "@/components/dashboard/bills";
+import { BillCheck, useSkippedBills } from "@/components/dashboard/bills";
 import { CategoryIcon } from "@/components/icons";
 import { GuardedLink } from "@/components/shell/unsaved";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Card, CardHeader, PageHeader, Stagger } from "@/components/ui/card";
 import { Field, MoneyInput, Segmented } from "@/components/ui/form";
 import { AnimatedNumber, Badge, EmptyState, Progress, STATUS_TONE } from "@/components/ui/misc";
 import { SaveBar } from "@/components/ui/save-bar";
-import { committedBills, type BillCharge } from "@/lib/bills";
+import { committedBills, monthCharges, type BillCharge } from "@/lib/bills";
 import { useDataset, useMutate } from "@/lib/data/hooks";
 import { budgetStatus, effectiveBudget, effectiveIncome, monthlyCost, subscriptionTotals, suggestBudget, summarizeMonth } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
@@ -54,7 +54,7 @@ export default function BudgetPage() {
   return (
     <Stagger className="space-y-4">
       <BudgetEditor key={version} ds={ds} month={month} />
-      <Subscriptions ds={ds} />
+      <Subscriptions ds={ds} month={month} />
     </Stagger>
   );
 }
@@ -407,9 +407,11 @@ function PlanVsActual({
   );
 }
 
-function Subscriptions({ ds }: { ds: Dataset }) {
+function Subscriptions({ ds, month }: { ds: Dataset; month: string }) {
   const { t, f } = useI18n();
   const open = useUi((s) => s.openSubscription);
+  // this month's charge of each one, logged or not — ticked off right here
+  const charges = useMemo(() => monthCharges(ds, month), [ds, month]);
   const totals = subscriptionTotals(ds.subscriptions);
   const order: Record<Subscription["status"], number> = { trial: 0, active: 1, paused: 2, cancelled: 3 };
   const sorted = [...ds.subscriptions].sort((a, b) => order[a.status] - order[b.status] || monthlyCost(b) - monthlyCost(a));
@@ -466,11 +468,12 @@ function Subscriptions({ ds }: { ds: Dataset }) {
                 {g.items.map((s, i) => {
                   const c = cats.get(s.category);
                   const tone = s.status === "trial" ? "warn" : "neutral";
+                  const charge = charges.get(s.id);
                   return (
-                    <motion.li key={s.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+                    <motion.li key={s.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="flex items-center gap-1 pr-2">
                       <button
                         onClick={() => open(s)}
-                        className={cn("flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.04]", s.status === "cancelled" && "opacity-50")}
+                        className={cn("flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.04]", s.status === "cancelled" && "opacity-50")}
                       >
                         <CategoryIcon icon={c?.icon ?? "Repeat"} color={c?.color ?? "#6f7fe0"} size="sm" />
                         <span className="min-w-0 flex-1">
@@ -485,6 +488,7 @@ function Subscriptions({ ds }: { ds: Dataset }) {
                             {s.cycle !== "monthly" && s.nextCharge ? ` · ${t("budget.subs.nextCharge")} ${f.dateShort(s.nextCharge)}` : ""}
                             {s.status === "trial" && s.trialEnd ? ` · ${t("budget.subs.trialEnd")} ${f.dateShort(s.trialEnd)}` : ""}
                             {s.kind === "subscription" && s.worthIt !== "yes" ? ` · ${t("budget.subs.worth")} ${t(`worth.${s.worthIt}`)}` : ""}
+                            {charge?.paid && <span className="text-good"> · {t("bills.loggedOn", { date: f.dateShort(charge.paid.date) })}</span>}
                           </span>
                         </span>
                         <span className="text-right">
@@ -492,6 +496,8 @@ function Subscriptions({ ds }: { ds: Dataset }) {
                           {s.cycle !== "monthly" && <span className="tabular block text-[11px] text-ink-3">{perMonth(monthlyCost(s))}</span>}
                         </span>
                       </button>
+                      {/* nothing to tick when it isn't charged this month (paused, yearly, no billing day…) */}
+                      {charge ? <BillCheck ds={ds} charge={charge} /> : <span aria-hidden className="w-8 shrink-0" />}
                     </motion.li>
                   );
                 })}

@@ -2,6 +2,7 @@
  * Recurring bills (the Subscriptions list): when they are charged, whether a charge was already
  * logged, and the expense to log for one. Pure, so it runs the same in demo and Google mode.
  */
+import { guessKind } from "./defaults";
 import type { Cycle, Dataset, Subscription, Transaction } from "./types";
 import { addMonths, daysInMonth, monthOf, normalize, round2, todayISO, uid } from "./utils";
 
@@ -9,6 +10,11 @@ export interface BillCharge {
   sub: Subscription;
   /** YYYY-MM-DD */
   date: string;
+}
+
+/** A charge and the expense that paid it, if one was logged */
+export interface LoggedCharge extends BillCharge {
+  paid?: Transaction;
 }
 
 const CYCLE_MONTHS: Record<Exclude<Cycle, "weekly">, number> = { monthly: 1, bimonthly: 2, quarterly: 3, semiannual: 6, annual: 12 };
@@ -54,29 +60,47 @@ export function billDates(sub: Subscription, from: string, to: string): string[]
   return out;
 }
 
-/** An expense logged by hand for this bill: same category and the bill's name in merchant or description. */
-function looksLikeBill(t: Transaction, sub: Subscription): boolean {
+/** An expense logged by hand for this bill: same category, and the bill's name in merchant or description (or the bill's merchant). */
+export function looksLikeBill(t: Pick<Transaction, "category" | "merchant" | "description">, sub: Subscription): boolean {
   if (t.category !== sub.category) return false;
   const name = normalize(sub.name);
+  const merchant = normalize(sub.merchant);
+  if (merchant && normalize(t.merchant) === merchant) return true;
   return [t.merchant, t.description].some((x) => {
     const v = normalize(x);
     return !!v && !!name && (v.includes(name) || (v.length >= 4 && name.includes(v)));
   });
 }
 
-/** The expense that covers the charge on `date`, if one was logged (linked, or a matching one typed by hand). */
-export function paidBy(sub: Subscription, date: string, txs: Transaction[]): Transaction | undefined {
+/**
+ * The expense that covers the charge on `date`, if one was logged (linked, or a matching one typed
+ * by hand) — the closest to that date, when more than one could.
+ */
+export function paidBy<T extends Pick<Transaction, "date" | "billId" | "category" | "merchant" | "description">>(sub: Subscription, date: string, txs: T[]): T | undefined {
   const tolerance = sub.cycle === "weekly" ? 3 : sub.cycle === "monthly" ? 7 : 20;
   const lo = addDays(date, -tolerance);
   const hi = addDays(date, tolerance);
-  return txs.find((t) => {
+  const at = Date.parse(date);
+  let best: T | undefined;
+  let bestGap = Infinity;
+  for (const t of txs) {
     // a monthly bill paid any day of its month counts (early or late)
     const near = (t.date >= lo && t.date <= hi) || (sub.cycle === "monthly" && monthOf(t.date) === monthOf(date));
-    return near && (t.billId === sub.id || (!t.billId && looksLikeBill(t, sub)));
-  });
+    if (!near || !(t.billId === sub.id || (!t.billId && looksLikeBill(t, sub)))) continue;
+    const gap = Math.abs(Date.parse(t.date) - at);
+    if (gap < bestGap) [best, bestGap] = [t, gap];
+  }
+  return best;
 }
 
 export const chargeKey = (c: BillCharge) => `${c.sub.id}|${c.date}`;
+
+/** Every charge between `from` and `to` (inclusive), by date, each with the expense that paid it, if any. */
+export function chargesBetween(ds: Pick<Dataset, "subscriptions" | "transactions">, from: string, to: string): LoggedCharge[] {
+  return ds.subscriptions
+    .flatMap((sub) => billDates(sub, from, to).map((date) => ({ sub, date, paid: paidBy(sub, date, ds.transactions) })))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
 
 /**
  * Charges this month up to today (plus the last week, across a month boundary) that nothing
@@ -86,10 +110,7 @@ export function dueBills(ds: Pick<Dataset, "subscriptions" | "transactions">, to
   const weekAgo = addDays(today, -7);
   const monthStart = `${monthOf(today)}-01`;
   const from = weekAgo < monthStart ? weekAgo : monthStart;
-  return ds.subscriptions
-    .flatMap((sub) => billDates(sub, from, today).map((date) => ({ sub, date })))
-    .filter((c) => !skipped.has(chargeKey(c)) && !paidBy(c.sub, c.date, ds.transactions))
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return chargesBetween(ds, from, today).filter((c) => !c.paid && !skipped.has(chargeKey(c)));
 }
 
 /**
@@ -104,27 +125,37 @@ export function committedBills(
 ): BillCharge[] {
   const last = `${month}-${String(daysInMonth(month)).padStart(2, "0")}`;
   if (last < today) return [];
-  return ds.subscriptions
-    .flatMap((sub) => billDates(sub, `${month}-01`, last).map((date) => ({ sub, date })))
-    .filter((c) => !skipped.has(chargeKey(c)) && !paidBy(c.sub, c.date, ds.transactions))
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return chargesBetween(ds, `${month}-01`, last).filter((c) => !c.paid && !skipped.has(chargeKey(c)));
 }
 
-/** Charges after today, within `days`, not already paid early. */
-export function upcomingBills(ds: Pick<Dataset, "subscriptions" | "transactions">, today = todayISO(), days = 30): BillCharge[] {
-  return ds.subscriptions
-    .flatMap((sub) => billDates(sub, addDays(today, 1), addDays(today, days)).map((date) => ({ sub, date })))
-    .filter((c) => !paidBy(c.sub, c.date, ds.transactions))
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+/** Charges after today, within `days` — `paid` when one was paid early. */
+export function upcomingBills(ds: Pick<Dataset, "subscriptions" | "transactions">, today = todayISO(), days = 30): LoggedCharge[] {
+  return chargesBetween(ds, addDays(today, 1), addDays(today, days));
 }
 
-/** The expense to log when a bill is marked paid — copying how the last one was logged, if any. */
-export function billTransaction(c: BillCharge, ds: Pick<Dataset, "transactions" | "settings">, now = new Date().toISOString()): Transaction {
+/** The charge of each bill in `month` to show as logged or not: the first one not logged yet, else the last one. By bill id. */
+export function monthCharges(ds: Pick<Dataset, "subscriptions" | "transactions">, month: string): Map<string, LoggedCharge> {
+  const out = new Map<string, LoggedCharge>();
+  for (const c of chargesBetween(ds, `${month}-01`, `${month}-${String(daysInMonth(month)).padStart(2, "0")}`)) {
+    const cur = out.get(c.sub.id);
+    // dates ascending: keep the first one not logged; while all so far are logged, move on to the latest
+    if (!cur || cur.paid) out.set(c.sub.id, c);
+  }
+  return out;
+}
+
+/**
+ * The expense to log when a bill is marked paid — copying how the last one was logged, if any.
+ * `paidOn` is for a charge paid ahead of time: the expense is dated that day when it still counts
+ * for this charge (see paidBy), otherwise on the charge date.
+ */
+export function billTransaction(c: BillCharge, ds: Pick<Dataset, "transactions" | "settings">, now = new Date().toISOString(), paidOn?: string): Transaction {
   const { sub } = c;
   const last = ds.transactions.find((t) => t.billId === sub.id || (!t.billId && looksLikeBill(t, sub)));
+  const early = paidOn && paidOn < c.date && paidBy(sub, c.date, [{ date: paidOn, billId: sub.id, category: "", merchant: "", description: "" }]) ? paidOn : undefined;
   return {
     id: uid("t"),
-    date: c.date,
+    date: early ?? c.date,
     category: sub.category,
     subcategory: sub.subcategory || last?.subcategory || "",
     description: sub.name,
@@ -132,7 +163,8 @@ export function billTransaction(c: BillCharge, ds: Pick<Dataset, "transactions" 
     payment: sub.payment || last?.payment || ds.settings.paymentMethods[0] || "",
     type: last?.type ?? "fixed",
     priority: last?.priority ?? "important",
-    merchant: last?.merchant || sub.name,
+    // the bill's merchant, else the last one's — not the bill's name, which is what it was paid for
+    merchant: sub.merchant || last?.merchant || "",
     recurring: true,
     notes: "",
     receiptUrl: "",
@@ -141,4 +173,32 @@ export function billTransaction(c: BillCharge, ds: Pick<Dataset, "transactions" 
     group: "",
     billId: sub.id,
   };
+}
+
+/** A new recurring bill for an expense that repeats: charged again every `cycle` from that expense's date. */
+export function billFromTransaction(
+  tx: Pick<Transaction, "date" | "description" | "merchant" | "category" | "subcategory" | "amount" | "payment">,
+  cycle: Cycle,
+  today = todayISO(),
+): Subscription {
+  const sub: Subscription = {
+    id: uid("sub"),
+    name: (tx.description || tx.merchant || tx.category).slice(0, 120),
+    category: tx.category,
+    subcategory: tx.subcategory,
+    merchant: tx.merchant,
+    amount: round2(Math.abs(tx.amount)),
+    cycle,
+    billingDay: cycle === "monthly" ? Number(tx.date.slice(8, 10)) : null,
+    nextCharge: cycle === "monthly" ? "" : tx.date,
+    payment: tx.payment,
+    status: "active",
+    trialEnd: "",
+    worthIt: "yes",
+    notes: "",
+    kind: guessKind(tx.category),
+  };
+  // longer cycles step from a known charge date: this expense's, moved on to the next one still to come
+  if (cycle !== "monthly") sub.nextCharge = billDates(sub, addDays(today, 1), addDays(today, 400))[0] ?? tx.date;
+  return sub;
 }

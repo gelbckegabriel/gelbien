@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Camera, ExternalLink, FileText, Loader2, Paperclip, Sparkles, Split, Trash2, X } from "lucide-react";
+import { AlertTriangle, Ban, Camera, ExternalLink, FileText, Loader2, Paperclip, Plus, Sparkles, Split, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -9,10 +9,11 @@ import { useActiveAi } from "@/lib/ai/config";
 import { useDataset, useMode, useMutate } from "@/lib/data/hooks";
 import { errorReason } from "@/lib/data/errors";
 import { uploadReceiptFile } from "@/lib/data/sources";
+import { billFromTransaction, looksLikeBill } from "@/lib/bills";
 import { knownMerchants, suggestFromHistory } from "@/lib/finance";
 import { prepareReceipt, receiptFromTransfer, type PreparedReceipt } from "@/lib/files";
 import { useI18n } from "@/lib/i18n";
-import { EXPENSE_TYPES, PRIORITIES, type Dataset, type ExpenseType, type Mutation, type Priority, type Transaction } from "@/lib/types";
+import { CYCLES, EXPENSE_TYPES, PRIORITIES, type Cycle, type Dataset, type ExpenseType, type Mutation, type Priority, type Transaction } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { cn, isValidISODate, normalize, parseAmount, round2, todayISO, uid } from "@/lib/utils";
 import { CategoryIcon } from "./icons";
@@ -20,7 +21,7 @@ import { GuardedLink } from "./shell/unsaved";
 import { newItem, newPart, partTotal, SplitEditor, type SplitPart } from "./split-editor";
 import { Button } from "./ui/button";
 import { PaymentSelect } from "./pickers";
-import { Field, Input, MoneyInput, Segmented, Switch, Textarea } from "./ui/form";
+import { Field, Input, MoneyInput, RichSelect, Segmented, Select, Switch, Textarea } from "./ui/form";
 import { Sheet } from "./ui/sheet";
 
 interface FormState {
@@ -40,6 +41,9 @@ interface FormState {
 }
 
 const LAST_PAYMENT_KEY = "gelbien.lastPayment";
+// "Recurring": the recurring expense it pays is one of the list (its id), a new one, or none
+const NEW_BILL = "+new";
+const NO_BILL = "-";
 /** Whether an attached receipt is also uploaded to Drive — remembered from the last expense. */
 const KEEP_RECEIPT_KEY = "gelbien.keepReceipt";
 
@@ -175,6 +179,12 @@ function ExpenseForm({
   const [suggestedFrom, setSuggestedFrom] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(() => !!editing && (!!editing.notes || editing.recurring || editing.amount < 0));
   const [saving, setSaving] = useState(false);
+  const linkedBill = (draft ?? editing)?.billId ?? "";
+  // null: picked automatically (see `bill` below)
+  const [billPick, setBillPick] = useState<string | null>(() => (ds.subscriptions.some((s) => s.id === linkedBill) ? linkedBill : null));
+  const [billCycle, setBillCycle] = useState<Cycle>("monthly");
+  // an expense that was already recurring (an imported one, say) isn't added to the list unless asked
+  const [wasRecurring] = useState(form.recurring);
   const touched = useRef(new Set<keyof FormState>());
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -183,6 +193,21 @@ function ExpenseForm({
   const categories = useMemo(() => ds.categories.filter((c) => !c.archived || c.name === form.category), [ds.categories, form.category]);
   const currentCat = ds.categories.find((c) => c.name === form.category);
   const merchants = useMemo(() => knownMerchants(ds.transactions).slice(0, 200), [ds.transactions]);
+  const bills = useMemo(
+    () => ds.subscriptions.filter((s) => s.status !== "cancelled" || s.id === linkedBill).sort((a, b) => a.name.localeCompare(b.name)),
+    [ds.subscriptions, linkedBill],
+  );
+  // the one this expense looks like it pays (same category, its name or merchant), else a new one
+  const matchedBill = !split && form.category ? bills.find((s) => looksLikeBill(form, s)) : undefined;
+  const bill = !form.recurring ? NO_BILL : (billPick ?? matchedBill?.id ?? (wasRecurring ? NO_BILL : NEW_BILL));
+  // what a new one would look like — a split goes under its first part's category
+  const lead = split?.[0] ?? form;
+  const newBillFrom = (amount: number) =>
+    billFromTransaction(
+      { date: isValidISODate(form.date) ? form.date : todayISO(), description: form.description.trim(), merchant: form.merchant.trim(), category: lead.category, subcategory: lead.subcategory, amount, payment: form.payment },
+      billCycle,
+    );
+  const billPreview = bill === NEW_BILL ? newBillFrom(0) : null;
   const currencySymbol = useMemo(
     () => new Intl.NumberFormat(f.intl, { style: "currency", currency: ds.settings.currency, currencyDisplay: "narrowSymbol" }).formatToParts(0).find((p) => p.type === "currency")?.value ?? "$",
     [f.intl, ds.settings.currency],
@@ -213,6 +238,21 @@ function ExpenseForm({
     if (!touched.current.has("type") && habits.type) patch.type = habits.type;
     set(patch);
     setErrors((e) => ({ ...e, category: undefined }));
+  };
+
+  // picking one from the list fills in what's still empty from it
+  const pickBill = (id: string) => {
+    setBillPick(id);
+    const sub = ds.subscriptions.find((s) => s.id === id);
+    if (!sub || split) return;
+    const patch: Partial<FormState> = {};
+    if (!parseAmount(form.amount)) patch.amount = String(sub.amount);
+    if (!form.category && ds.categories.some((c) => c.name === sub.category)) Object.assign(patch, { category: sub.category, subcategory: sub.subcategory });
+    if (!form.merchant.trim() && sub.merchant) patch.merchant = sub.merchant;
+    if (!form.description.trim()) patch.description = sub.name;
+    if (!touched.current.has("payment") && sub.payment) patch.payment = sub.payment;
+    set(patch, false);
+    setErrors({});
   };
 
   const applyHistory = () => {
@@ -378,8 +418,10 @@ function ExpenseForm({
       createdAt: loaded?.[0].createdAt || editing?.createdAt || draft?.createdAt || now,
       updatedAt: now,
       group: "",
-      billId: (draft ?? editing)?.billId ?? "",
+      billId: "",
     };
+    const newBill = bill === NEW_BILL ? newBillFrom(value) : null;
+    base.billId = newBill?.id ?? (bill === NO_BILL ? "" : bill);
     // A split is one row per category sharing a group id, so budgets and charts need nothing special
     const groupId = loaded?.[0].group || uid("g");
     const txs: Transaction[] = parts
@@ -414,6 +456,7 @@ function ExpenseForm({
     } catch {
       /* ignore */
     }
+    if (newBill) mutate.mutate({ op: "upsertSubscription", sub: newBill });
     mutate.mutate(mutation, {
       // The dialog closed optimistically: bring it back with what was typed. If the user is
       // already entering the next expense, don't clobber it — offer "Review" instead.
@@ -426,8 +469,19 @@ function ExpenseForm({
     });
     setSaving(false);
     toast.success(previous ? t("exp.updated") : t("exp.saved"), {
-      description: isGroup ? `${f.money(base.amount)} · ${t("split.nParts", { n: txs.length })}` : `${f.money(txs[0].amount)} · ${txs[0].category}`,
-      action: { label: t("common.undo"), onClick: () => mutate.mutate(undo) },
+      description: [
+        isGroup ? `${f.money(base.amount)} · ${t("split.nParts", { n: txs.length })}` : `${f.money(txs[0].amount)} · ${txs[0].category}`,
+        newBill && t("form.bill.added"),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      action: {
+        label: t("common.undo"),
+        onClick: () => {
+          mutate.mutate(undo);
+          if (newBill) mutate.mutate({ op: "deleteSubscription", id: newBill.id });
+        },
+      },
     });
     if (another) onAnother();
     else onClose();
@@ -695,6 +749,45 @@ function ExpenseForm({
                     <Switch checked={form.recurring} onChange={(v) => set({ recurring: v })} label={t("form.recurring")} />
                     <Switch checked={form.refund} onChange={(v) => set({ refund: v })} label={t("form.refund")} />
                   </div>
+                  {/* a recurring expense is one of the Budget page's recurring expenses (or becomes one) */}
+                  {form.recurring && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label={t("form.bill.label")} className={cn(bill !== NEW_BILL && "sm:col-span-2")}>
+                        <RichSelect
+                          value={bill}
+                          onChange={pickBill}
+                          placeholder={t("form.bill.label")}
+                          aria-label={t("form.bill.label")}
+                          options={[
+                            { value: NEW_BILL, label: t("form.bill.new"), icon: <span className={optionBox}><Plus className="h-3.5 w-3.5 text-gold" /></span> },
+                            ...bills.map((s) => {
+                              const c = ds.categories.find((x) => x.name === s.category);
+                              return { value: s.id, label: s.name, icon: <CategoryIcon icon={c?.icon ?? "Repeat"} color={c?.color ?? "#6f7fe0"} size="sm" /> };
+                            }),
+                            { value: NO_BILL, label: t("form.bill.none"), icon: <span className={optionBox}><Ban className="h-3.5 w-3.5" /></span> },
+                          ]}
+                        />
+                      </Field>
+                      {bill === NEW_BILL && (
+                        <Field label={t("budget.subs.cycle")}>
+                          <Select value={billCycle} onChange={(e) => setBillCycle(e.target.value as Cycle)}>
+                            {CYCLES.map((c) => (
+                              <option key={c} value={c}>
+                                {t(`cycle.${c}`)}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                      )}
+                      {billPreview?.name && (
+                        <p className="text-xs text-ink-3 sm:col-span-2">
+                          {billPreview.billingDay
+                            ? t("form.bill.newHint", { name: billPreview.name, day: billPreview.billingDay })
+                            : t("form.bill.newHintNext", { name: billPreview.name, date: f.dateShort(billPreview.nextCharge) })}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -704,6 +797,9 @@ function ExpenseForm({
     </Sheet>
   );
 }
+
+// the icon spot of the "new" / "none" options, the size of a small CategoryIcon
+const optionBox = "grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-line bg-surface-3 text-ink-3";
 
 function ReceiptZone({
   receipt,
