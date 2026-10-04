@@ -35,9 +35,13 @@ export const ACCOUNT_TYPE_ICON = {
   chequing: "Wallet",
   savings: "PiggyBank",
   investment: "TrendingUp",
-  credit: "CreditCard",
   cash: "Banknote",
+  property: "Home",
   other: "Landmark",
+  credit: "CreditCard",
+  lineOfCredit: "HandCoins",
+  loan: "BadgeDollarSign",
+  mortgage: "KeyRound",
 } as const;
 
 export function CategoryIcon({ icon, color, size = "md", className }: { icon: string; color: string; size?: "sm" | "md" | "lg"; className?: string }) {

@@ -15,9 +15,14 @@ export const SUB_STATUSES: SubStatus[] = ["active", "trial", "paused", "cancelle
 export const WORTH_IT: WorthIt[] = ["yes", "maybe", "no"];
 export const SUB_KINDS: SubKind[] = ["bill", "subscription"];
 
-export type AccountType = "chequing" | "savings" | "investment" | "credit" | "cash" | "other";
+export type AccountType = "chequing" | "savings" | "investment" | "cash" | "property" | "other" | "credit" | "lineOfCredit" | "loan" | "mortgage";
 export type GoalStatus = "active" | "paused" | "achieved";
-export const ACCOUNT_TYPES: AccountType[] = ["chequing", "savings", "investment", "credit", "cash", "other"];
+export const ACCOUNT_TYPES: AccountType[] = ["chequing", "savings", "investment", "cash", "property", "other", "credit", "lineOfCredit", "loan", "mortgage"];
+/** Accounts that hold what you owe: their balance is the amount owed, and it counts against net worth. */
+export const DEBT_TYPES: readonly AccountType[] = ["credit", "lineOfCredit", "loan", "mortgage"];
+export const isDebt = (type: AccountType) => DEBT_TYPES.includes(type);
+/** A home or car, a loan, a mortgage: part of net worth, but not money to live on (see accountsReserve). */
+export const isLongTerm = (type: AccountType) => type === "property" || type === "loan" || type === "mortgage";
 export const GOAL_STATUSES: GoalStatus[] = ["active", "paused", "achieved"];
 
 export interface Transaction {

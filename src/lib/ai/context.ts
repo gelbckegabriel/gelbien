@@ -78,7 +78,7 @@ export function buildFinanceContext(ds: Dataset, anchorMonth = currentMonth()): 
     const latest = latestBalances(ds.balances);
     const nw = netWorth(ds);
     lines.push(`## Accounts — latest monthly check-in (net worth ${nw.total.toFixed(2)}: assets ${nw.assets.toFixed(2)}, debts ${nw.debts.toFixed(2)})`);
-    lines.push("name, institution, type, balance (credit = amount owed), as of, state");
+    lines.push("name, institution, type, balance (for credit, lineOfCredit, loan and mortgage: amount owed), as of, state");
     for (const a of ds.accounts) {
       const b = latest.get(a.id);
       lines.push([a.name, a.institution, a.type, b ? b.balance.toFixed(2) : "-", b?.date ?? "-", a.archived ? "closed" : "open"].map(csv).join(", "));

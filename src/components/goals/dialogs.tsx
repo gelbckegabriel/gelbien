@@ -8,7 +8,7 @@ import { CATEGORY_COLORS, GOAL_ICONS, INSTITUTIONS } from "@/lib/defaults";
 import { recentAverages } from "@/lib/finance";
 import { accountsMonthlyGrowth, latestBalances, netWorth, signedBalance } from "@/lib/goals";
 import { useI18n } from "@/lib/i18n";
-import { ACCOUNT_TYPES, type Account, type AccountType, type BalanceSnapshot, type Dataset, type Goal, type GoalStatus } from "@/lib/types";
+import { ACCOUNT_TYPES, DEBT_TYPES, isDebt, type Account, type AccountType, type BalanceSnapshot, type Dataset, type Goal, type GoalStatus } from "@/lib/types";
 import { cn, currentMonth, isValidISODate, parseAmount, round2, todayISO, uid } from "@/lib/utils";
 import { ACCOUNT_TYPE_ICON, CategoryIcon, ICONS } from "../icons";
 import { Button } from "../ui/button";
@@ -31,7 +31,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
   const [color, setColor] = useState(goal?.color ?? CATEGORY_COLORS[ds.goals.length % 8]);
   const [target, setTarget] = useState(str(goal?.target ?? 0));
   const [targetMonth, setTargetMonth] = useState(goal?.targetDate ? goal.targetDate.slice(0, 7) : "");
-  const [funding, setFunding] = useState<"linked" | "manual">(goal && !goal.accountIds.length ? "manual" : ds.accounts.some((a) => a.type !== "credit" && !a.archived) ? "linked" : "manual");
+  const [funding, setFunding] = useState<"linked" | "manual">(goal && !goal.accountIds.length ? "manual" : ds.accounts.some((a) => !isDebt(a.type) && !a.archived) ? "linked" : "manual");
   const [accountIds, setAccountIds] = useState<string[]>(goal?.accountIds ?? []);
   const [saved, setSaved] = useState(str(goal?.saved ?? 0));
   const [monthly, setMonthly] = useState(str(goal?.monthlyContribution ?? 0));
@@ -39,7 +39,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
   const [status, setStatus] = useState<GoalStatus>(goal?.status ?? "active");
   const [notes, setNotes] = useState(goal?.notes ?? "");
 
-  const eligible = ds.accounts.filter((a) => a.type !== "credit" && (!a.archived || accountIds.includes(a.id)));
+  const eligible = ds.accounts.filter((a) => !isDebt(a.type) && (!a.archived || accountIds.includes(a.id)));
   const usedBy = useMemo(() => {
     const m = new Map<string, string>();
     for (const g of ds.goals) if (g.id !== goal?.id) for (const id of g.accountIds) m.set(id, g.name);
@@ -379,15 +379,25 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
         </Field>
         <Field label={t("acc.type")}>
           <Select value={type} onChange={(e) => setType(e.target.value as AccountType)}>
-            {ACCOUNT_TYPES.map((ty) => (
-              <option key={ty} value={ty}>
-                {t(`acc.type.${ty}`)}
-              </option>
-            ))}
+            {/* what you have, then what you owe */}
+            <optgroup label={t("nw.assets")}>
+              {ACCOUNT_TYPES.filter((ty) => !isDebt(ty)).map((ty) => (
+                <option key={ty} value={ty}>
+                  {t(`acc.type.${ty}`)}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label={t("nw.debts")}>
+              {DEBT_TYPES.map((ty) => (
+                <option key={ty} value={ty}>
+                  {t(`acc.type.${ty}`)}
+                </option>
+              ))}
+            </optgroup>
           </Select>
         </Field>
-        <Field label={type === "credit" ? t("acc.owed") : t("acc.balance")}>
-          <MoneyInput value={balance} onChange={setBalance} placeholder="0.00" className={cn(type === "credit" && "text-bad")} />
+        <Field label={isDebt(type) ? t("acc.owed") : t("acc.balance")}>
+          <MoneyInput value={balance} onChange={setBalance} placeholder="0.00" className={cn(isDebt(type) && "text-bad")} />
         </Field>
         <Field label={t("cfg.color")} className="sm:col-span-2">
           <ColorPicker value={color} onChange={setColor} />
@@ -482,7 +492,7 @@ export function CheckInDialog({ ds, open, onClose }: { ds: Dataset; open: boolea
                   onChange={(v) => setValues((cur) => ({ ...cur, [a.id]: v }))}
                   placeholder="0.00"
                   aria-label={a.name}
-                  className={cn("h-10 text-right", a.type === "credit" && "text-bad")}
+                  className={cn("h-10 text-right", isDebt(a.type) && "text-bad")}
                 />
               </div>
             </li>

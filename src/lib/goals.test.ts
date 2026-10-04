@@ -98,6 +98,24 @@ describe("accounts", () => {
     expect(accountsReserve({ accounts, balances: [] }, "2026-09-26")).toBeNull();
   });
 
+  it("counts loans, mortgages and lines of credit as debts, and a home as an asset", () => {
+    const more = {
+      accounts: [...accounts, acct("home", "property"), acct("mortgage", "mortgage"), acct("car", "loan"), acct("loc", "lineOfCredit")],
+      balances: [
+        ...balances,
+        { accountId: "home", date: "2026-09-01", balance: 450000 },
+        { accountId: "mortgage", date: "2026-09-01", balance: 380000 },
+        { accountId: "car", date: "2026-09-01", balance: 12000 },
+        // typed as a negative by mistake: still what's owed
+        { accountId: "loc", date: "2026-09-01", balance: -1500 },
+      ],
+    };
+    expect(netWorth(more, "2026-09-26")).toEqual({ assets: 466000, debts: 394300, total: 71700 });
+    // the runway lives on bank accounts and investments, less cards and lines of credit — not the house or its mortgage
+    expect(accountsReserve(more, "2026-09-26")).toBe(15200 - 1500);
+    expect(accountsReserve({ accounts: [acct("home", "property")], balances: [{ accountId: "home", date: "2026-09-01", balance: 450000 }] }, "2026-09-26")).toBeNull();
+  });
+
   it("carries balances forward month by month", () => {
     const s = netWorthSeries(ds, "2026-09", 12);
     expect(s.map((p) => p.month)).toEqual(["2026-07", "2026-08", "2026-09"]);

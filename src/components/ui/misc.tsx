@@ -21,7 +21,8 @@ export function AnimatedNumber({ value, format, className }: { value: number; fo
     });
     return () => controls.stop();
   }, [value]);
-  return <span className={className}>{format(shown)}</span>;
+  // digits of equal width, so the number doesn't jiggle or re-flow every frame while it counts
+  return <span className={cn("tabular-nums", className)}>{format(shown)}</span>;
 }
 
 export function Progress({ value, tone = "gold", className, delay = 0 }: { value: number; tone?: "gold" | "good" | "warn" | "bad"; className?: string; delay?: number }) {

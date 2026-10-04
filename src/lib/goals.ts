@@ -5,7 +5,7 @@
  * every month, compounding monthly at the rate equivalent to `annualReturn` %.
  */
 import { recentAverages, summarizeMonth } from "./finance";
-import type { Account, BalanceSnapshot, Dataset, Goal } from "./types";
+import { isDebt, isLongTerm, type Account, type BalanceSnapshot, type Dataset, type Goal } from "./types";
 import { addMonths, currentMonth, daysInMonth, monthOf, monthRange, round2, todayISO } from "./utils";
 
 /** Cap projections at 50 years — anything later is "not reachable" for planning purposes. */
@@ -68,9 +68,9 @@ export function monthsBetween(fromMonth: string, toMonth: string): number {
 // Accounts & balances
 // ---------------------------------------------------------------------------
 
-/** Credit accounts store what you owe; count it against net worth. */
+/** Debt accounts (cards, lines of credit, loans, mortgages) store what you owe; count it against net worth. */
 export function signedBalance(account: Pick<Account, "type">, balance: number): number {
-  return account.type === "credit" ? -Math.abs(balance) : balance;
+  return isDebt(account.type) ? -Math.abs(balance) : balance;
 }
 
 /** Most recent snapshot per account on or before `asOf`. */
@@ -99,12 +99,21 @@ export function netWorth(ds: Pick<Dataset, "accounts" | "balances">, asOf = toda
 }
 
 /**
- * What the user has across their accounts today (credit card balances subtract) — the reserve the
- * runway and the reserve projection start from. null until a balance has been recorded.
+ * What the user could live on from their accounts today: bank accounts, cash and investments, minus
+ * credit cards and lines of credit — not a home, a loan or a mortgage (see isLongTerm). The reserve the
+ * runway and the reserve projection start from. null until such a balance has been recorded.
  */
 export function accountsReserve(ds: Pick<Dataset, "accounts" | "balances">, asOf = todayISO()): number | null {
   const latest = latestBalances(ds.balances, asOf);
-  return ds.accounts.some((a) => latest.has(a.id)) ? netWorth(ds, asOf).total : null;
+  let total = 0;
+  let any = false;
+  for (const a of ds.accounts) {
+    const b = latest.get(a.id);
+    if (!b || isLongTerm(a.type)) continue;
+    any = true;
+    total += signedBalance(a, b.balance);
+  }
+  return any ? round2(total) : null;
 }
 
 /** Month-end net worth for the last `count` months, carrying each account's last known balance forward. */
@@ -180,7 +189,7 @@ export function goalCurrent(ds: Pick<Dataset, "accounts" | "balances">, goal: Go
   for (const id of goal.accountIds) {
     const account = ds.accounts.find((a) => a.id === id);
     const b = latest.get(id);
-    if (account && b && account.type !== "credit") total += b.balance;
+    if (account && b && !isDebt(account.type)) total += b.balance;
   }
   return round2(total);
 }

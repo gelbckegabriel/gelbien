@@ -49,7 +49,7 @@ export function GoalCard({
 
   return (
     <Card className={cn("flex flex-col", goal.status === "paused" && "opacity-70")}>
-      {achieved && <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-gold/20 blur-3xl" />}
+      {achieved && <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[radial-gradient(circle,#d9b45f40,transparent_70%)]" />}
       <button onClick={onEdit} className="-m-2 flex flex-1 flex-col rounded-2xl p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-gold/50">
         <div className="flex items-start gap-3">
           <CategoryIcon icon={goal.icon} color={goal.color} size="lg" />

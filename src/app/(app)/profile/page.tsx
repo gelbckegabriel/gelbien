@@ -205,7 +205,7 @@ function AiCard() {
   return (
     <div ref={ref} id="ai">
       <Card>
-        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-gold/10 blur-3xl" />
+        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[radial-gradient(circle,#d9b45f26,transparent_70%)]" />
         <CardHeader
           title={
             <span className="inline-flex items-center gap-2">

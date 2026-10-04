@@ -248,44 +248,52 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
             const spent = spentBy.get(c.name) ?? 0;
             const status = budgetStatus(spent, limit, ds.settings.warnAt);
             return (
-              <li key={c.name} className="flex items-center gap-3 border-b border-line/50 py-3">
-                {/* Everything but the input opens this month's expenses for the category */}
-                <GuardedLink
-                  href={`/expenses?category=${encodeURIComponent(c.name)}`}
-                  title={t("budget.plan.viewExpenses", { category: c.name })}
-                  className="-my-1.5 -ml-1.5 flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 transition-colors hover:bg-white/[0.04]"
-                >
-                  <CategoryIcon icon={c.icon} color={c.color} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm text-ink">{c.name}</span>
-                      {limit > 0 && status !== "within" && (
-                        // Icon-only on phones so long names fit; the coloured % below carries the same status
-                        <Badge tone={STATUS_TONE[status]} className="px-1.5 sm:px-2">
-                          <span title={t(`budgetStatus.${status}`)} className="sm:hidden">
-                            <AlertTriangle className="h-3 w-3" aria-hidden />
-                          </span>
-                          <span className="sr-only sm:not-sr-only">{t(`budgetStatus.${status}`)}</span>
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      {limit > 0 ? <Progress value={spent / limit} tone={STATUS_TONE[status]} className="h-1.5" delay={i * 0.03} /> : <div className="h-1.5 flex-1 rounded-full bg-white/5" />}
-                      <span className="tabular min-w-20 shrink-0 whitespace-nowrap text-right text-[11px] text-ink-3 sm:min-w-28">
-                        {limit > 0 ? (
-                          <>
-                            <span className={cn("font-semibold", TONE_TEXT[STATUS_TONE[status]])}>{f.pct(spent / limit)}</span> · {f.money0(spent)}
-                          </>
-                        ) : (
-                          t("budget.plan.spent", { amount: f.money0(spent) })
-                        )}
+              // Phones: two lines — name and limit, then the progress bar across the card. Larger screens:
+              // the bar under the name, the limit beside both (a grid, so it's one set of elements for both).
+              <li
+                key={c.name}
+                className="group relative isolate grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-line/50 py-3 sm:gap-y-1.5"
+              >
+                {/* hover highlight behind everything but the limit field */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-1.5 -left-1.5 right-[calc(6rem+0.75rem)] -z-10 rounded-xl bg-white/[0.04] opacity-0 transition-opacity group-has-[a:hover]:opacity-100 sm:right-[calc(8rem+0.75rem)]"
+                />
+                <CategoryIcon icon={c.icon} color={c.color} className="row-span-2" />
+                <div className="flex min-w-0 items-center gap-2">
+                  {/* the whole row (but the limit field) opens this month's expenses for the category */}
+                  <GuardedLink
+                    href={`/expenses?category=${encodeURIComponent(c.name)}`}
+                    title={t("budget.plan.viewExpenses", { category: c.name })}
+                    className="truncate text-sm text-ink outline-none after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-gold/60"
+                  >
+                    {c.name}
+                  </GuardedLink>
+                  {limit > 0 && status !== "within" && (
+                    // Icon-only on phones so long names fit; the coloured % below carries the same status
+                    <Badge tone={STATUS_TONE[status]} className="px-1.5 sm:px-2">
+                      <span title={t(`budgetStatus.${status}`)} className="sm:hidden">
+                        <AlertTriangle className="h-3 w-3" aria-hidden />
                       </span>
-                      <ChevronRight className="-ml-1 h-3.5 w-3.5 shrink-0 text-ink-3" />
-                    </div>
-                  </div>
-                </GuardedLink>
-                <div className="w-24 shrink-0 sm:w-32">
+                      <span className="sr-only sm:not-sr-only">{t(`budgetStatus.${status}`)}</span>
+                    </Badge>
+                  )}
+                </div>
+                <div className="relative z-10 w-24 sm:row-span-2 sm:w-32">
                   <MoneyInput value={draft.lines[c.name] ?? ""} onChange={(v) => setLine(c.name, v)} placeholder="0" className="h-10 text-right" aria-label={c.name} />
+                </div>
+                <div className="col-span-2 col-start-2 flex items-center gap-2 sm:col-span-1">
+                  {limit > 0 ? <Progress value={spent / limit} tone={STATUS_TONE[status]} className="h-1.5" delay={i * 0.03} /> : <div className="h-1.5 flex-1 rounded-full bg-white/5" />}
+                  <span className="tabular min-w-20 shrink-0 whitespace-nowrap text-right text-[11px] text-ink-3 sm:min-w-28">
+                    {limit > 0 ? (
+                      <>
+                        <span className={cn("font-semibold", TONE_TEXT[STATUS_TONE[status]])}>{f.pct(spent / limit)}</span> · {f.money0(spent)}
+                      </>
+                    ) : (
+                      t("budget.plan.spent", { amount: f.money0(spent) })
+                    )}
+                  </span>
+                  <ChevronRight className="-ml-1 h-3.5 w-3.5 shrink-0 text-ink-3" />
                 </div>
               </li>
             );

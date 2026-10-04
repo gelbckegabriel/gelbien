@@ -16,20 +16,27 @@ function Ring({ value, tone }: { value: number; tone: "gold" | "warn" | "bad" })
   return (
     <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
       <circle cx="60" cy="60" r={r} fill="none" stroke="#ffffff0f" strokeWidth="10" />
-      <motion.circle
-        cx="60"
-        cy="60"
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth="10"
-        strokeLinecap="round"
-        strokeDasharray={c}
-        initial={{ strokeDashoffset: c }}
-        animate={{ strokeDashoffset: c * (1 - pct) }}
-        transition={{ type: "spring", stiffness: 60, damping: 18, delay: 0.15 }}
-        style={{ filter: `drop-shadow(0 0 10px ${color}55)` }}
-      />
+      {/* the glow: a wide faint stroke under the arc. (A drop-shadow filter here flickered as a dark box on phones while it animated.) */}
+      {[
+        { width: 18, opacity: 0.16 },
+        { width: 10, opacity: 1 },
+      ].map((l) => (
+        <motion.circle
+          key={l.width}
+          cx="60"
+          cy="60"
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeOpacity={l.opacity}
+          strokeWidth={l.width}
+          strokeLinecap="round"
+          strokeDasharray={c}
+          initial={{ strokeDashoffset: c }}
+          animate={{ strokeDashoffset: c * (1 - pct) }}
+          transition={{ type: "spring", stiffness: 60, damping: 18, delay: 0.15 }}
+        />
+      ))}
     </svg>
   );
 }
@@ -47,7 +54,8 @@ export function Hero({ s, prevTotal, name, bills = 0 }: { s: MonthSummary; prevT
 
   return (
     <Card className="p-6 sm:p-7">
-      <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gold/10 blur-3xl" />
+{/* a soft glow from a gradient, not a blur filter: blurred layers flicker as dark boxes on phones while the card repaints */}
+      <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[radial-gradient(circle,#d9b45f26,transparent_70%)]" />
       <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
           <p className="text-sm text-ink-3">

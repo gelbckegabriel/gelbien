@@ -473,9 +473,18 @@ function IconPicker({
   const { t } = useI18n();
   const sections = groups ? groups.map((g) => ({ id: g.id, label: t(`cfg.iconGroup.${g.id}` as MessageKey), icons: g.icons })) : [{ id: "all", label: null, icons: icons ?? [] }];
   // opens with the current icon in view rather than at the top of a long list (only when it mounts or the pick changes)
+  // (measured on screen: the groups' entrance animation makes them, not the list, the icons' offsetParent;
+  // and once more after the popover has been fitted to the room there is, which can shrink the list)
   const scrollToPick = useCallback((el: HTMLButtonElement | null) => {
-    const box = el?.closest<HTMLElement>("[data-icon-scroll]");
-    if (el && box) box.scrollTop = el.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2;
+    const center = () => {
+      const box = el?.closest<HTMLElement>("[data-icon-scroll]");
+      if (!el || !box) return;
+      const offset = el.getBoundingClientRect().top - box.getBoundingClientRect().top;
+      box.scrollTop += offset - box.clientHeight / 2 + el.offsetHeight / 2;
+    };
+    center();
+    const later = setTimeout(center, 80);
+    return () => clearTimeout(later);
   }, []);
   return (
     <Popover.Root>
@@ -487,12 +496,13 @@ function IconPicker({
           sideOffset={8}
           align="start"
           collisionPadding={12}
-          className="z-50 w-[min(20rem,calc(100vw-1.5rem))] origin-[var(--radix-popover-content-transform-origin)] rounded-2xl border border-line-strong bg-[#16161b] p-4 shadow-2xl shadow-black/60 data-[side=bottom]:animate-pop-in data-[side=top]:animate-pop-in-up motion-reduce:animate-none"
+          // never taller than the room there is: the icon list gives way and scrolls
+          className="z-50 flex max-h-[var(--radix-popover-content-available-height)] w-[min(20rem,calc(100vw-1.5rem))] origin-[var(--radix-popover-content-transform-origin)] flex-col rounded-2xl border border-line-strong bg-[#16161b] p-4 shadow-2xl shadow-black/60 data-[side=bottom]:animate-pop-in data-[side=top]:animate-pop-in-up motion-reduce:animate-none"
         >
           <p className="mb-2 text-xs font-medium text-ink-3">{t("cfg.color")}</p>
           <ColorPicker value={value.color} onChange={(color) => onChange({ color })} className="max-w-none" />
           <p className="mb-1 mt-4 text-xs font-medium text-ink-3">{t("cfg.icon")}</p>
-          <div data-icon-scroll className="rise-list relative -mr-2 max-h-[min(16rem,42dvh)] overflow-y-auto overscroll-contain pr-2 [--rise-delay:160ms]">
+          <div data-icon-scroll className="rise-list relative -mr-2 max-h-64 min-h-24 flex-1 overflow-y-auto overscroll-contain pr-2 [--rise-delay:160ms]">
             {sections.map((sec) => (
               <section key={sec.id} aria-label={sec.label ?? undefined}>
                 {sec.label && <p className="sticky top-0 z-10 bg-[#16161b] pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-ink-3">{sec.label}</p>}
