@@ -181,7 +181,7 @@ const en: GuideContent = {
     ],
     steps: [
       { title: "Rename, recolour, change the icon", body: "Tap a category's name to rename it; every expense and budget that uses it is updated too. Tap its icon to choose a colour and an icon." },
-      { title: "Subcategories", body: "Tap the arrow on a category to open it, then add subcategories (Groceries → Supermarket, Bakery, Butcher) or remove one with ✕." },
+      { title: "Subcategories", body: "Tap the arrow on a category to open it, then add subcategories (Groceries → Supermarket, Bakery, Butcher). Tap a subcategory to rename it (press Enter to keep the new name, Esc to cancel); every expense and recurring expense that uses it is updated when you save. ✕ removes one." },
       { title: "Change the order", body: "Use the up and down arrows. It's the order of the category buttons in the expense form, so put the ones you use most at the top." },
       { title: "Add, hide or delete", body: "**Add category** creates a new one. **Hide** keeps a category out of the expense form while keeping its history. **Delete category** removes it, or hides it instead if expenses already use it, so your history stays intact." },
       { title: "Payment methods", body: "On the right (below, on a phone) are the cards and accounts you pay with. Add new ones, rename them (past expenses and recurring payments are updated too), tap an icon to change its look, reorder them with the arrows (the first one is the default for new recurring expenses) or remove one with ✕." },

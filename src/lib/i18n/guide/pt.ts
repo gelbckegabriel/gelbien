@@ -181,7 +181,7 @@ const pt: GuideContent = {
     ],
     steps: [
       { title: "Renomear, mudar cor e ícone", body: "Toque no nome de uma categoria para renomear; todos os gastos e orçamentos que a usam são atualizados junto. Toque no ícone para escolher uma cor e um ícone." },
-      { title: "Subcategorias", body: "Toque na seta de uma categoria para abri-la e adicione subcategorias (Mercado → Supermercado, Padaria, Açougue) ou remova uma com ✕." },
+      { title: "Subcategorias", body: "Toque na seta de uma categoria para abri-la e adicione subcategorias (Mercado → Supermercado, Padaria, Açougue). Toque numa subcategoria para renomeá-la (Enter mantém o novo nome, Esc cancela); todos os gastos e gastos recorrentes que a usam são atualizados quando você salva. ✕ remove uma." },
       { title: "Mudar a ordem", body: "Use as setas para cima e para baixo. É a ordem dos botões de categoria no formulário de gasto, então deixe as mais usadas no topo." },
       { title: "Adicionar, ocultar ou excluir", body: "**Adicionar categoria** cria uma nova. **Ocultar** tira a categoria do formulário de gasto, mas mantém o histórico. **Excluir categoria** remove, ou oculta no lugar de excluir se já houver gastos nela, para não perder o histórico." },
       { title: "Formas de pagamento", body: "À direita (abaixo, no celular) ficam os cartões e contas com que você paga. Adicione novas, renomeie (gastos passados e pagamentos recorrentes são atualizados também), toque num ícone para mudar a aparência, reordene com as setas (a primeira é a padrão para novos gastos recorrentes) ou remova com ✕." },

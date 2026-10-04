@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ChevronDown, Eye, EyeOff, Languages, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Eye, EyeOff, Languages, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AnimatePresence, motion, Reorder } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { Popover } from "radix-ui";
@@ -20,10 +20,18 @@ import type { Category, Dataset, PaymentStyle, Settings } from "@/lib/types";
 import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
 import { cn, normalize, uid } from "@/lib/utils";
 
-interface Draft extends Category {
+interface SubDraft {
+  key: string;
+  name: string;
+  /** Name when loaded — a rename carries over to the expenses and recurring expenses that use it */
+  original: string | null;
+}
+
+interface Draft extends Omit<Category, "subcategories"> {
   key: string;
   /** Name when loaded — used to detect renames */
   original: string | null;
+  subs: SubDraft[];
 }
 
 interface PaymentDraft {
@@ -63,7 +71,11 @@ function moveItem<T extends { key: string }>(list: T[], key: string, dir: -1 | 1
 }
 
 const toDraft = (cats: Category[]): Draft[] =>
-  [...cats].sort((a, b) => a.order - b.order).map((c) => ({ ...c, subcategories: [...c.subcategories], key: uid("c"), original: c.name }));
+  [...cats]
+    .sort((a, b) => a.order - b.order)
+    .map(({ subcategories, ...c }) => ({ ...c, subs: subcategories.map((name) => ({ key: uid("s"), name, original: name })), key: uid("c"), original: c.name }));
+
+const subNames = (c: Draft) => c.subs.map((s) => s.name.trim()).filter(Boolean);
 
 export default function ConfigPage() {
   return (
@@ -107,7 +119,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
     return m;
   }, [ds.transactions]);
 
-  const strip = (list: Draft[]) => list.map(({ name, color, icon, subcategories, archived }) => ({ name: name.trim(), color, icon, subcategories, archived }));
+  const strip = (list: Draft[]) => list.map((c) => ({ name: c.name.trim(), color: c.color, icon: c.icon, subcategories: subNames(c), archived: c.archived }));
   const dirty = JSON.stringify(strip(cats)) !== JSON.stringify(strip(initialCats)) || paymentsDirty;
   const duplicate = (name: string, key: string) => cats.some((c) => c.key !== key && normalize(c.name) === normalize(name));
 
@@ -117,7 +129,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
   const addCategory = () => {
     const used = new Set(cats.map((c) => c.color));
     const color = CATEGORY_COLORS.find((c) => !used.has(c)) ?? CATEGORY_COLORS[cats.length % CATEGORY_COLORS.length];
-    const draft: Draft = { key: uid("c"), original: null, name: t("cfg.newCategory"), color, icon: "Sparkles", order: cats.length, subcategories: [], archived: false };
+    const draft: Draft = { key: uid("c"), original: null, name: t("cfg.newCategory"), color, icon: "Sparkles", order: cats.length, subs: [], archived: false };
     setCats((list) => [...list, draft]);
     setExpanded(draft.key);
   };
@@ -136,17 +148,26 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
     const clean = cats.map((c) => ({ ...c, name: c.name.trim() })).filter((c) => c.name);
     const names = clean.map((c) => normalize(c.name));
     const paymentNames = paymentsOut.paymentMethods.map(normalize);
-    if (new Set(names).size !== names.length || new Set(paymentNames).size !== paymentNames.length) {
+    // two subcategories of one category can't share a name either
+    const subClash = clean.some((c) => {
+      const subs = subNames(c).map(normalize);
+      return new Set(subs).size !== subs.length;
+    });
+    if (new Set(names).size !== names.length || new Set(paymentNames).size !== paymentNames.length || subClash) {
       toast.error(t("cfg.duplicate"));
       return false;
     }
     const renames = clean.filter((c) => c.original && c.original !== c.name).map((c) => ({ from: c.original!, to: c.name }));
-    const categories: Category[] = clean.map((c, i) => ({ name: c.name, color: c.color, icon: c.icon, order: i, subcategories: c.subcategories, archived: c.archived }));
+    // keyed by the category's name before this save, as the expenses still have it
+    const subRenames = clean.flatMap((c) =>
+      c.original ? c.subs.filter((sub) => sub.original && sub.name.trim() && sub.original !== sub.name.trim()).map((sub) => ({ category: c.original!, from: sub.original!, to: sub.name.trim() })) : [],
+    );
+    const categories: Category[] = clean.map((c, i) => ({ name: c.name, color: c.color, icon: c.icon, order: i, subcategories: subNames(c), archived: c.archived }));
     const onFailure = () => {
       stashDraft("config:categories", cats);
       stashDraft("config:payments", payments);
     };
-    mutate.mutate({ op: "saveCategories", categories, renames }, { onFailure });
+    mutate.mutate({ op: "saveCategories", categories, renames, subRenames }, { onFailure });
     if (paymentsDirty) {
       const { paymentRenames, ...settings } = paymentsOut;
       mutate.mutate({ op: "saveSettings", settings: { ...ds.settings, ...settings }, paymentRenames }, { onFailure });
@@ -203,7 +224,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
                         maxLength={60}
                       />
                       <p className="px-2 text-xs text-ink-3">
-                        {t("cfg.subCount", { count: c.subcategories.length })} · {t("cfg.usage", { count: n })}
+                        {t("cfg.subCount", { count: c.subs.length })} · {t("cfg.usage", { count: n })}
                         {c.original && c.original !== c.name.trim() && <span className="text-gold"> · {t("cfg.renameHint")}</span>}
                       </p>
                     </div>
@@ -224,10 +245,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
                     {open && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                         <div className="border-t border-line/70 p-4">
-                          <SubcategoryEditor
-                            items={c.subcategories}
-                            onChange={(subcategories) => update(c.key, { subcategories })}
-                          />
+                          <SubcategoryEditor items={c.subs} onChange={(subs) => update(c.key, { subs })} />
                           <div className="mt-4 flex flex-wrap items-center gap-2">
                             <div className="flex sm:hidden">
                               <Button size="sm" variant="ghost" onClick={() => move(c.key, -1)} disabled={i === 0}>
@@ -332,36 +350,95 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
   );
 }
 
-function SubcategoryEditor({ items, onChange }: { items: string[]; onChange: (items: string[]) => void }) {
+/** Subcategory chips: tap one to rename it, ✕ to remove it, and a field to add more. */
+function SubcategoryEditor({ items, onChange }: { items: SubDraft[]; onChange: (items: SubDraft[]) => void }) {
   const { t } = useI18n();
   const [value, setValue] = useState("");
+  const [editing, setEditing] = useState<{ key: string; name: string } | null>(null);
+  const taken = (name: string, key?: string) => items.some((s) => s.key !== key && normalize(s.name) === normalize(name));
   const add = () => {
     const v = value.trim();
-    if (!v || items.some((s) => normalize(s) === normalize(v))) return;
-    onChange([...items, v]);
+    if (!v || taken(v)) return;
+    onChange([...items, { key: uid("s"), name: v, original: null }]);
     setValue("");
   };
+  // an empty name or one already in this category puts the old name back
+  const commit = () => {
+    if (!editing) return;
+    const v = editing.name.trim();
+    if (v && !taken(v, editing.key)) onChange(items.map((s) => (s.key === editing.key ? { ...s, name: v } : s)));
+    setEditing(null);
+  };
+  const renamed = items.some((s) => s.original && s.original !== s.name);
+
   return (
     <div>
       <div className="flex flex-wrap gap-1.5">
         <AnimatePresence initial={false}>
-          {items.map((s) => (
-            <motion.span
-              key={s}
-              layout
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="inline-flex items-center gap-1 rounded-full border border-line bg-surface-2/70 py-1 pl-3 pr-1.5 text-[13px] text-ink-2"
-            >
-              {s}
-              <button onClick={() => onChange(items.filter((x) => x !== s))} className="rounded-full p-0.5 text-ink-3 hover:bg-white/10 hover:text-bad" aria-label={t("common.delete")}>
-                <X className="h-3 w-3" />
-              </button>
-            </motion.span>
-          ))}
+          {items.map((s) => {
+            const isRenamed = !!s.original && s.original !== s.name;
+            const edit = editing?.key === s.key ? editing : null;
+            return (
+              <motion.span
+                key={s.key}
+                layout
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border py-1 pl-3 pr-1.5 text-[13px]",
+                  edit ? "border-gold/60 bg-gold-soft text-ink" : isRenamed ? "border-gold/40 bg-gold-soft/60 text-gold-bright" : "border-line bg-surface-2/70 text-ink-2",
+                )}
+              >
+                {edit ? (
+                  <input
+                    autoFocus
+                    value={edit.name}
+                    onChange={(e) => setEditing({ key: s.key, name: e.target.value })}
+                    onFocus={(e) => e.target.select()}
+                    onBlur={commit}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commit();
+                      } else if (e.key === "Escape") setEditing(null);
+                    }}
+                    size={Math.max(edit.name.length, 4)}
+                    maxLength={80}
+                    aria-label={t("cfg.renameSub", { name: s.name })}
+                    className={cn("min-w-0 bg-transparent text-base outline-none sm:text-[13px]", edit.name.trim() && taken(edit.name.trim(), s.key) && "text-bad")}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditing({ key: s.key, name: s.name })}
+                    className="group/sub inline-flex items-center gap-1 hover:text-ink"
+                    aria-label={t("cfg.renameSub", { name: s.name })}
+                    title={isRenamed ? t("cfg.subWas", { name: s.original! }) : t("cfg.renameSub", { name: s.name })}
+                  >
+                    {s.name}
+                    <Pencil className="h-3 w-3 text-ink-3 transition-colors group-hover/sub:text-gold" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  // keeps the rename field from committing first on mousedown, so ✕ removes the right chip
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setEditing(null);
+                    onChange(items.filter((x) => x.key !== s.key));
+                  }}
+                  className="rounded-full p-0.5 text-ink-3 hover:bg-white/10 hover:text-bad"
+                  aria-label={t("common.delete")}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </motion.span>
+            );
+          })}
         </AnimatePresence>
       </div>
+      {renamed && <p className="mt-2 text-xs text-gold">{t("cfg.subRenameHint")}</p>}
       <form
         className="mt-3 flex gap-2"
         onSubmit={(e) => {
