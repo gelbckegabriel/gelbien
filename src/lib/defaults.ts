@@ -1,8 +1,14 @@
 import type { Category, Locale, PaymentStyle, Settings, SubKind } from "./types";
 import { normalize } from "./utils";
 
-/** Category colors offered in the picker. The first 8 are the CVD-validated chart slots. */
+/**
+ * Colours offered in every colour picker (categories, payment methods, goals, accounts), shown 8 per row.
+ * The first 8 are the CVD-validated chart slots, used first for new categories, goals and accounts; then
+ * the extras, and a lighter and a deeper shade of each slot in the same column. A custom colour is also
+ * possible (see ColorPicker).
+ */
 export const CATEGORY_COLORS = [
+  // chart slots
   "#3987e5", // blue
   "#d95926", // orange
   "#199e70", // aqua
@@ -11,26 +17,79 @@ export const CATEGORY_COLORS = [
   "#2aa3c7", // cyan
   "#c98500", // amber
   "#b565c9", // plum
+  // extras
   "#6f7fe0", // indigo
   "#e0707a", // rose
   "#8fa12a", // olive
   "#a8744f", // bronze
   "#6b6a72", // gray
+  "#e5484d", // red
+  "#30a46c", // green
+  "#d9b45f", // gold
+  // lighter
+  "#78b2f5", // sky
+  "#f2996e", // peach
+  "#5ccaa1", // mint
+  "#b6aefb", // lavender
+  "#f28fb8", // pink
+  "#6ccfe6", // ice
+  "#e8c65f", // butter
+  "#d79ce8", // orchid
+  // deeper
+  "#2f63c0", // navy
+  "#bb4321", // brick
+  "#148a62", // forest
+  "#6b5ccc", // grape
+  "#ab3a68", // wine
+  "#1f86a3", // teal
+  "#a06c00", // ochre
+  "#924fa8", // deep plum
 ];
 
 export const OTHER_COLOR = "#6b6a72";
 /** Fold bucket in charts ("everything else") — darker than the "Other" category so the two never look alike. */
 export const REST_COLOR = "#46454c";
 
-export const CATEGORY_ICONS = [
-  "Home", "Zap", "ShoppingCart", "UtensilsCrossed", "Bus", "HeartPulse", "Shirt", "Sofa",
-  "Repeat", "Ticket", "GraduationCap", "Landmark", "Package", "PawPrint", "Plane", "Gift",
-  "Baby", "Car", "Dumbbell", "Coffee", "Smartphone", "Wallet", "Briefcase", "FileText",
-  "Music", "Gamepad2", "BookOpen", "Wrench", "PiggyBank", "CreditCard", "Globe", "Sparkles",
+/** Icons offered for categories, in themed groups — the picker shows each under a heading (cfg.iconGroup.<id>). */
+export const CATEGORY_ICON_GROUPS = [
+  {
+    id: "home",
+    icons: ["Home", "Building2", "KeyRound", "Sofa", "Armchair", "Bed", "Bath", "Lamp", "Lightbulb", "Zap", "Flame", "Droplets", "Wifi", "Plug", "Hammer", "Wrench", "Trees", "Recycle"],
+  },
+  { id: "transport", icons: ["Car", "CarFront", "CarTaxiFront", "Fuel", "SquareParking", "Bus", "TrainFront", "Bike", "Motorbike", "Plane", "Ship", "Truck", "Caravan"] },
+  {
+    id: "food",
+    icons: [
+      "ShoppingCart", "ShoppingBasket", "Apple", "Carrot", "Beef", "Fish", "Egg", "Milk", "Croissant", "UtensilsCrossed", "ChefHat", "Pizza",
+      "Sandwich", "Salad", "Soup", "Coffee", "CupSoda", "Beer", "Wine", "Martini", "IceCreamCone", "Cookie", "Candy",
+    ],
+  },
+  { id: "shopping", icons: ["ShoppingBag", "Store", "Tag", "Shirt", "Footprints", "Watch", "Glasses", "Gem", "Backpack", "Scissors", "Sparkles", "Flower2"] },
+  { id: "health", icons: ["HeartPulse", "Pill", "Stethoscope", "Syringe", "Bandage", "Activity", "Brain", "Smile", "Eye", "Dumbbell"] },
+  {
+    id: "fun",
+    icons: [
+      "Ticket", "Film", "Clapperboard", "Tv", "Popcorn", "Music", "Headphones", "Gamepad2", "Dices", "Camera", "Palette", "Drama",
+      "BookOpen", "PartyPopper", "Trophy", "Volleyball", "Mountain", "Tent", "Palmtree", "Luggage", "Hotel", "MapPin", "Compass", "Globe",
+    ],
+  },
+  { id: "family", icons: ["Baby", "ToyBrick", "School", "Heart", "Users", "Gift", "Cake", "PawPrint", "Dog", "Cat", "Bird", "Rabbit", "Bone"] },
+  {
+    id: "money",
+    icons: [
+      "Wallet", "CreditCard", "Banknote", "Coins", "PiggyBank", "Landmark", "Receipt", "Percent", "Calculator", "Scale", "ShieldCheck", "Umbrella",
+      "HandHeart", "HandCoins", "BadgeDollarSign", "TrendingUp", "Briefcase", "GraduationCap", "Library", "Laptop", "Monitor", "Smartphone",
+      "Cloud", "Repeat", "FileText",
+    ],
+  },
+  { id: "other", icons: ["Package", "Leaf", "Sprout", "Sun", "Snowflake", "Star", "Target", "Rocket", "Anchor", "Cigarette"] },
 ] as const;
 
+export const CATEGORY_ICONS: readonly string[] = CATEGORY_ICON_GROUPS.flatMap((g) => g.icons);
+
 export const GOAL_ICONS = [
-  "Target", "Car", "Home", "Plane", "Umbrella", "GraduationCap", "Baby", "Gem", "Laptop", "Bike", "Gift", "PiggyBank",
+  "Target", "Car", "Motorbike", "Home", "KeyRound", "Plane", "Palmtree", "Luggage", "Mountain", "Caravan", "Ship", "Umbrella",
+  "ShieldCheck", "GraduationCap", "Baby", "Heart", "Gem", "Laptop", "Smartphone", "Camera", "Bike", "Dog", "Gift", "PiggyBank", "Rocket",
 ] as const;
 
 /** Suggestions for the institution field — free text, these are just shortcuts. */
@@ -298,7 +357,8 @@ const PAYMENT_TEMPLATES: { names: [string, string, string]; icon: string; color:
 /** Icons offered for payment methods */
 export const PAYMENT_ICONS = [
   "CreditCard", "WalletCards", "Banknote", "ArrowLeftRight", "CalendarSync", "Gift", "QrCode", "Smartphone",
-  "Landmark", "Wallet", "Coins", "HandCoins", "PiggyBank", "Receipt", "Globe", "CircleEllipsis",
+  "Landmark", "Building2", "Wallet", "Coins", "HandCoins", "PiggyBank", "Receipt", "BadgeDollarSign",
+  "Store", "Globe", "Percent", "CircleEllipsis",
 ] as const;
 
 // For methods the user typed in: an icon from words in the name (accents stripped). First match wins.

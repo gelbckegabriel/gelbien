@@ -1,20 +1,34 @@
 "use client";
 
 import {
-  ArrowLeftRight, Baby, Banknote, Bike, BookOpen, Briefcase, Bus, CalendarSync, Car, CircleEllipsis, Coffee, Coins, CreditCard,
-  Dumbbell, FileText, Gamepad2, Gem, Gift, Globe, GraduationCap, HandCoins, HeartPulse, Home, Landmark, Laptop, Music, Package,
-  PawPrint, PiggyBank, Plane, QrCode, Receipt, Repeat, ShoppingCart, Shirt, Smartphone, Sofa, Sparkles, Target, Ticket,
-  TrendingUp, Umbrella, UtensilsCrossed, Wallet, WalletCards, Wrench, Zap, type LucideIcon,
+  Activity, Anchor, Apple, Armchair, ArrowLeftRight, Baby, Backpack, BadgeDollarSign, Bandage, Banknote, Bath, Bed, Beef, Beer,
+  Bike, Bird, Bone, BookOpen, Brain, Briefcase, Building2, Bus, Cake, Calculator, CalendarSync, Camera, Candy, Car, CarFront,
+  CarTaxiFront, Caravan, Carrot, Cat, ChefHat, Cigarette, CircleEllipsis, Clapperboard, Cloud, Coffee, Coins, Compass, Cookie,
+  CreditCard, Croissant, CupSoda, Dices, Dog, Drama, Droplets, Dumbbell, Egg, Eye, FileText, Film, Fish, Flame, Flower2,
+  Footprints, Fuel, Gamepad2, Gem, Gift, Glasses, Globe, GraduationCap, Hammer, HandCoins, HandHeart, Headphones, Heart,
+  HeartPulse, Home, Hotel, IceCreamCone, KeyRound, Lamp, Landmark, Laptop, Leaf, Library, Lightbulb, Luggage, MapPin, Martini,
+  Milk, Monitor, Motorbike, Mountain, Music, Package, Palette, Palmtree, PartyPopper, PawPrint, Percent, PiggyBank, Pill, Pizza,
+  Plane, Plug, Popcorn, QrCode, Rabbit, Receipt, Recycle, Repeat, Rocket, Salad, Sandwich, Scale, School, Scissors, ShieldCheck,
+  Ship, Shirt, ShoppingBag, ShoppingBasket, ShoppingCart, Smartphone, Smile, Snowflake, Sofa, Soup, Sparkles, Sprout,
+  SquareParking, Star, Stethoscope, Store, Sun, Syringe, Tag, Target, Tent, Ticket, ToyBrick, TrainFront, Trees, TrendingUp,
+  Trophy, Truck, Tv, Umbrella, Users, UtensilsCrossed, Volleyball, Wallet, WalletCards, Watch, Wifi, Wine, Wrench, Zap, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Every icon a category, goal, payment method or account can use, by the name stored in the sheet.
+// Names are only ever added: removing one would blank out the icon of whoever picked it.
 export const ICONS: Record<string, LucideIcon> = {
-  Home, Zap, ShoppingCart, UtensilsCrossed, Bus, HeartPulse, Shirt, Sofa, Repeat, Ticket, GraduationCap, Landmark,
-  Package, PawPrint, Plane, Gift, Baby, Car, Dumbbell, Coffee, Smartphone, Wallet, Briefcase, FileText, Music,
-  Gamepad2, BookOpen, Wrench, PiggyBank, CreditCard, Globe, Sparkles, Target, Umbrella, Laptop, Gem, Bike, TrendingUp,
-  Banknote,
-  // payment methods
-  WalletCards, ArrowLeftRight, CalendarSync, QrCode, Coins, HandCoins, Receipt, CircleEllipsis,
+  Activity, Anchor, Apple, Armchair, ArrowLeftRight, Baby, Backpack, BadgeDollarSign, Bandage, Banknote, Bath, Bed, Beef, Beer,
+  Bike, Bird, Bone, BookOpen, Brain, Briefcase, Building2, Bus, Cake, Calculator, CalendarSync, Camera, Candy, Car, CarFront,
+  CarTaxiFront, Caravan, Carrot, Cat, ChefHat, Cigarette, CircleEllipsis, Clapperboard, Cloud, Coffee, Coins, Compass, Cookie,
+  CreditCard, Croissant, CupSoda, Dices, Dog, Drama, Droplets, Dumbbell, Egg, Eye, FileText, Film, Fish, Flame, Flower2,
+  Footprints, Fuel, Gamepad2, Gem, Gift, Glasses, Globe, GraduationCap, Hammer, HandCoins, HandHeart, Headphones, Heart,
+  HeartPulse, Home, Hotel, IceCreamCone, KeyRound, Lamp, Landmark, Laptop, Leaf, Library, Lightbulb, Luggage, MapPin, Martini,
+  Milk, Monitor, Motorbike, Mountain, Music, Package, Palette, Palmtree, PartyPopper, PawPrint, Percent, PiggyBank, Pill, Pizza,
+  Plane, Plug, Popcorn, QrCode, Rabbit, Receipt, Recycle, Repeat, Rocket, Salad, Sandwich, Scale, School, Scissors, ShieldCheck,
+  Ship, Shirt, ShoppingBag, ShoppingBasket, ShoppingCart, Smartphone, Smile, Snowflake, Sofa, Soup, Sparkles, Sprout,
+  SquareParking, Star, Stethoscope, Store, Sun, Syringe, Tag, Target, Tent, Ticket, ToyBrick, TrainFront, Trees, TrendingUp,
+  Trophy, Truck, Tv, Umbrella, Users, UtensilsCrossed, Volleyball, Wallet, WalletCards, Watch, Wifi, Wine, Wrench, Zap,
 };
 
 export const ACCOUNT_TYPE_ICON = {

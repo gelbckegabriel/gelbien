@@ -4,9 +4,10 @@ import { ArrowDown, ArrowUp, ChevronDown, Eye, EyeOff, Languages, Pencil, Plus, 
 import { AnimatePresence, motion, Reorder } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { Popover } from "radix-ui";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CategoryIcon, ICONS } from "@/components/icons";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { TranslateCategoriesDialog } from "@/components/translate-categories";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, PageHeader } from "@/components/ui/card";
@@ -14,8 +15,8 @@ import { Input } from "@/components/ui/form";
 import { Badge } from "@/components/ui/misc";
 import { SaveBar } from "@/components/ui/save-bar";
 import { useDataset, useMutate } from "@/lib/data/hooks";
-import { CATEGORY_COLORS, CATEGORY_ICONS, PAYMENT_ICONS, paymentLook } from "@/lib/defaults";
-import { useI18n } from "@/lib/i18n";
+import { CATEGORY_COLORS, CATEGORY_ICON_GROUPS, PAYMENT_ICONS, paymentLook } from "@/lib/defaults";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 import type { Category, Dataset, PaymentStyle, Settings } from "@/lib/types";
 import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
 import { cn, normalize, uid } from "@/lib/utils";
@@ -211,7 +212,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
               return (
                 <Reorder.Item key={c.key} value={c} dragListener={false} className={cn("card overflow-hidden", c.archived && "opacity-60")}>
                   <div className="flex items-center gap-3 p-3">
-                    <IconPicker value={c} icons={CATEGORY_ICONS} onChange={(patch) => update(c.key, patch)} />
+                    <IconPicker value={c} groups={CATEGORY_ICON_GROUPS} onChange={(patch) => update(c.key, patch)} />
                     <div className="min-w-0 flex-1">
                       <input
                         value={c.name}
@@ -455,54 +456,67 @@ function SubcategoryEditor({ items, onChange }: { items: SubDraft[]; onChange: (
   );
 }
 
-/** Icon + colour for a category or a payment method */
+/** Icon + colour for a category or a payment method. Long icon lists come in themed groups, scrolled to the current icon. */
 function IconPicker({
   value,
   icons,
+  groups,
   size = "lg",
   onChange,
 }: {
   value: PaymentStyle;
-  icons: readonly string[];
+  icons?: readonly string[];
+  groups?: readonly { id: string; icons: readonly string[] }[];
   size?: "md" | "lg";
   onChange: (patch: Partial<PaymentStyle>) => void;
 }) {
   const { t } = useI18n();
+  const sections = groups ? groups.map((g) => ({ id: g.id, label: t(`cfg.iconGroup.${g.id}` as MessageKey), icons: g.icons })) : [{ id: "all", label: null, icons: icons ?? [] }];
+  // opens with the current icon in view rather than at the top of a long list (only when it mounts or the pick changes)
+  const scrollToPick = useCallback((el: HTMLButtonElement | null) => {
+    const box = el?.closest<HTMLElement>("[data-icon-scroll]");
+    if (el && box) box.scrollTop = el.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2;
+  }, []);
   return (
     <Popover.Root>
       <Popover.Trigger className="rounded-xl outline-none transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-gold" aria-label={`${t("cfg.icon")} / ${t("cfg.color")}`}>
         <CategoryIcon icon={value.icon} color={value.color} size={size} />
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content sideOffset={8} align="start" className="z-50 w-72 origin-[var(--radix-popover-content-transform-origin)] rounded-2xl border border-line-strong bg-[#16161b] p-4 shadow-2xl shadow-black/60 data-[side=bottom]:animate-pop-in data-[side=top]:animate-pop-in-up motion-reduce:animate-none">
+        <Popover.Content
+          sideOffset={8}
+          align="start"
+          collisionPadding={12}
+          className="z-50 w-[min(20rem,calc(100vw-1.5rem))] origin-[var(--radix-popover-content-transform-origin)] rounded-2xl border border-line-strong bg-[#16161b] p-4 shadow-2xl shadow-black/60 data-[side=bottom]:animate-pop-in data-[side=top]:animate-pop-in-up motion-reduce:animate-none"
+        >
           <p className="mb-2 text-xs font-medium text-ink-3">{t("cfg.color")}</p>
-          <div className="rise-list grid grid-cols-7 gap-2">
-            {CATEGORY_COLORS.map((c) => (
-              <button
-                key={c}
-                onClick={() => onChange({ color: c })}
-                className={cn("h-7 w-7 rounded-full transition hover:scale-110", value.color === c && "ring-2 ring-white ring-offset-2 ring-offset-[#16161b]")}
-                style={{ background: c }}
-                aria-label={c}
-              />
+          <ColorPicker value={value.color} onChange={(color) => onChange({ color })} className="max-w-none" />
+          <p className="mb-1 mt-4 text-xs font-medium text-ink-3">{t("cfg.icon")}</p>
+          <div data-icon-scroll className="rise-list relative -mr-2 max-h-[min(16rem,42dvh)] overflow-y-auto overscroll-contain pr-2 [--rise-delay:160ms]">
+            {sections.map((sec) => (
+              <section key={sec.id} aria-label={sec.label ?? undefined}>
+                {sec.label && <p className="sticky top-0 z-10 bg-[#16161b] pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-ink-3">{sec.label}</p>}
+                <div className="grid grid-cols-8 gap-1">
+                  {sec.icons.map((name) => {
+                    const Icon = ICONS[name];
+                    const picked = value.icon === name;
+                    return (
+                      <button
+                        key={name}
+                        ref={picked ? scrollToPick : undefined}
+                        onClick={() => onChange({ icon: name })}
+                        className={cn("grid h-8 w-8 place-items-center rounded-lg transition hover:bg-white/10", picked ? "bg-white/10" : "text-ink-3")}
+                        style={picked ? { color: value.color } : undefined}
+                        aria-label={name}
+                        aria-pressed={picked}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
             ))}
-          </div>
-          <p className="mb-2 mt-4 text-xs font-medium text-ink-3">{t("cfg.icon")}</p>
-          <div className="rise-list grid grid-cols-8 gap-1 [--rise-delay:160ms]">
-            {icons.map((name) => {
-              const Icon = ICONS[name];
-              return (
-                <button
-                  key={name}
-                  onClick={() => onChange({ icon: name })}
-                  className={cn("grid h-8 w-8 place-items-center rounded-lg transition hover:bg-white/10", value.icon === name ? "bg-white/10" : "text-ink-3")}
-                  style={value.icon === name ? { color: value.color } : undefined}
-                  aria-label={name}
-                >
-                  <Icon className="h-4 w-4" />
-                </button>
-              );
-            })}
           </div>
         </Popover.Content>
       </Popover.Portal>

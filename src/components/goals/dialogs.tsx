@@ -13,26 +13,10 @@ import { cn, currentMonth, isValidISODate, parseAmount, round2, todayISO, uid } 
 import { ACCOUNT_TYPE_ICON, CategoryIcon, ICONS } from "../icons";
 import { Button } from "../ui/button";
 import { Field, Input, MoneyInput, MonthField, Segmented, Select, Switch, Textarea } from "../ui/form";
+import { ColorPicker } from "../ui/color-picker";
 import { Sheet } from "../ui/sheet";
 
 const str = (n: number) => (n ? String(round2(n)) : "");
-
-function ColorSwatches({ value, onChange }: { value: string; onChange: (c: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {CATEGORY_COLORS.map((c) => (
-        <button
-          key={c}
-          type="button"
-          onClick={() => onChange(c)}
-          className={cn("h-7 w-7 rounded-full transition hover:scale-110", value === c && "ring-2 ring-white ring-offset-2 ring-offset-[#141418]")}
-          style={{ background: c }}
-          aria-label={c}
-        />
-      ))}
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Goal
@@ -158,7 +142,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
             </div>
           </Field>
           <Field label={t("cfg.color")}>
-            <ColorSwatches value={color} onChange={setColor} />
+            <ColorPicker value={color} onChange={setColor} />
           </Field>
         </div>
 
@@ -406,7 +390,7 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
           <MoneyInput value={balance} onChange={setBalance} placeholder="0.00" className={cn(type === "credit" && "text-bad")} />
         </Field>
         <Field label={t("cfg.color")} className="sm:col-span-2">
-          <ColorSwatches value={color} onChange={setColor} />
+          <ColorPicker value={color} onChange={setColor} />
         </Field>
         <Field label={t("goals.f.notes")} className="sm:col-span-2">
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} className="min-h-16" />
