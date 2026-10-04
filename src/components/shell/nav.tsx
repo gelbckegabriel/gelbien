@@ -113,7 +113,7 @@ export function BottomNav() {
   const { t } = useI18n();
   const { add, icon, burst } = useAddExpense();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-[#0c0c0f]/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-[#0c0c0f]/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
       <div className="mx-auto grid h-16 max-w-lg grid-cols-5 items-center px-2">
         {MOBILE.map((item) => {
           if (!item) {

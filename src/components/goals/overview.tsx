@@ -7,6 +7,7 @@ import { checkInStatus, latestBalances, netWorth, netWorthSeries, savingsPlan, s
 import { downloadFile } from "@/lib/files";
 import { monthlyReminderIcs } from "@/lib/ics";
 import { useI18n } from "@/lib/i18n";
+import { growX } from "@/lib/motion";
 import type { Dataset } from "@/lib/types";
 import { useMutate } from "@/lib/data/hooks";
 import { cn, currentMonth } from "@/lib/utils";
@@ -59,12 +60,10 @@ export function PlanCard({ ds }: { ds: Dataset }) {
         {active.map((g, i) => (
           <motion.div
             key={g.id}
-            className="h-full first:rounded-l-full"
-            style={{ background: g.color }}
+            className="h-full origin-left transition-[width] duration-500 ease-out first:rounded-l-full"
+            style={{ background: g.color, width: `${(g.monthlyContribution / scale) * 100}%` }}
             title={`${g.name}: ${f.money0(g.monthlyContribution)}`}
-            initial={{ width: 0 }}
-            animate={{ width: `${(g.monthlyContribution / scale) * 100}%` }}
-            transition={{ type: "spring", stiffness: 90, damping: 20, delay: i * 0.05 }}
+            {...growX(i * 0.05, 90, 20)}
           />
         ))}
         {/* marker for what there is to save */}

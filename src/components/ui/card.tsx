@@ -3,10 +3,12 @@
 import { motion, type HTMLMotionProps } from "motion/react";
 import { cn } from "@/lib/utils";
 
-// Cards cascade onto every page: each rises a little, settles from slightly smaller with a soft spring
+// Cards cascade onto every page, each rising into place with a soft spring. A whole `transform` (not
+// motion's separate y/scale) so motion hands it to the browser to run on the compositor: smooth even
+// while the page is still rendering, and nothing left behind once it settles.
 export const fadeUp = {
-  hidden: { opacity: 0, y: 22, scale: 0.97 },
-  show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24, opacity: { duration: 0.3 } } },
+  hidden: { opacity: 0, transform: "translateY(22px)" },
+  show: { opacity: 1, transform: "none", transition: { type: "spring" as const, stiffness: 300, damping: 26, opacity: { duration: 0.3 } } },
 };
 
 export const stagger = {

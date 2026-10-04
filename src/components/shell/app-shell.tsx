@@ -65,7 +65,7 @@ function TopBar() {
   const { mode } = useMode();
   const { t } = useI18n();
   return (
-    <header className="sticky top-0 z-20 border-b border-line/60 bg-bg/70 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+    <header className="sticky top-0 z-20 border-b border-line/60 bg-bg/80 pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
         {/* the smallest phones (under 360px) need the room; the dashboard is in the bottom bar anyway */}
         <GuardedLink href="/dashboard" className="lg:hidden max-[359px]:hidden" aria-label="Gelbien">

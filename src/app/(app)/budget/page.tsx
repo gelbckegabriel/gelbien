@@ -16,6 +16,7 @@ import { committedBills, monthCharges, type BillCharge } from "@/lib/bills";
 import { useDataset, useMutate } from "@/lib/data/hooks";
 import { budgetStatus, effectiveBudget, effectiveIncome, monthlyCost, subscriptionTotals, suggestBudget, summarizeMonth } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
+import { growX } from "@/lib/motion";
 import { SUB_KINDS, type Dataset, type Subscription } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
@@ -186,19 +187,16 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
                   <motion.div
                     key={s.name}
                     title={`${s.name}: ${f.money0(s.value)}`}
-                    className="h-full first:rounded-l-full"
-                    style={{ background: s.color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(s.value / base) * 100}%` }}
-                    transition={{ type: "spring", stiffness: 90, damping: 20, delay: i * 0.03 }}
+                    className="h-full origin-left transition-[width] duration-500 ease-out first:rounded-l-full"
+                    style={{ background: s.color, width: `${(s.value / base) * 100}%` }}
+                    {...growX(i * 0.03, 90, 20)}
                   />
                 ))}
                 {unallocated > 0 && (
                   <motion.div
-                    className="gold-fill h-full rounded-r-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(unallocated / base) * 100}%` }}
-                    transition={{ type: "spring", stiffness: 90, damping: 20 }}
+                    className="gold-fill h-full rounded-r-full origin-left transition-[width] duration-500 ease-out"
+                    style={{ width: `${(unallocated / base) * 100}%` }}
+                    {...growX(segments.length * 0.03, 90, 20)}
                     title={`${t("budget.plan.savings")}: ${f.money0(unallocated)}`}
                   />
                 )}

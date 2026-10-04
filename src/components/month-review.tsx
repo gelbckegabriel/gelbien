@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useDataset } from "@/lib/data/hooks";
 import { useI18n } from "@/lib/i18n";
+import { growX } from "@/lib/motion";
 import { monthReview, type CategoryRow, type MonthReview, type Suggestion } from "@/lib/review";
 import type { Dataset } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
@@ -278,11 +279,9 @@ function PlanBars({ r }: { r: MonthReview }) {
               </div>
               <div className="relative h-2 rounded-full bg-white/[0.06]">
                 <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: over ? BAD : GOLD }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(Math.max(0, c.spent) / scale) * 100}%` }}
-                  transition={{ type: "spring", stiffness: 90, damping: 20, delay: i * 0.04 }}
+                  className="h-full rounded-full origin-left transition-[width] duration-500 ease-out"
+                  style={{ background: over ? BAD : GOLD, width: `${(Math.max(0, c.spent) / scale) * 100}%` }}
+                  {...growX(i * 0.04, 90, 20)}
                 />
                 {c.budget > 0 && <span className="absolute -bottom-1 -top-1 w-0.5 -translate-x-1/2 rounded-full bg-ink" style={{ left: `${(c.budget / scale) * 100}%` }} />}
               </div>

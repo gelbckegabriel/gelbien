@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import type { MonthSummary } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
+import { growX } from "@/lib/motion";
 import { PRIORITIES, type Dataset, type PaymentStyle } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
@@ -78,11 +79,9 @@ export function PrioritySplit({ summary, className }: { summary: MonthSummary; c
           return share > 0 ? (
             <motion.div
               key={p}
-              initial={{ width: 0 }}
-              animate={{ width: `${share * 100}%` }}
-              transition={{ type: "spring", stiffness: 90, damping: 20, delay: i * 0.08 }}
-              className="h-full first:rounded-l-full last:rounded-r-full"
-              style={{ background: PRIORITY_COLORS[p] }}
+              {...growX(i * 0.08, 90, 20)}
+              className="h-full origin-left transition-[width] duration-500 ease-out first:rounded-l-full last:rounded-r-full"
+              style={{ background: PRIORITY_COLORS[p], width: `${share * 100}%` }}
               title={`${t(`priority.${p}`)}: ${f.money(summary.byPriority[p])}`}
             />
           ) : null;
@@ -117,11 +116,9 @@ export function PaymentBreakdown({ summary, styles, className }: { summary: Mont
             </div>
             <div className="h-1.5 rounded-full bg-white/5">
               <motion.div
-                className="h-full rounded-full"
-                style={{ background: GOLD }}
-                initial={{ width: 0 }}
-                animate={{ width: `${(Math.max(0, p.amount) / max) * 100}%` }}
-                transition={{ type: "spring", stiffness: 90, damping: 20, delay: i * 0.05 }}
+                className="h-full rounded-full origin-left transition-[width] duration-500 ease-out"
+                style={{ background: GOLD, width: `${(Math.max(0, p.amount) / max) * 100}%` }}
+                {...growX(i * 0.05, 90, 20)}
               />
             </div>
           </li>

@@ -70,10 +70,10 @@
     35% { opacity: 1; }
     100% { opacity: 1; transform: none; clip-path: inset(-4rem -4rem -4rem -4rem round 1rem); }
   }
-  /* one row of a panel arriving: rises, fades in, comes into focus. Uses `translate` so it never
-     fights a transform that motion is animating on the same element. */
+  /* one row of a panel arriving: rises and fades in. Uses `translate` so it never fights a transform
+     that motion is animating on the same element. (No blur: animating a filter repaints every frame.) */
   @keyframes rise-in {
-    from { opacity: 0; translate: 0 12px; filter: blur(5px); }
+    from { opacity: 0; translate: 0 14px; }
   }
   @keyframes rise-in-small {
     from { opacity: 0; translate: 0 6px; scale: 0.94; }
@@ -183,6 +183,51 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .recharts-wrapper:focus,
 .recharts-sector:focus {
   outline: none;
+}
+
+/*
+ * Entrances that run on the compositor — smooth even while the page is busy rendering — so they only
+ * touch opacity and the individual transform properties (translate/scale), never layout, filters or
+ * clip-paths.
+ */
+/* sheets: phones' rises from the bottom while growing out of the tap; larger screens' grows from it,
+   with a touch of overshoot. The tap point is the element's transform-origin (see Sheet). */
+@keyframes sheet-up {
+  from { opacity: 0; translate: 0 56px; scale: 0.94; }
+  50% { opacity: 1; }
+}
+@keyframes sheet-in {
+  0% { opacity: 0; scale: 0.86; }
+  55% { opacity: 1; scale: 1.012; }
+  100% { opacity: 1; scale: 1; }
+}
+.sheet-up {
+  animation: sheet-up 480ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.sheet-in {
+  animation: sheet-in 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+/* a soft gold wave spreading across a sheet from where it was opened: a small glow scaled up */
+@keyframes ink {
+  from { opacity: 0.55; transform: translate(-50%, -50%) scale(0); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(var(--ink-scale, 12)); }
+}
+.sheet-ink {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle, #d9b45f50, #d9b45f1f 45%, transparent 70%);
+  animation: ink 950ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* pages arriving from the direction of the nav (see (app)/template.tsx) */
+@keyframes page-in {
+  from { opacity: 0; translate: var(--page-from, 0 12px); }
+}
+.page-enter {
+  animation: page-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 /*

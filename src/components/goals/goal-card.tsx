@@ -4,6 +4,7 @@ import { CalendarCheck, Flag, Link2, Plus, SlidersHorizontal, Trophy } from "luc
 import { motion } from "motion/react";
 import type { GoalPlan } from "@/lib/goals";
 import { useI18n, type Formatters, type TFn } from "@/lib/i18n";
+import { growX } from "@/lib/motion";
 import type { Account, Goal } from "@/lib/types";
 import { cn, monthOf } from "@/lib/utils";
 import { CategoryIcon } from "../icons";
@@ -71,11 +72,9 @@ export function GoalCard({
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.06]">
           <motion.div
-            className="h-full rounded-full"
-            style={{ background: achieved ? "linear-gradient(90deg,#f3d894,#d9b45f)" : goal.color }}
-            initial={{ width: 0 }}
-            animate={{ width: `${plan.progress * 100}%` }}
-            transition={{ type: "spring", stiffness: 70, damping: 18, delay: 0.1 + index * 0.05 }}
+            className="h-full rounded-full origin-left transition-[width] duration-500 ease-out"
+            style={{ background: achieved ? "linear-gradient(90deg,#f3d894,#d9b45f)" : goal.color, width: `${plan.progress * 100}%` }}
+            {...growX(0.1 + index * 0.05, 70, 18)}
           />
         </div>
 

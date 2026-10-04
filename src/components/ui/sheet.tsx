@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useDragControls, useReducedMotion } from "moti
 import { Dialog } from "radix-ui";
 import { X } from "lucide-react";
 import { useState } from "react";
-import { EASE_OUT, revealFrom, tapOrigin } from "@/lib/motion";
+import { EASE_OUT, coverRadius, tapOrigin } from "@/lib/motion";
 import { useMediaQuery } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
 
@@ -20,9 +20,13 @@ interface SheetProps {
 }
 
 /**
- * Modal that is a draggable bottom sheet on phones and a centered dialog on larger screens. It unfolds
- * from what was tapped to open it (a growing circle, with a glow there on the backdrop), then its
- * title, fields and buttons arrive one after another.
+ * Modal that is a draggable bottom sheet on phones and a centered dialog on larger screens. It grows
+ * out of what was tapped to open it, a gold wave spreading across it from there (and a glow on the
+ * backdrop), then its title, fields and buttons arrive one after another.
+ *
+ * Kept cheap so it stays smooth on phones: the entrance is CSS on the compositor (opacity, translate,
+ * scale — see .sheet-in/.sheet-up), motion only handles closing and dragging, and the backdrop blur
+ * is fixed (animating it re-blurs the whole screen every frame) and skipped on phones.
  */
 export function Sheet(props: SheetProps) {
   return (
@@ -42,23 +46,11 @@ function SheetLayer({ onOpenChange, title, description, children, footer, classN
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const p = tapOrigin() ?? (mobile ? { x: vw / 2, y: vh } : { x: vw / 2, y: vh / 2 });
-    const at = mobile ? `${p.x}px calc(100% - ${vh - p.y}px)` : `calc(50% + ${p.x - vw / 2}px) calc(50% + ${p.y - vh / 2}px)`;
-    return { p, at, ...revealFrom(p, at) };
+    const x = mobile ? `${p.x}px` : `calc(50% + ${p.x - vw / 2}px)`;
+    const y = mobile ? `calc(100% - ${vh - p.y}px)` : `calc(50% + ${p.y - vh / 2}px)`;
+    // the wave is a 160px glow: scaled until it reaches the farthest corner
+    return { p, x, y, inkScale: Math.ceil((coverRadius(p) * 2) / 160) };
   });
-
-  const panel = reduce
-    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
-    : mobile
-      ? {
-          initial: { y: 48, clipPath: origin.from },
-          animate: { y: 0, clipPath: origin.to },
-          exit: { y: "100%", transition: { type: "spring" as const, stiffness: 420, damping: 40 } },
-        }
-      : {
-          initial: { opacity: 0, scale: 0.88, x: "-50%", y: "-48%", clipPath: origin.from },
-          animate: { opacity: 1, scale: 1, x: "-50%", y: "-50%", clipPath: origin.to },
-          exit: { opacity: 0, scale: 0.96, x: "-50%", y: "-49%", transition: { duration: 0.16, ease: "easeIn" as const } },
-        };
 
   return (
     <Dialog.Portal forceMount>
@@ -67,11 +59,11 @@ function SheetLayer({ onOpenChange, title, description, children, footer, classN
             they must not swallow the next tap (e.g. on the bottom nav). Radix puts an inline
             pointer-events: auto on the overlay, hence the !important. */}
         <motion.div
-          className="fixed inset-0 z-50 bg-black/60 data-[state=closed]:pointer-events-none!"
-          initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-          animate={{ opacity: 1, backdropFilter: "blur(6px)" }}
-          exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
-          transition={{ duration: 0.3, ease: EASE_OUT }}
+          className="fixed inset-0 z-50 bg-black/65 data-[state=closed]:pointer-events-none! sm:bg-black/60 sm:backdrop-blur-[6px]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25, ease: EASE_OUT }}
         >
           {/* a flash of gold where it was opened from, settling into a faint glow */}
           {!reduce && (
@@ -107,20 +99,21 @@ function SheetLayer({ onOpenChange, title, description, children, footer, classN
       >
         <motion.div
           className={cn(
-            "fixed z-50 flex flex-col border border-line-strong bg-[#141418] shadow-2xl shadow-black/60 focus:outline-none data-[state=closed]:pointer-events-none",
+            "fixed z-50 flex flex-col overflow-hidden border border-line-strong bg-[#141418] shadow-2xl shadow-black/60 focus:outline-none data-[state=closed]:pointer-events-none",
             mobile
-              ? "inset-x-0 bottom-0 max-h-[94dvh] rounded-t-[28px] pb-[env(safe-area-inset-bottom)]"
-              : cn("left-1/2 top-1/2 max-h-[90dvh] w-[calc(100vw-2rem)] rounded-3xl", wide ? "max-w-3xl" : "max-w-lg"),
+              ? "sheet-up inset-x-0 bottom-0 max-h-[94dvh] rounded-t-[28px] pb-[env(safe-area-inset-bottom)]"
+              : cn("sheet-in left-1/2 top-1/2 max-h-[90dvh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-3xl", wide ? "max-w-3xl" : "max-w-lg"),
             className,
           )}
-          // the panel grows towards the tap, not from its own centre
-          style={mobile ? { transformOrigin: origin.at } : { x: "-50%", y: "-50%", transformOrigin: origin.at }}
-          {...panel}
-          transition={{
-            default: { type: "spring", stiffness: 380, damping: mobile ? 34 : 30 },
-            opacity: { duration: 0.18 },
-            clipPath: { duration: mobile ? 0.55 : 0.6, ease: EASE_OUT },
-          }}
+          // it grows out of the tap, not from its own centre
+          style={{ transformOrigin: `${origin.x} ${origin.y}` }}
+          exit={
+            reduce
+              ? { opacity: 0 }
+              : mobile
+                ? { y: "100%", transition: { type: "spring", stiffness: 420, damping: 40 } }
+                : { opacity: 0, scale: 0.96, transition: { duration: 0.16, ease: "easeIn" } }
+          }
           drag={mobile ? "y" : false}
           dragControls={drag}
           dragListener={false}
@@ -130,6 +123,7 @@ function SheetLayer({ onOpenChange, title, description, children, footer, classN
             if (info.offset.y > 120 || info.velocity.y > 600) onOpenChange(false);
           }}
         >
+          {!reduce && <span aria-hidden className="sheet-ink" style={{ left: origin.x, top: origin.y, ["--ink-scale" as string]: origin.inkScale }} />}
           {mobile && (
             <div className="flex cursor-grab touch-none justify-center pb-1 pt-3 active:cursor-grabbing" onPointerDown={(e) => drag.start(e)}>
               <div className="h-1.5 w-10 rounded-full bg-white/20" />

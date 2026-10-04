@@ -40,7 +40,7 @@ function HeroPreview() {
         <p className="text-xs text-ink-3">{t("dash.spentIn", { month: f.monthLong(currentMonth()) })}</p>
         <p className="mt-1 text-3xl font-semibold text-ink">{f.money(2184.4)}</p>
         <div className="mt-3 h-2 rounded-full bg-gold/15">
-          <motion.div className="h-full rounded-full bg-gold" initial={{ width: 0 }} animate={{ width: "62%" }} transition={{ delay: 0.8, duration: 1.2, ease: [0.16, 1, 0.3, 1] }} />
+          <motion.div className="h-full w-[62%] origin-left rounded-full bg-gold" initial={{ transform: "scaleX(0)" }} animate={{ transform: "scaleX(1)" }} transition={{ delay: 0.8, duration: 1.2, ease: [0.16, 1, 0.3, 1] }} />
         </div>
         <p className="mt-2 text-xs text-good">{t("dash.left", { amount: f.money(1315.6) })}</p>
       </motion.div>

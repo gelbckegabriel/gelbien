@@ -3,6 +3,7 @@
 import { animate, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { BudgetStatus } from "@/lib/finance";
+import { growX } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /** Counts up/down to `value` whenever it changes. */
@@ -29,12 +30,7 @@ export function Progress({ value, tone = "gold", className, delay = 0 }: { value
   const track = { gold: "bg-gold/15", good: "bg-good/15", warn: "bg-warn/15", bad: "bg-bad/15" }[tone];
   return (
     <div className={cn("h-2 w-full overflow-hidden rounded-full", track, className)}>
-      <motion.div
-        className={cn("h-full rounded-full", fill)}
-        initial={{ width: 0 }}
-        animate={{ width: `${pct * 100}%` }}
-        transition={{ type: "spring", stiffness: 120, damping: 22, delay }}
-      />
+      <motion.div className={cn("h-full rounded-full origin-left transition-[width] duration-500 ease-out", fill)} style={{ width: `${pct * 100}%` }} {...growX(delay)} />
     </div>
   );
 }
