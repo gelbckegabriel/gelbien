@@ -44,7 +44,7 @@ export function ProjectionChart({ ds, month, className }: { ds: Dataset; month: 
       table={<DataTable head={["", t("dash.proj.reserve")]} rows={data.map((d) => [f.monthLong(d.month), f.money(d.value)])} />}
     >
       <div className="mb-3 flex items-baseline gap-2">
-        <AnimatedNumber value={end} format={f.money0} className={rising ? "text-2xl font-semibold text-good" : "text-2xl font-semibold text-bad"} />
+        <AnimatedNumber smallCents value={end} format={f.amount} className={rising ? "text-2xl font-semibold text-good" : "text-2xl font-semibold text-bad"} />
         <span className="text-xs text-ink-3">
           {t("dash.proj.in12")} · {f.moneySigned(avg.saved)}/{t("cycle.monthly").toLowerCase()}
         </span>

@@ -50,7 +50,7 @@ export const TABS = {
   balances: { title: "Balances", headers: ["accountId", "date", "balance"] },
   goals: {
     title: "Goals",
-    headers: ["id", "name", "icon", "color", "target", "targetDate", "accountIds", "saved", "monthlyContribution", "annualReturn", "status", "order", "notes", "createdAt"],
+    headers: ["id", "name", "icon", "color", "target", "targetDate", "accountIds", "saved", "monthlyContribution", "annualReturn", "status", "order", "notes", "createdAt", "startMonth", "afterGoal", "pausedMonths"],
   },
 } as const;
 
@@ -243,12 +243,16 @@ export function rowToGoal(r: Row, index: number): Goal | null {
     order: r[11] === "" || r[11] === undefined || r[11] === null ? index : num(r[11]),
     notes: str(r[12]),
     createdAt: str(r[13]),
+    startMonth: /^\d{4}-(0[1-9]|1[0-2])$/.test(str(r[14])) ? str(r[14]) : "",
+    afterGoalId: str(r[15]),
+    // stored as "6|7|8", like accountIds
+    pausedMonths: [...new Set(str(r[16]).split("|").map(Number).filter((m) => Number.isInteger(m) && m >= 1 && m <= 12))].sort((a, b) => a - b),
   };
 }
 
 export const goalToRow = (g: Goal): Row => [
   g.id, g.name, g.icon, g.color, g.target, g.targetDate, g.accountIds.join("|"), g.saved, g.monthlyContribution, g.annualReturn,
-  g.status, g.order, g.notes, g.createdAt,
+  g.status, g.order, g.notes, g.createdAt, g.startMonth, g.afterGoalId, g.pausedMonths.join("|"),
 ];
 
 export function rowsToSettings(rows: Row[], fallbackLocale: Locale): Settings {

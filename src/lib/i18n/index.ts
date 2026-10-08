@@ -74,6 +74,8 @@ export function makeFormatters(locale: Locale, currency: string) {
   const weekdayShort = new Intl.DateTimeFormat(intl, { weekday: "short" });
   const rel = new Intl.RelativeTimeFormat(intl, { numeric: "auto" });
 
+  const amount = (n: number) => (Math.round(n * 100) % 100 === 0 ? money0 : money2).format(n);
+
   const toDate = (iso: string) => {
     const [y, m, d] = iso.split("-").map(Number);
     return new Date(y, (m || 1) - 1, d || 1);
@@ -86,12 +88,12 @@ export function makeFormatters(locale: Locale, currency: string) {
     currencySymbol: money0.formatToParts(0).find((p) => p.type === "currency")?.value ?? "$",
     /** $1,234.56 */
     money: (n: number) => money2.format(n),
-    /** $1,235 */
-    money0: (n: number) => money0.format(n),
+    /** $4.50, $1,200 — to the cent, without the ".00" on whole amounts. Money is never rounded for display. */
+    amount,
     /** +$12.00 / −$12.00 */
     moneySigned: (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "") + money2.format(Math.abs(n)),
-    /** $1.2K for axes */
-    moneyCompact: (n: number) => (Math.abs(n) < 1000 ? money0.format(n) : compact.format(n)),
+    /** $245.60, $1.2K — exact under a thousand, abbreviated (visibly, with K/M) above: axes and tight cells */
+    moneyCompact: (n: number) => (Math.abs(n) < 1000 ? amount(n) : compact.format(n)),
     pct: (x: number) => pctFmt.format(Number.isFinite(x) ? x : 0),
     pct1: (x: number) => pct1Fmt.format(Number.isFinite(x) ? x : 0),
     num: (n: number) => num.format(n),

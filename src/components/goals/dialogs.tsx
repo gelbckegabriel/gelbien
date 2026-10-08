@@ -15,6 +15,7 @@ import { Button } from "../ui/button";
 import { Field, Input, MoneyInput, MonthField, Segmented, Select, Switch, Textarea } from "../ui/form";
 import { ColorPicker } from "../ui/color-picker";
 import { Sheet } from "../ui/sheet";
+import { ScheduleFields, scheduleDraft, scheduleValue } from "./schedule-fields";
 
 const str = (n: number) => (n ? String(round2(n)) : "");
 
@@ -37,6 +38,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
   const [monthly, setMonthly] = useState(str(goal?.monthlyContribution ?? 0));
   const [annualReturn, setAnnualReturn] = useState(String(goal?.annualReturn ?? 0));
   const [status, setStatus] = useState<GoalStatus>(goal?.status ?? "active");
+  const [schedule, setSchedule] = useState(() => scheduleDraft(goal));
   const [notes, setNotes] = useState(goal?.notes ?? "");
 
   const eligible = ds.accounts.filter((a) => !isDebt(a.type) && (!a.archived || accountIds.includes(a.id)));
@@ -66,6 +68,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
       order: goal?.order ?? ds.goals.length,
       notes: notes.trim(),
       createdAt: goal?.createdAt || new Date().toISOString(),
+      ...scheduleValue(schedule),
     };
     if (!(await run(() => mutate.save({ op: "upsertGoal", goal: next })))) return;
     toast.success(t("goals.saved"));
@@ -210,10 +213,10 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
             <p className="mt-1.5 space-x-2 text-xs text-ink-3">
               {growth !== null && (
                 <button type="button" className="text-gold hover:underline" onClick={() => setMonthly(str(Math.max(0, Math.round(growth))))}>
-                  {t("goals.f.growthHint", { amount: f.money0(growth) })}
+                  {t("goals.f.growthHint", { amount: f.amount(growth) })}
                 </button>
               )}
-              {avgSaved > 0 && <span>{t("goals.f.avgHint", { amount: f.money0(avgSaved) })}</span>}
+              {avgSaved > 0 && <span>{t("goals.f.avgHint", { amount: f.amount(avgSaved) })}</span>}
             </p>
           </Field>
           <Field label={t("goals.f.return")}>
@@ -245,6 +248,8 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
           </Field>
         </div>
 
+        <ScheduleFields ds={ds} goalId={goal?.id ?? null} value={schedule} onChange={setSchedule} />
+
         <Field label={t("goals.f.notes")}>
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} className="min-h-16" />
         </Field>
@@ -267,7 +272,7 @@ export function AddMoneyDialog({ open, goal, onClose }: { open: boolean; goal: G
   const save = async () => {
     if (!value || saving) return;
     if (!(await run(() => mutate.save({ op: "upsertGoal", goal: { ...goal, saved: round2(goal.saved + value) } })))) return;
-    toast.success(`${goal.name}: ${f.money0(goal.saved + value)}`);
+    toast.success(`${goal.name}: ${f.amount(goal.saved + value)}`);
     onClose();
   };
   return (
@@ -289,7 +294,7 @@ export function AddMoneyDialog({ open, goal, onClose }: { open: boolean; goal: G
     >
       <MoneyInput value={amount} onChange={setAmount} placeholder="0.00" data-autofocus className="h-14 text-2xl font-semibold" />
       <p className="mt-2 text-sm text-ink-3">
-        {f.money0(goal.saved)} → <span className="text-ink">{f.money0(goal.saved + value)}</span> {t("goals.of", { target: f.money0(goal.target) })}
+        {f.amount(goal.saved)} → <span className="text-ink">{f.amount(goal.saved + value)}</span> {t("goals.of", { target: f.amount(goal.target) })}
       </p>
     </Sheet>
   );
@@ -439,7 +444,7 @@ export function CheckInDialog({ ds, open, onClose }: { ds: Dataset; open: boolea
   const save = async () => {
     if (!draft.length || !isValidISODate(date) || saving) return;
     if (!(await run(() => mutate.save({ op: "saveBalances", balances: draft })))) return;
-    toast.success(t("ci.saved"), { description: `${t("nw.total")}: ${f.money0(after)}` });
+    toast.success(t("ci.saved"), { description: `${t("nw.total")}: ${f.amount(after)}` });
     onClose();
   };
 
@@ -454,10 +459,10 @@ export function CheckInDialog({ ds, open, onClose }: { ds: Dataset; open: boolea
         <div className="flex flex-wrap items-center gap-3">
           <div className="text-sm">
             <span className="text-ink-3">{t("ci.preview")}: </span>
-            <span className={cn("tabular font-semibold", after < 0 ? "text-bad" : "text-ink")}>{f.money0(after)}</span>{" "}
+            <span className={cn("tabular font-semibold", after < 0 ? "text-bad" : "text-ink")}>{f.amount(after)}</span>{" "}
             <span className={cn("tabular text-xs", after >= before ? "text-good" : "text-bad")}>
               ({after >= before ? "+" : "−"}
-              {f.money0(Math.abs(after - before))})
+              {f.amount(Math.abs(after - before))})
             </span>
           </div>
           <Button variant="ghost" className="ml-auto" onClick={onClose} disabled={saving}>
@@ -483,7 +488,7 @@ export function CheckInDialog({ ds, open, onClose }: { ds: Dataset; open: boolea
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-ink">{a.name}</p>
                 <p className="truncate text-[11px] text-ink-3">
-                  {prev ? t("ci.lastValue", { amount: f.money0(signedBalance(a, prev.balance)), date: f.dateShort(prev.date) }) : a.institution}
+                  {prev ? t("ci.lastValue", { amount: f.amount(signedBalance(a, prev.balance)), date: f.dateShort(prev.date) }) : a.institution}
                 </p>
               </div>
               <div className="w-32 shrink-0">

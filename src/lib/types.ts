@@ -156,6 +156,12 @@ export interface Goal {
   order: number;
   notes: string;
   createdAt: string;
+  /** First month with a contribution (YYYY-MM); "" = from now. Not used while `afterGoalId` is set. */
+  startMonth: string;
+  /** Contributions start the month after this other goal is reached; "" = they don't wait for one */
+  afterGoalId: string;
+  /** Months of the year (1–12) with no contribution, every year, e.g. [12] to skip December */
+  pausedMonths: number[];
 }
 
 export interface DatasetMeta {

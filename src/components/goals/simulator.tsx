@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { useMutate, useSaving } from "@/lib/data/hooks";
-import { avgSuperfluous, goalCurrent, goalPlanFor, MAX_MONTHS, planGoal, projectBalance } from "@/lib/goals";
+import { avgSuperfluous, goalCurrent, goalPlanFor, goalSchedule, MAX_MONTHS, planGoal, projectBalance } from "@/lib/goals";
 import { useI18n } from "@/lib/i18n";
 import type { Dataset, Goal } from "@/lib/types";
 import { addMonths, cn, currentMonth, round2 } from "@/lib/utils";
@@ -17,6 +17,7 @@ import { AnimatedNumber } from "../ui/misc";
 import { Sheet } from "../ui/sheet";
 import { Slider } from "../ui/slider";
 import { durationText } from "./goal-card";
+import { ScheduleFields, scheduleDraft, scheduleValue } from "./schedule-fields";
 
 const niceMax = (v: number, step: number) => Math.max(step, Math.ceil(v / step) * step);
 
@@ -40,6 +41,7 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
     target: goal.target,
     targetMonth: goal.targetDate ? goal.targetDate.slice(0, 7) : "",
     cut: 0,
+    schedule: scheduleDraft(goal),
   };
   const [s, setS] = useState(initial);
   const set = (patch: Partial<typeof initial>) => setS((cur) => ({ ...cur, ...patch }));
@@ -51,6 +53,7 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
     monthly: s.monthly + extra,
     annualReturn: s.annualReturn,
     targetDate: s.targetMonth ? `${s.targetMonth}-01` : "",
+    schedule: goalSchedule(ds, { id: goal.id, ...scheduleValue(s.schedule) }),
   });
 
   // Chart horizon: long enough to show both plans (and the deadline) reaching the target.
@@ -59,9 +62,11 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
     MAX_MONTHS,
     Math.max(12, Math.max(base.months ?? 0, scenario.months ?? 0, scenario.monthsToDeadline ?? 0, base.months === null && scenario.months === null ? 120 : 0) + 3),
   );
-  const planPath = projectBalance(base.current, base.monthly, base.annualReturn, horizon);
-  const scenPath = projectBalance(scenario.current, scenario.monthly, scenario.annualReturn, horizon);
+  const planPath = projectBalance(base.current, base.monthly, base.annualReturn, horizon, base.schedule, now);
+  const scenPath = projectBalance(scenario.current, scenario.monthly, scenario.annualReturn, horizon, scenario.schedule, now);
   const data = planPath.map((p, i) => ({ month: addMonths(now, i), plan: p, scenario: scenPath[i] }));
+  // the scenario's first contribution, when it's later than next month's
+  const startsAt = scenario.schedule?.start && scenario.schedule.start > addMonths(now, 1) ? scenario.schedule.start : null;
 
   const diff = base.months !== null && scenario.months !== null ? base.months - scenario.months : null;
   const monthlyMax = niceMax(Math.max(goal.monthlyContribution * 3, (scenario.requiredMonthly ?? 0) * 1.5, 1000), 100);
@@ -76,6 +81,7 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
       annualReturn: s.annualReturn,
       target: round2(s.target),
       targetDate: s.targetMonth ? `${s.targetMonth}-01` : "",
+      ...scheduleValue(s.schedule),
       // a deposit can only be recorded on goals tracked by hand; linked accounts show it at the next check-in
       saved: goal.accountIds.length ? goal.saved : round2(goal.saved + s.boost),
     };
@@ -122,8 +128,9 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
             <p className="mt-1 text-lg font-semibold text-ink-3">—</p>
           ) : (
             <AnimatedNumber
+              smallCents
               value={scenario.requiredMonthly}
-              format={(n) => t("goals.perMonth", { amount: f.money0(n) })}
+              format={(n) => t("goals.perMonth", { amount: f.amount(n) })}
               className={cn("mt-1 block text-lg font-semibold", scenario.onTrack ? "text-good" : "text-warn")}
             />
           )}
@@ -165,6 +172,9 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
               {s.targetMonth && s.targetMonth <= data[data.length - 1].month && (
                 <ReferenceLine x={s.targetMonth} stroke={INK.muted} label={{ value: tick(s.targetMonth), position: "insideTopRight", fill: INK.muted, fontSize: 11 }} />
               )}
+              {startsAt && startsAt <= data[data.length - 1].month && (
+                <ReferenceLine x={startsAt} stroke={GOLD} strokeOpacity={0.5} strokeDasharray="3 3" label={{ value: t("sim.starts"), position: "insideTopLeft", fill: GOLD, fontSize: 11 }} />
+              )}
               <Tooltip
                 cursor={{ stroke: "#ffffff30" }}
                 content={({ active, payload, label }) =>
@@ -172,8 +182,8 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
                     <TooltipBox
                       title={f.monthLong(String(label))}
                       rows={[
-                        { label: t("sim.scenario"), value: f.money0(Number(payload.find((p) => p.dataKey === "scenario")?.value ?? 0)), color: GOLD },
-                        { label: t("sim.plan"), value: f.money0(Number(payload.find((p) => p.dataKey === "plan")?.value ?? 0)), color: INK.secondary },
+                        { label: t("sim.scenario"), value: f.amount(Number(payload.find((p) => p.dataKey === "scenario")?.value ?? 0)), color: GOLD },
+                        { label: t("sim.plan"), value: f.amount(Number(payload.find((p) => p.dataKey === "plan")?.value ?? 0)), color: INK.secondary },
                       ]}
                     />
                   ) : null
@@ -236,11 +246,14 @@ function SimulatorInner({ ds, goal, open, onClose }: { ds: Dataset; goal: Goal; 
           onChange={(v) => set({ cut: v })}
           suffix="%"
           inputMax={100}
-          hint={superfluous > 0 ? t("sim.cutHint", { amount: f.money0(extra), avg: f.money0(superfluous) }) : undefined}
+          hint={superfluous > 0 ? t("sim.cutHint", { amount: f.amount(extra), avg: f.amount(superfluous) }) : undefined}
         />
         <Field label={t("sim.date")} hint={t("goals.f.optional")}>
           <MonthField value={s.targetMonth} min={addMonths(now, 1)} onChange={(targetMonth) => set({ targetMonth })} />
         </Field>
+        <div className="border-t border-line/70 pt-5 md:col-span-2">
+          <ScheduleFields ds={ds} goalId={goal.id} value={s.schedule} onChange={(schedule) => set({ schedule })} />
+        </div>
       </div>
     </Sheet>
   );

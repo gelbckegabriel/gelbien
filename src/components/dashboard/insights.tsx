@@ -15,12 +15,12 @@ import { Card, CardHeader } from "../ui/card";
 import { Skeleton } from "../ui/misc";
 
 const MONEY_VARS = new Set(["spent", "budget", "amount", "avg", "goal", "monthly"]);
-const PCT_VARS = new Set(["pct", "spentPct", "elapsedPct", "rate"]);
+const PCT_VARS = new Set(["pct", "spentPct", "expectedPct", "rate"]);
 
 function formatInsight(i: LocalInsight, t: TFn, f: Formatters) {
   const vars: Record<string, string | number> = {};
   for (const [k, v] of Object.entries(i.vars)) {
-    if (typeof v === "number" && MONEY_VARS.has(k)) vars[k] = f.money0(v);
+    if (typeof v === "number" && MONEY_VARS.has(k)) vars[k] = f.amount(v);
     else if (typeof v === "number" && PCT_VARS.has(k)) vars[k] = f.pct(v);
     else if (k === "date" && typeof v === "string") vars[k] = f.dateShort(v);
     else vars[k] = v;

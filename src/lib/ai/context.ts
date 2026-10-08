@@ -87,11 +87,15 @@ export function buildFinanceContext(ds: Dataset, anchorMonth = currentMonth()): 
   }
 
   if (ds.goals.length) {
-    lines.push("## Savings goals (name, target, saved now, monthly contribution, expected yearly return %, deadline, projected month reached at this pace, status)");
+    lines.push(
+      "## Savings goals (name, target, saved now, monthly contribution, expected yearly return %, deadline, contributions start, months of the year (1-12) skipped every year, projected month reached at this pace, status)",
+    );
     for (const g of ds.goals) {
       const p = goalPlanFor(ds, g);
+      const after = g.afterGoalId ? ds.goals.find((o) => o.id === g.afterGoalId) : undefined;
+      const starts = after ? `after "${after.name}" is reached${p.schedule?.start ? ` (${p.schedule.start})` : ""}` : g.startMonth || "now";
       lines.push(
-        [g.name, g.target.toFixed(2), p.current.toFixed(2), g.monthlyContribution.toFixed(2), g.annualReturn, g.targetDate || "none", p.achieved ? "reached" : p.eta ?? "never", g.status]
+        [g.name, g.target.toFixed(2), p.current.toFixed(2), g.monthlyContribution.toFixed(2), g.annualReturn, g.targetDate || "none", starts, g.pausedMonths.join(" ") || "none", p.achieved ? "reached" : p.eta ?? "never", g.status]
           .map(csv)
           .join(", "),
       );

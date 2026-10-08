@@ -86,7 +86,7 @@ export function FlowSankey({ summary, className }: { summary: MonthSummary; clas
                     >
                       <tspan>{node.name}</tspan>
                       <tspan dx={5} fill={INK.primary} fontWeight={600}>
-                        {f.moneyCompact(node.value)}
+                        {f.amount(node.value)}
                       </tspan>
                     </text>
                   )}

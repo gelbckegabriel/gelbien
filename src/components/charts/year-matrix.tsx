@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import type { Dataset } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
+import { MoneyText } from "../ui/misc";
 import { ChartCard, DataTable, rampColor, rampInk } from "./kit";
 
 // Phones: the categories stay pinned on the left (on the card's own colour) while the months swipe under them.
@@ -49,7 +50,7 @@ export function YearMatrix({ ds, month }: { ds: Dataset; month: string }) {
       table={
         <DataTable
           head={["", ...m.months.map((mm) => f.monthShort(mm)), t("common.total")]}
-          rows={[...m.rows.map((r) => [r.name, ...r.values.map((v) => (v ? f.money0(v) : "—")), f.money0(r.total)]), [t("common.total"), ...m.monthTotals.map((v) => f.money0(v)), f.money0(m.yearTotal)]]}
+          rows={[...m.rows.map((r) => [r.name, ...r.values.map((v) => (v ? f.amount(v) : "—")), f.amount(r.total)]), [t("common.total"), ...m.monthTotals.map((v) => f.amount(v)), f.amount(m.yearTotal)]]}
         />
       }
     >
@@ -94,21 +95,21 @@ export function YearMatrix({ ds, month }: { ds: Dataset; month: string }) {
                           className={cn("tabular grid h-9 w-12 place-items-center rounded-md sm:h-8 sm:w-auto", m.months[i] === month && "ring-1 ring-gold/60")}
                           style={{ background: rampColor(v, m.max), color: rampInk(v, m.max) }}
                         >
-                          {v ? f.moneyCompact(v) : ""}
+                          {v ? <MoneyText text={f.moneyCompact(v)} /> : ""}
                         </motion.div>
                       </td>
                     ))}
-                    <td className="tabular pl-2 text-right text-[12px] font-medium text-ink">{f.money0(r.total)}</td>
+                    <td className="tabular pl-2 text-right text-[12px] font-medium text-ink">{f.amount(r.total)}</td>
                   </tr>
                 ))}
                 <tr>
                   <td className={cn("pr-2 pt-2 text-[12px] font-semibold text-ink", PIN, !edge.start && PIN_SHADOW)}>{t("common.total")}</td>
                   {m.monthTotals.map((v, i) => (
                     <td key={i} className="tabular pt-2 text-center text-[11px] font-semibold text-ink-2">
-                      {v ? f.moneyCompact(v) : "—"}
+                      {v ? <MoneyText text={f.moneyCompact(v)} /> : "—"}
                     </td>
                   ))}
-                  <td className="tabular pl-2 pt-2 text-right text-[12px] font-semibold text-gold-bright">{f.money0(m.yearTotal)}</td>
+                  <td className="tabular pl-2 pt-2 text-right text-[12px] font-semibold text-gold-bright">{f.amount(m.yearTotal)}</td>
                 </tr>
               </tbody>
             </table>

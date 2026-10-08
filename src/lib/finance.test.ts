@@ -8,6 +8,7 @@ import {
   foldCategories,
   localInsights,
   monthlyCost,
+  expectedPace,
   paceSeries,
   recentAverages,
   runway,
@@ -144,6 +145,45 @@ describe("summarizeMonth", () => {
     expect(pace[14].actual).toBe(1810);
     expect(pace[15].actual).toBeNull();
     expect(pace[29].pace).toBe(2200);
+    // rent lands on the 1st: the planned line starts with it, then the other 550 spread over the month
+    expect(pace[0].pace).toBeCloseTo(1650 + 550 / 30, 2);
+    expect(pace[14].pace).toBeCloseTo(1650 + (550 / 30) * 15, 2);
+  });
+});
+
+describe("expectedPace", () => {
+  const rent = {
+    id: "rent", name: "Rent", category: "Housing", amount: 1650, cycle: "monthly" as const, billingDay: 1, payment: "Debit", status: "active" as const,
+    trialEnd: "", worthIt: "yes" as const, notes: "", nextCharge: "", kind: "bill" as const, subcategory: "", merchant: "",
+  };
+  const phone = { ...rent, id: "phone", name: "Phone", category: "Utilities", amount: 60, billingDay: 20 };
+  const budget = { Housing: 1700, Groceries: 400, Utilities: 60 };
+
+  it("puts bills still to come on their due day and spreads the rest of the budget evenly", () => {
+    const ds = dataset([], { subscriptions: [rent, phone] });
+    const pace = expectedPace(ds, "2026-09", budget, "2026-09-01");
+    expect(pace).toHaveLength(30);
+    expect(pace[0]).toBeCloseTo(1650 + 450 / 30, 2);
+    expect(pace[19] - pace[18]).toBeCloseTo(60 + 450 / 30, 2);
+    expect(pace[29]).toBe(2160);
+  });
+
+  it("counts a logged bill where and as much as it went out, and a fixed cost typed by hand", () => {
+    const paidLate = tx({ date: "2026-09-04", amount: 1700, category: "Housing", billId: "rent", type: "fixed" });
+    const gym = tx({ date: "2026-09-10", amount: 45, category: "Health", type: "fixed" });
+    const pace = expectedPace(dataset([paidLate, gym], { subscriptions: [rent] }), "2026-09", budget, "2026-09-15");
+    const even = (400 + 60) / 30; // Housing's limit is used up by the rent itself
+    expect(pace[2]).toBeCloseTo(even * 3, 2);
+    expect(pace[3]).toBeCloseTo(1700 + even * 4, 2);
+    // a fixed cost with no limit still counts in full
+    expect(pace[29]).toBeCloseTo(1700 + 45 + 460, 2);
+  });
+
+  it("leaves out a bill paid the month before, and charges nobody logged once the month is over", () => {
+    const early = tx({ date: "2026-08-29", amount: 1650, category: "Housing", billId: "rent", type: "fixed" });
+    expect(expectedPace(dataset([early], { subscriptions: [rent] }), "2026-09", budget, "2026-09-15")[0]).toBeCloseTo(2160 / 30, 2);
+    expect(expectedPace(dataset([], { subscriptions: [rent] }), "2026-08", budget, "2026-09-15")[0]).toBeCloseTo(2160 / 31, 2);
+    expect(expectedPace(dataset([]), "2026-09", {}, "2026-09-15")).toEqual([]);
   });
 });
 

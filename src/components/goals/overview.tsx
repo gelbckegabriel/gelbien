@@ -22,11 +22,11 @@ import { AnimatedNumber, Delta, EmptyState } from "../ui/misc";
 /** Goal contributions next to planned savings (without a budget: what's actually saved), with the actual average as a check. */
 export function PlanCard({ ds }: { ds: Dataset }) {
   const { t, f } = useI18n();
-  const { active, allocated, planned, actual, basis, free } = savingsPlan(ds);
+  const { active, waiting, allocated, planned, actual, basis, free } = savingsPlan(ds);
   const marker = basis !== null && basis > 0 ? basis : 0;
   const scale = Math.max(marker, allocated, 1);
   const range = actual ? (actual.from === actual.to ? f.monthShort(actual.from) : `${f.monthShort(actual.from)} – ${f.monthShort(actual.to)}`) : "";
-  const perMonth = (n: number) => t("budget.subs.perMonth", { amount: f.money0(n) });
+  const perMonth = (n: number) => t("budget.subs.perMonth", { amount: f.amount(n) });
   // saving less than planned: spending has run over the budget
   const shortfall = planned && actual ? planned.saved - actual.saved : 0;
 
@@ -36,22 +36,22 @@ export function PlanCard({ ds }: { ds: Dataset }) {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div>
           <p className="text-xs text-ink-3">{t("goals.plan.allocatedLabel")}</p>
-          <AnimatedNumber value={allocated} format={f.money0} className="mt-1 block text-xl font-semibold text-ink" />
+          <AnimatedNumber smallCents value={allocated} format={f.amount} className="mt-1 block text-xl font-semibold text-ink" />
         </div>
         <div>
           <p className="text-xs text-ink-3">{planned ? t("goals.plan.plannedLabel") : t("goals.plan.savedLabel")}</p>
           {basis === null ? (
             <p className="mt-1 text-xl font-semibold text-ink-3">—</p>
           ) : (
-            <AnimatedNumber value={basis} format={f.money0} className={cn("mt-1 block text-xl font-semibold", basis >= 0 ? "text-good" : "text-bad")} />
+            <AnimatedNumber smallCents value={basis} format={f.amount} className={cn("mt-1 block text-xl font-semibold", basis >= 0 ? "text-good" : "text-bad")} />
           )}
         </div>
         {free !== null && (
           <p className={cn("col-span-2 flex items-center gap-1.5 self-end text-sm font-medium sm:col-span-1", free >= 0 ? "text-gold-bright" : "text-bad")}>
             {free < 0 && <AlertTriangle className="h-4 w-4 shrink-0" />}
             {free >= 0
-              ? t("goals.plan.free", { amount: f.money0(free) })
-              : t(planned ? "goals.plan.overPlan" : "goals.plan.over", { amount: f.money0(-free) })}
+              ? t("goals.plan.free", { amount: f.amount(free) })
+              : t(planned ? "goals.plan.overPlan" : "goals.plan.over", { amount: f.amount(-free) })}
           </p>
         )}
       </div>
@@ -62,7 +62,7 @@ export function PlanCard({ ds }: { ds: Dataset }) {
             key={g.id}
             className="h-full origin-left transition-[width] duration-500 ease-out first:rounded-l-full"
             style={{ background: g.color, width: `${(g.monthlyContribution / scale) * 100}%` }}
-            title={`${g.name}: ${f.money0(g.monthlyContribution)}`}
+            title={`${g.name}: ${f.amount(g.monthlyContribution)}`}
             {...growX(i * 0.05, 90, 20)}
           />
         ))}
@@ -73,15 +73,33 @@ export function PlanCard({ ds }: { ds: Dataset }) {
         {active.map((g) => (
           <li key={g.id} className="inline-flex items-center gap-1.5 text-xs text-ink-2">
             <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: g.color }} />
-            {g.name} <span className="tabular text-ink-3">{f.money0(g.monthlyContribution)}</span>
+            {g.name} <span className="tabular text-ink-3">{f.amount(g.monthlyContribution)}</span>
           </li>
         ))}
         {marker > 0 && (
           <li className="inline-flex items-center gap-1.5 text-xs text-ink-2">
-            <span className="h-3 w-0.5 bg-ink" /> {t(planned ? "goals.plan.plannedMarker" : "goals.plan.avgSaved", { amount: f.money0(marker) })}
+            <span className="h-3 w-0.5 bg-ink" /> {t(planned ? "goals.plan.plannedMarker" : "goals.plan.avgSaved", { amount: f.amount(marker) })}
           </li>
         )}
       </ul>
+      {/* goals that start later, wait for another one, or skip this month */}
+      {waiting.length > 0 && (
+        <p className="mt-2 text-xs text-ink-3">
+          {t("goals.plan.waiting")}{" "}
+          {waiting.map(({ goal: g, from, skipping }, i) => (
+            <span key={g.id}>
+              {i > 0 && ", "}
+              <span className="text-ink-2">{g.name}</span> (
+              {from
+                ? t("goals.plan.from", { date: f.monthLong(from) })
+                : skipping
+                  ? t("goals.plan.skipping")
+                  : t("goals.plan.waitsFor", { goal: ds.goals.find((o) => o.id === g.afterGoalId)?.name ?? "" })}
+              )
+            </span>
+          ))}
+        </p>
+      )}
 
       {/* where the numbers come from, and how the plan holds up against what really happened */}
       <div className="mt-4 space-y-1 border-t border-line/70 pt-3 text-xs text-ink-3">
@@ -94,12 +112,12 @@ export function PlanCard({ ds }: { ds: Dataset }) {
           </p>
         ) : (
           <>
-            {planned && <p>{t("goals.plan.planBasis", { income: f.money0(planned.income), spending: f.money0(planned.spending) })}</p>}
+            {planned && <p>{t("goals.plan.planBasis", { income: f.amount(planned.income), spending: f.amount(planned.spending) })}</p>}
             {actual && (
               <p>
                 {planned ? t("goals.plan.actualLabel") : null}{" "}
                 {planned && <span className={cn("tabular font-medium", actual.saved >= 0 ? "text-good" : "text-bad")}>{perMonth(actual.saved)}</span>}{" "}
-                {t(planned ? "goals.plan.actualBasis" : "goals.plan.basis", { range, income: f.money0(actual.income), spent: f.money0(actual.spent) })}
+                {t(planned ? "goals.plan.actualBasis" : "goals.plan.basis", { range, income: f.amount(actual.income), spent: f.amount(actual.spent) })}
                 {shortfall > 0 && <span className="text-warn"> {t("goals.plan.belowPlan", { amount: perMonth(shortfall) })}</span>}
                 {actual.missingIncome && <span className="text-warn"> {t("goals.plan.someMissing")}</span>}
               </p>
@@ -126,16 +144,16 @@ export function NetWorthCard({ ds, className }: { ds: Dataset; className?: strin
         series.length ? (
           <DataTable
             head={["", t("nw.assets"), t("nw.debts"), t("nw.total")]}
-            rows={series.map((p) => [f.monthLong(p.month), f.money0(p.assets), f.money0(p.debts), f.money0(p.total)])}
+            rows={series.map((p) => [f.monthLong(p.month), f.amount(p.assets), f.amount(p.debts), f.amount(p.total)])}
           />
         ) : undefined
       }
     >
       <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <AnimatedNumber value={now.total} format={f.money0} className={cn("text-3xl font-semibold tracking-tight", now.total < 0 ? "text-bad" : "text-ink")} />
+        <AnimatedNumber smallCents value={now.total} format={f.amount} className={cn("text-3xl font-semibold tracking-tight", now.total < 0 ? "text-bad" : "text-ink")} />
         {prev !== null && prev !== 0 && prev !== now.total && <Delta value={(now.total - prev) / Math.abs(prev)} goodWhenUp format={f.pct1} />}
         <span className="text-xs text-ink-3">
-          {t("nw.assets")} {f.money0(now.assets)} · {t("nw.debts")} {f.money0(now.debts)}
+          {t("nw.assets")} {f.amount(now.assets)} · {t("nw.debts")} {f.amount(now.debts)}
         </span>
       </div>
       {series.length === 0 ? (
@@ -163,9 +181,9 @@ export function NetWorthCard({ ds, className }: { ds: Dataset; className?: strin
                     <TooltipBox
                       title={f.monthLong(String(label))}
                       rows={[
-                        { label: t("nw.total"), value: f.money0(p.total), color: GOLD },
-                        { label: t("nw.assets"), value: f.money0(p.assets) },
-                        { label: t("nw.debts"), value: f.money0(p.debts) },
+                        { label: t("nw.total"), value: f.amount(p.total), color: GOLD },
+                        { label: t("nw.assets"), value: f.amount(p.assets) },
+                        { label: t("nw.debts"), value: f.amount(p.debts) },
                       ]}
                     />
                   );
@@ -249,7 +267,7 @@ export function AccountsCard({
                     </span>
                   </span>
                   <span className={cn("tabular shrink-0 text-[13px] font-medium", value !== null && value < 0 ? "text-bad" : "text-ink")}>
-                    {value === null ? "—" : f.money0(value)}
+                    {value === null ? "—" : f.amount(value)}
                   </span>
                 </button>
               </li>

@@ -3,6 +3,8 @@
  *
  * Money growth model: an amount `current` today, `monthly` added at the end of
  * every month, compounding monthly at the rate equivalent to `annualReturn` %.
+ * A schedule can hold the contributions back (a later start, skipped months of the
+ * year); the money already there keeps growing through those months.
  */
 import { recentAverages, summarizeMonth } from "./finance";
 import { isDebt, isLongTerm, type Account, type BalanceSnapshot, type Dataset, type Goal } from "./types";
@@ -15,10 +17,42 @@ export function monthlyRate(annualReturnPct: number): number {
   return Math.pow(1 + annualReturnPct / 100, 1 / 12) - 1;
 }
 
+// ---------------------------------------------------------------------------
+// Contribution schedules
+// ---------------------------------------------------------------------------
+
+/**
+ * Which months a goal's contribution goes in: from `start` (YYYY-MM; null = never, e.g. waiting for a
+ * goal that won't be reached), except the `paused` months of the year (1–12). The k-th contribution
+ * from now is the one for month `now + k`.
+ */
+export interface Schedule {
+  start: string | null;
+  paused: readonly number[];
+}
+
+/** Whether the contribution for `month` (YYYY-MM) goes in */
+export function contributes(s: Schedule, month: string): boolean {
+  return s.start !== null && month >= s.start && !s.paused.includes(Number(month.slice(5, 7)));
+}
+
+/** Every contribution from the next one on goes in: the closed-form maths applies. */
+function everyMonth(s: Schedule | undefined, nowMonth: string): boolean {
+  return !s || (s.start !== null && s.start <= addMonths(nowMonth, 1) && s.paused.length === 0);
+}
+
 /** Whole months until `current` (plus contributions and growth) reaches `target`; null if never. */
-export function monthsToTarget(current: number, target: number, monthly: number, annualReturnPct: number): number | null {
+export function monthsToTarget(current: number, target: number, monthly: number, annualReturnPct: number, schedule?: Schedule, nowMonth = currentMonth()): number | null {
   if (current >= target) return 0;
   const i = monthlyRate(annualReturnPct);
+  if (!everyMonth(schedule, nowMonth)) {
+    let v = current;
+    for (let k = 1; k <= MAX_MONTHS; k++) {
+      v = v * (1 + i) + (contributes(schedule!, addMonths(nowMonth, k)) ? monthly : 0);
+      if (v >= target - 1e-9) return k;
+    }
+    return null;
+  }
   let n: number;
   if (Math.abs(i) < 1e-12) {
     if (monthly <= 0) return null;
@@ -35,23 +69,32 @@ export function monthsToTarget(current: number, target: number, monthly: number,
   return months > MAX_MONTHS ? null : months;
 }
 
-/** Monthly amount needed to go from `current` to `target` in `months` months. */
-export function requiredMonthly(current: number, target: number, months: number, annualReturnPct: number): number {
+/**
+ * Monthly amount needed to go from `current` to `target` in `months` months — Infinity when the
+ * schedule leaves no contribution before then.
+ */
+export function requiredMonthly(current: number, target: number, months: number, annualReturnPct: number, schedule?: Schedule, nowMonth = currentMonth()): number {
   if (current >= target) return 0;
   if (months <= 0) return target - current;
   const i = monthlyRate(annualReturnPct);
+  if (!everyMonth(schedule, nowMonth)) {
+    // each contribution that goes in grows until the deadline: their weights add up
+    let weight = 0;
+    for (let k = 1; k <= months; k++) if (contributes(schedule!, addMonths(nowMonth, k))) weight += Math.pow(1 + i, months - k);
+    return weight > 0 ? Math.max(0, (target - current * Math.pow(1 + i, months)) / weight) : Infinity;
+  }
   if (Math.abs(i) < 1e-12) return (target - current) / months;
   const g = Math.pow(1 + i, months);
   return Math.max(0, ((target - current * g) * i) / (g - 1));
 }
 
 /** Balance at the end of each month, index 0 = today. */
-export function projectBalance(current: number, monthly: number, annualReturnPct: number, months: number): number[] {
+export function projectBalance(current: number, monthly: number, annualReturnPct: number, months: number, schedule?: Schedule, nowMonth = currentMonth()): number[] {
   const i = monthlyRate(annualReturnPct);
   const out = [round2(current)];
   let v = current;
   for (let m = 1; m <= months; m++) {
-    v = v * (1 + i) + monthly;
+    v = v * (1 + i) + (!schedule || contributes(schedule, addMonths(nowMonth, m)) ? monthly : 0);
     out.push(round2(v));
   }
   return out;
@@ -201,6 +244,8 @@ export interface PlanInput {
   annualReturn: number;
   /** YYYY-MM-DD or "" */
   targetDate: string;
+  /** When the contributions go in; every month from now when absent */
+  schedule?: Schedule;
 }
 
 export interface GoalPlan extends PlanInput {
@@ -220,13 +265,15 @@ export interface GoalPlan extends PlanInput {
 }
 
 export function planGoal(input: PlanInput, today = todayISO()): GoalPlan {
-  const { current, target, monthly, annualReturn, targetDate } = input;
+  const { current, target, monthly, annualReturn, targetDate, schedule } = input;
   const achieved = current >= target && target > 0;
-  const months = monthsToTarget(current, target, monthly, annualReturn);
   const nowMonth = monthOf(today);
+  const months = monthsToTarget(current, target, monthly, annualReturn, schedule, nowMonth);
   const eta = months === null ? null : addMonths(nowMonth, months);
   const monthsToDeadline = targetDate ? Math.max(0, monthsBetween(nowMonth, monthOf(targetDate))) : null;
-  const required = monthsToDeadline === null ? null : round2(requiredMonthly(current, target, monthsToDeadline, annualReturn));
+  const needed = monthsToDeadline === null ? null : requiredMonthly(current, target, monthsToDeadline, annualReturn, schedule, nowMonth);
+  // no contribution before the deadline: nothing per month would make it
+  const required = needed === null || !Number.isFinite(needed) ? null : round2(needed);
   const onTrack = targetDate ? achieved || (eta !== null && eta <= monthOf(targetDate)) : null;
   return {
     ...input,
@@ -241,11 +288,57 @@ export function planGoal(input: PlanInput, today = todayISO()): GoalPlan {
   };
 }
 
-export function goalPlanFor(ds: Pick<Dataset, "accounts" | "balances">, goal: Goal, today = todayISO()): GoalPlan {
+/**
+ * When a goal's contributions go in. Waiting for another goal: from the month after that one is
+ * reached — at once if it already is, never if it's paused or won't be reached (or if the two wait for
+ * each other). Otherwise from its start month, or now. Its paused months are skipped either way.
+ * (A goal it waits for that's been deleted no longer holds it back.)
+ */
+export function goalSchedule(
+  ds: Pick<Dataset, "accounts" | "balances" | "goals">,
+  goal: Pick<Goal, "id" | "startMonth" | "afterGoalId" | "pausedMonths">,
+  today = todayISO(), seen: ReadonlySet<string> = new Set()): Schedule {
+  const nowMonth = monthOf(today);
+  const paused = goal.pausedMonths;
+  const other = goal.afterGoalId ? ds.goals.find((g) => g.id === goal.afterGoalId && g.id !== goal.id) : undefined;
+  if (other) {
+    if (seen.has(other.id) || other.status === "paused") return { start: null, paused };
+    if (other.status === "achieved") return { start: nowMonth, paused };
+    const plan = goalPlanFor(ds, other, today, new Set([...seen, goal.id]));
+    if (plan.achieved) return { start: nowMonth, paused };
+    return { start: plan.eta ? addMonths(plan.eta, 1) : null, paused };
+  }
+  return { start: goal.startMonth > nowMonth ? goal.startMonth : nowMonth, paused };
+}
+
+export function goalPlanFor(ds: Pick<Dataset, "accounts" | "balances" | "goals">, goal: Goal, today = todayISO(), seen: ReadonlySet<string> = new Set()): GoalPlan {
   return planGoal(
-    { current: goalCurrent(ds, goal, today), target: goal.target, monthly: goal.monthlyContribution, annualReturn: goal.annualReturn, targetDate: goal.targetDate },
+    {
+      current: goalCurrent(ds, goal, today),
+      target: goal.target,
+      monthly: goal.monthlyContribution,
+      annualReturn: goal.annualReturn,
+      targetDate: goal.targetDate,
+      schedule: goalSchedule(ds, goal, today, seen),
+    },
     today,
   );
+}
+
+/** Goals waiting for `goal`, directly or through others — it can't wait for any of them in turn. */
+export function goalsWaitingFor(goals: Goal[], goalId: string): Set<string> {
+  const out = new Set<string>();
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const g of goals) {
+      if (!out.has(g.id) && (g.afterGoalId === goalId || out.has(g.afterGoalId))) {
+        out.add(g.id);
+        grew = true;
+      }
+    }
+  }
+  return out;
 }
 
 /** Average monthly spending marked "superfluous" over the previous `n` complete months. */
@@ -262,7 +355,17 @@ export function avgSuperfluous(ds: Pick<Dataset, "transactions">, today = todayI
  * budget, what was actually saved lately. The actual average comes along either way, as a check.
  */
 export function savingsPlan(ds: Dataset, month = currentMonth(), today = todayISO()) {
-  const active = ds.goals.filter((g) => g.status === "active" && !goalPlanFor(ds, g, today).achieved);
+  const open = ds.goals.filter((g) => g.status === "active" && !goalPlanFor(ds, g, today).achieved);
+  const schedules = new Map(open.map((g) => [g.id, goalSchedule(ds, g, today)]));
+  // only the goals that get their contribution this month count against this month's savings
+  const active = open.filter((g) => contributes(schedules.get(g.id)!, month));
+  /** open goals with nothing going in this month: starting later (`from`; null = not before the goal they wait for), or skipping it */
+  const waiting = open
+    .filter((g) => !contributes(schedules.get(g.id)!, month))
+    .map((g) => {
+      const { start } = schedules.get(g.id)!;
+      return { goal: g, from: start !== null && start > month ? start : null, skipping: start !== null && start <= month };
+    });
   const allocated = round2(active.reduce((a, g) => a + g.monthlyContribution, 0));
   const s = summarizeMonth(ds, month);
   const planned = s.budgetTotal > 0 && s.income.net > 0 ? { saved: round2(s.income.net - s.budgetTotal), income: s.income.net, spending: s.budgetTotal } : null;
@@ -270,5 +373,5 @@ export function savingsPlan(ds: Dataset, month = currentMonth(), today = todayIS
   // full months only: with none, recentAverages falls back on the plan, which isn't "actual"
   const actual = r.months > 0 && r.income > 0 ? r : null;
   const basis = planned?.saved ?? actual?.saved ?? null;
-  return { active, allocated, planned, actual, basis, free: basis === null ? null : round2(basis - allocated) };
+  return { active, waiting, allocated, planned, actual, basis, free: basis === null ? null : round2(basis - allocated) };
 }

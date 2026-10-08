@@ -6,7 +6,7 @@ import type { MonthSummary } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Card } from "../ui/card";
-import { AnimatedNumber, Badge, Delta } from "../ui/misc";
+import { AnimatedNumber, Badge, Delta, fitFont } from "../ui/misc";
 
 function Ring({ value, tone }: { value: number; tone: "gold" | "warn" | "bad" }) {
   const r = 52;
@@ -63,10 +63,19 @@ export function Hero({ s, prevTotal, name, bills = 0 }: { s: MonthSummary; prevT
             {name ? `, ${name.split(" ")[0]}` : ""} ·{" "}
             <span className="text-ink-2">{t("dash.spentIn", { month: f.monthLong(s.month) })}</span>
           </p>
-          <AnimatedNumber value={s.total} format={f.money} className="mt-2 block text-5xl font-semibold tracking-tight text-ink sm:text-[56px]" />
+          {/* its own size container: the amount shrinks to fit beside the ring instead of running into it */}
+          <div className="@container [--hero-size:48px] sm:[--hero-size:56px]">
+            <AnimatedNumber
+              smallCents
+              value={s.total}
+              format={f.money}
+              style={{ fontSize: fitFont(f.money(s.total), "var(--hero-size)") }}
+              className="mt-2 block whitespace-nowrap font-semibold tracking-tight text-ink"
+            />
+          </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             {s.budgetTotal > 0 ? (
-              <span className="text-ink-3">{t("dash.ofBudget", { budget: f.money0(s.budgetTotal) })}</span>
+              <span className="text-ink-3">{t("dash.ofBudget", { budget: f.amount(s.budgetTotal) })}</span>
             ) : (
               <Link href="/budget" className="text-gold underline-offset-2 hover:underline">
                 {t("dash.setBudget")} →
@@ -83,7 +92,7 @@ export function Hero({ s, prevTotal, name, bills = 0 }: { s: MonthSummary; prevT
               <Badge tone={left >= 0 ? "good" : "bad"} className="px-3 py-1 text-[13px]">
                 {left >= 0 ? t("dash.left", { amount: f.money(left) }) : t("dash.overBy", { amount: f.money(-left) })}
               </Badge>
-              {bills > 0 && <span className="text-[13px] text-ink-3">{t("dash.afterBills", { amount: f.money0(bills) })}</span>}
+              {bills > 0 && <span className="text-[13px] text-ink-3">{t("dash.afterBills", { amount: f.amount(bills) })}</span>}
               {s.isCurrent && s.daysLeft > 0 && (
                 <span className="text-[13px] text-ink-2">
                   {left > 0 ? t("dash.perDay", { amount: f.money(perDay), days: s.daysLeft }) : t("dash.perDayOver", { days: s.daysLeft })}

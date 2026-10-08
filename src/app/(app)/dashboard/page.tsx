@@ -19,7 +19,7 @@ import { ReviewPrompt } from "@/components/month-review";
 import { Insights } from "@/components/dashboard/insights";
 import { Button } from "@/components/ui/button";
 import { Card, Stagger } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/misc";
+import { Delta, EmptyState } from "@/components/ui/misc";
 import { recentAverages, runway, subscriptionTotals, summarizeMonth, yearMatrix } from "@/lib/finance";
 import { committedBills } from "@/lib/bills";
 import { accountsReserve } from "@/lib/goals";
@@ -60,21 +60,26 @@ export default function DashboardPage() {
       <Stagger className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="flex flex-col gap-4 lg:col-span-8">
           <Hero s={s} prevTotal={prev.total} name={session?.user?.name} bills={bills} />
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {/* four across, except beside the insights on a laptop (lg), where four would be too narrow */}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
             <StatTile
               label={s.saved >= 0 ? t("dash.kpi.saved") : t("dash.kpi.deficit")}
               value={s.income.net > 0 ? s.saved : 0}
-              format={f.money0}
+              format={f.amount}
               tone={s.income.net > 0 ? (s.saved >= 0 ? "good" : "bad") : undefined}
               icon={<PiggyBank className="h-4 w-4" />}
-              sub={s.income.net > 0 ? `${f.pct(s.savingsRate)} · ${t("dash.kpi.income").toLowerCase()} ${f.money0(s.income.net)}` : "—"}
+              detail={
+                s.income.net > 0
+                  ? { label: t("dash.kpi.savingsRate"), value: t("dash.kpi.rateOf", { pct: f.pct(s.savingsRate), amount: f.amount(s.income.net) }) }
+                  : { label: t("dash.kpi.income"), value: "—" }
+              }
             />
             <StatTile
               label={t("dash.kpi.dailyAvg")}
               value={s.dailyAvg}
-              format={f.money}
+              format={f.amount}
               icon={<Gauge className="h-4 w-4" />}
-              delta={{ value: change(s.dailyAvg, prev.dailyAvg), goodWhenUp: false, format: f.pct, label: t("dash.vsLast") }}
+              detail={{ label: t("dash.vsLast"), value: <Delta value={change(s.dailyAvg, prev.dailyAvg)} goodWhenUp={false} format={f.pct} /> }}
             />
             <StatTile
               label={t("dash.kpi.superfluous")}
@@ -82,7 +87,7 @@ export default function DashboardPage() {
               format={f.pct}
               tone={s.superfluousShare >= 0.25 ? "warn" : undefined}
               icon={<Flame className="h-4 w-4" />}
-              sub={f.money0(s.byPriority.superfluous)}
+              detail={{ label: t("dash.kpi.spent"), value: f.amount(s.byPriority.superfluous) }}
             />
             <StatTile
               label={t("dash.kpi.runway")}
@@ -90,37 +95,40 @@ export default function DashboardPage() {
               format={(n) => (run.sustainable ? "∞" : noReserve ? "—" : t("dash.kpi.runwayValue", { n: f.num(n) }))}
               tone={run.sustainable ? "good" : !noReserve && run.months < 6 ? "bad" : undefined}
               icon={<ShieldCheck className="h-4 w-4" />}
-              sub={
-                reserve === null ? (
-                  <Link href="/goals" className="text-gold hover:underline">
-                    {t("dash.kpi.addAccounts")}
-                  </Link>
-                ) : (
-                  `${run.sustainable ? `${t("dash.kpi.sustainable")} · ` : ""}${t("dash.proj.reserve")} ${f.money0(reserve)}`
-                )
+              detail={
+                reserve === null
+                  ? {
+                      label: t("dash.proj.reserve"),
+                      value: (
+                        <Link href="/goals" className="text-gold hover:underline">
+                          {t("dash.kpi.addAccounts")}
+                        </Link>
+                      ),
+                    }
+                  : { label: run.sustainable ? t("dash.kpi.reserveSustainable") : t("dash.proj.reserve"), value: f.amount(reserve) }
               }
             />
-            <StatTile label={t("dash.kpi.fixed")} value={s.fixed} format={f.money0} icon={<Wallet className="h-4 w-4" />} sub={`${t("dash.kpi.variable")} ${f.money0(s.variable)}`} />
+            <StatTile label={t("dash.kpi.fixed")} value={s.fixed} format={f.amount} icon={<Wallet className="h-4 w-4" />} detail={{ label: t("dash.kpi.variable"), value: f.amount(s.variable) }} />
             <StatTile
               label={t("dash.kpi.count")}
               value={s.count}
               format={(n) => String(Math.round(n))}
               icon={<Receipt className="h-4 w-4" />}
-              sub={s.largest ? `${t("dash.kpi.largest")} ${f.money0(s.largest.amount)}` : undefined}
+              detail={{ label: t("dash.kpi.largest"), value: s.largest ? f.amount(s.largest.amount) : "—" }}
             />
             <StatTile
               label={t("dash.kpi.recurring")}
               value={subs.activeMonthly}
-              format={f.money}
+              format={f.amount}
               icon={<Repeat className="h-4 w-4" />}
-              sub={t("dash.kpi.subsPart", { amount: f.money0(subs.subscriptionsMonthly) })}
+              detail={{ label: t("dash.kpi.subscriptions"), value: f.amount(subs.subscriptionsMonthly) }}
             />
             <StatTile
               label={t("dash.kpi.yearTotal", { year: month.slice(0, 4) })}
               value={year.yearTotal}
-              format={f.money0}
+              format={f.amount}
               icon={<CalendarRange className="h-4 w-4" />}
-              sub={`${t("dash.kpi.monthlyAvg")} ${f.money0(year.monthlyAverage)}`}
+              detail={{ label: t("dash.kpi.monthlyAvg"), value: f.amount(year.monthlyAverage) }}
             />
           </div>
         </div>

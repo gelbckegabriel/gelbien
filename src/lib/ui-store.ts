@@ -38,6 +38,9 @@ interface UiState {
   openTour: () => void;
   setTourStep: (step: number) => void;
   closeTour: () => void;
+  /** How the Budget page lists spending limits: biggest spending first, or in category order */
+  limitsOrder: "spent" | "category";
+  setLimitsOrder: (order: "spent" | "category") => void;
 }
 
 export const useUi = create<UiState>()(
@@ -70,7 +73,9 @@ export const useUi = create<UiState>()(
       openTour: () => set({ tour: { open: true, step: 0 } }),
       setTourStep: (step) => set((s) => ({ tour: { ...s.tour, step } })),
       closeTour: () => set((s) => ({ tour: { ...s.tour, open: false } })),
+      limitsOrder: "spent",
+      setLimitsOrder: (limitsOrder) => set({ limitsOrder }),
     }),
-    { name: "gelbien.ui", partialize: (s) => ({ demo: s.demo }) },
+    { name: "gelbien.ui", partialize: (s) => ({ demo: s.demo, limitsOrder: s.limitsOrder }) },
   ),
 );

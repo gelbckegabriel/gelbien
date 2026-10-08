@@ -101,6 +101,7 @@ function Goals() {
                   goal={goal}
                   plan={plan}
                   accounts={ds.accounts}
+                  after={goal.afterGoalId ? ds.goals.find((g) => g.id === goal.afterGoalId) : undefined}
                   onEdit={() => open({ kind: "goal", goal })}
                   onSimulate={() => open({ kind: "simulate", goal })}
                   onAddMoney={() => open({ kind: "addMoney", goal })}

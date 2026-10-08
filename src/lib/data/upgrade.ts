@@ -29,7 +29,7 @@ export const RECORD: Records = {
   balances: { accountId: "", date: "", balance: 0 },
   goals: {
     id: "", name: "", icon: "Target", color: "#d9b45f", target: 0, targetDate: "", accountIds: [], saved: 0, monthlyContribution: 0,
-    annualReturn: 0, status: "active", order: 0, notes: "", createdAt: "",
+    annualReturn: 0, status: "active", order: 0, notes: "", createdAt: "", startMonth: "", afterGoalId: "", pausedMonths: [],
   },
 };
 

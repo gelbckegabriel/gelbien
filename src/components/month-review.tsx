@@ -17,7 +17,7 @@ import { PaceChart } from "./charts/pace-chart";
 import { PrioritySplit } from "./dashboard/breakdowns";
 import { CategoryIcon } from "./icons";
 import { Button } from "./ui/button";
-import { EmptyState } from "./ui/misc";
+import { Delta, EmptyState } from "./ui/misc";
 import { Sheet } from "./ui/sheet";
 
 /** The review sheet, opened from the dashboard prompt or the budget page (see useUi().openReview). */
@@ -102,37 +102,46 @@ function Tiles({ r }: { r: MonthReview }) {
       <StatTile
         label={t("review.tile.spent")}
         value={r.spent}
-        format={f.money0}
+        format={f.amount}
         icon={<Wallet className="h-4 w-4" />}
         tone={r.planned > 0 && r.diff < 0 ? "bad" : undefined}
-        sub={r.planned > 0 ? t("review.ofPlanned", { amount: f.money0(r.planned) }) : undefined}
-        delta={r.change !== null ? { value: r.change, goodWhenUp: false, format: f.pct, label: t("review.vsPrev", { month: prevMonth }), showLabel: true } : undefined}
+        detail={{
+          label: t("review.tile.plan"),
+          value: r.planned > 0 ? f.amount(r.planned) : "—",
+          aside:
+            r.change !== null ? (
+              <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+                <Delta value={r.change} goodWhenUp={false} format={f.pct} />
+                <span className="text-ink-3">{t("review.vsPrev", { month: prevMonth })}</span>
+              </span>
+            ) : undefined,
+        }}
       />
       <StatTile
         label={t("review.tile.saved")}
         value={r.net > 0 ? r.saved : 0}
-        format={(n) => (r.net > 0 ? f.money0(n) : "—")}
+        format={(n) => (r.net > 0 ? f.amount(n) : "—")}
         icon={<PiggyBank className="h-4 w-4" />}
         tone={r.net > 0 ? (r.saved >= r.plannedSavings ? "good" : r.saved < 0 ? "bad" : "warn") : undefined}
-        sub={r.net > 0 ? (r.planned > 0 ? t("review.tile.planSaved", { amount: f.money0(r.plannedSavings) }) : undefined) : t("review.tile.noIncome")}
+        detail={r.net > 0 ? { label: t("review.tile.plan"), value: r.planned > 0 ? f.amount(r.plannedSavings) : "—" } : { label: t("dash.kpi.income"), value: t("review.tile.noIncome") }}
       />
       {r.netWorth ? (
         <StatTile
           label={t("review.tile.netWorth")}
           value={r.netWorth.end}
-          format={f.money0}
+          format={f.amount}
           icon={<Landmark className="h-4 w-4" />}
           className="col-span-2 sm:col-span-1"
-          sub={t("review.tile.nwChange", { change: `${r.netWorth.change >= 0 ? "+" : "−"}${f.money0(Math.abs(Math.round(r.netWorth.end) - Math.round(r.netWorth.start)))}` })}
+          detail={{ label: t("review.tile.thisMonth"), value: `${r.netWorth.change >= 0 ? "+" : "−"}${f.amount(Math.abs(r.netWorth.end - r.netWorth.start))}` }}
         />
       ) : (
         <StatTile
           label={t("review.tile.daily")}
           value={r.summary.dailyAvg}
-          format={f.money0}
+          format={f.amount}
           icon={<CalendarDays className="h-4 w-4" />}
           className="col-span-2 sm:col-span-1"
-          sub={t("review.tile.count", { count: r.count })}
+          detail={{ label: t("review.tile.expenses"), value: String(r.count) }}
         />
       )}
     </div>
@@ -153,7 +162,7 @@ const SUGGESTION_LOOK = {
 function Suggestions({ r, go }: { r: MonthReview; go: (href: string, month: string) => void }) {
   const { t, f } = useI18n();
   const next = addMonths(r.month, 1);
-  const perMonth = (n: number) => t("budget.subs.perMonth", { amount: f.money0(n) });
+  const perMonth = (n: number) => t("budget.subs.perMonth", { amount: f.amount(n) });
   const adjust = { label: t("review.a.budget", { month: f.monthName(next) }), run: () => go("/budget", next) };
 
   const content = (s: Suggestion): { title: string; body: string; action?: { label: string; run: () => void } } => {
@@ -161,42 +170,42 @@ function Suggestions({ r, go }: { r: MonthReview; go: (href: string, month: stri
       case "raiseLimit":
         return {
           title: t("review.s.raise.title", { category: s.category }),
-          body: t("review.s.raise.body", { months: s.months, average: f.money0(s.average), limit: f.money0(s.limit), suggested: f.money0(s.suggested) }),
+          body: t("review.s.raise.body", { months: s.months, average: f.amount(s.average), limit: f.amount(s.limit), suggested: f.amount(s.suggested) }),
           action: adjust,
         };
       case "lowerLimit":
         return {
           title: t("review.s.lower.title", { category: s.category }),
-          body: t("review.s.lower.body", { average: f.money0(s.average), limit: f.money0(s.limit), suggested: f.money0(s.suggested), frees: perMonth(s.limit - s.suggested) }),
+          body: t("review.s.lower.body", { average: f.amount(s.average), limit: f.amount(s.limit), suggested: f.amount(s.suggested), frees: perMonth(s.limit - s.suggested) }),
           action: adjust,
         };
       case "overspent":
         return {
-          title: t("review.s.over.title", { category: s.category, over: f.money0(s.over) }),
-          body: [s.biggest ? t("review.s.over.biggest", { name: s.biggest.description || s.biggest.merchant || s.category, amount: f.money0(s.biggest.amount) }) : "", t("review.s.over.body")]
+          title: t("review.s.over.title", { category: s.category, over: f.amount(s.over) }),
+          body: [s.biggest ? t("review.s.over.biggest", { name: s.biggest.description || s.biggest.merchant || s.category, amount: f.amount(s.biggest.amount) }) : "", t("review.s.over.body")]
             .filter(Boolean)
             .join(" "),
           action: { label: t("review.a.expenses"), run: () => go(`/expenses?category=${encodeURIComponent(s.category)}`, r.month) },
         };
       case "unplanned":
         return {
-          title: t("review.s.unplanned.title", { amount: f.money0(s.spent) }),
+          title: t("review.s.unplanned.title", { amount: f.amount(s.spent) }),
           body: t("review.s.unplanned.body", { categories: s.categories.slice(0, 3).join(", ") + (s.categories.length > 3 ? ` +${s.categories.length - 3}` : "") }),
           action: adjust,
         };
       case "subscriptions":
         return {
           title: t("review.s.subs.title"),
-          body: t("review.s.subs.body", { names: s.names.join(", "), monthly: perMonth(s.monthly), yearly: f.money0(s.monthly * 12) }),
+          body: t("review.s.subs.body", { names: s.names.join(", "), monthly: perMonth(s.monthly), yearly: f.amount(s.monthly * 12) }),
           action: { label: t("review.a.recurring"), run: () => go("/budget", r.month) },
         };
       case "superfluous":
         return {
           title: t("review.s.superfluous.title", { share: f.pct(s.share) }),
-          body: t("review.s.superfluous.body", { amount: f.money0(s.amount), half: perMonth(s.half), yearly: f.money0(s.half * 12) }),
+          body: t("review.s.superfluous.body", { amount: f.amount(s.amount), half: t("budget.subs.perMonth", { amount: f.amount(s.half) }), yearly: f.amount(s.half * 12) }),
         };
       case "wellDone":
-        return { title: t("review.s.wellDone.title", { amount: f.money0(s.under) }), body: t("review.s.wellDone.body"), action: { label: t("review.a.goals"), run: () => go("/goals", r.month) } };
+        return { title: t("review.s.wellDone.title", { amount: f.amount(s.under) }), body: t("review.s.wellDone.body"), action: { label: t("review.a.goals"), run: () => go("/goals", r.month) } };
     }
   };
 
@@ -257,7 +266,7 @@ function PlanBars({ r }: { r: MonthReview }) {
       table={
         <DataTable
           head={[t("exp.col.category"), t("review.legend.spent"), t("review.legend.limit"), t("review.col.diff")]}
-          rows={rows.map((c) => [name(c), f.money0(c.spent), c.budget > 0 ? f.money0(c.budget) : "—", c.budget > 0 ? f.money0(c.budget - c.spent) : "—"])}
+          rows={rows.map((c) => [name(c), f.amount(c.spent), c.budget > 0 ? f.amount(c.budget) : "—", c.budget > 0 ? f.amount(c.budget - c.spent) : "—"])}
         />
       }
     >
@@ -265,16 +274,16 @@ function PlanBars({ r }: { r: MonthReview }) {
         {rows.map((c, i) => {
           const over = c.budget > 0 && c.spent > c.budget;
           return (
-            <li key={c.rest ? "rest" : c.name} title={`${name(c)}: ${f.money0(c.spent)}${c.budget > 0 ? ` / ${f.money0(c.budget)}` : ""}`}>
+            <li key={c.rest ? "rest" : c.name} title={`${name(c)}: ${f.amount(c.spent)}${c.budget > 0 ? ` / ${f.amount(c.budget)}` : ""}`}>
               <div className="mb-1.5 flex items-center justify-between gap-3 text-[13px]">
                 <span className="flex min-w-0 items-center gap-2">
                   <CategoryIcon icon={c.icon} color={c.color} size="sm" className="h-6 w-6 rounded-md" />
                   <span className="truncate text-ink-2">{name(c)}</span>
                 </span>
                 <span className="tabular shrink-0 text-ink">
-                  {f.money0(c.spent)}
-                  <span className="text-ink-3"> / {c.budget > 0 ? f.money0(c.budget) : t("review.noLimit")}</span>
-                  {over && <span className="ml-1.5 font-medium text-bad">▲ {f.money0(c.spent - c.budget)}</span>}
+                  {f.amount(c.spent)}
+                  <span className="text-ink-3"> / {c.budget > 0 ? f.amount(c.budget) : t("review.noLimit")}</span>
+                  {over && <span className="ml-1.5 font-medium text-bad">▲ {f.amount(c.spent - c.budget)}</span>}
                 </span>
               </div>
               <div className="relative h-2 rounded-full bg-white/[0.06]">
@@ -304,13 +313,13 @@ function Movers({ r }: { r: MonthReview }) {
             <CategoryIcon icon={m.icon} color={m.color} size="sm" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm text-ink">{m.name}</span>
-              <span className="block text-xs text-ink-3">{t("review.usual", { amount: f.money0(m.usual) })}</span>
+              <span className="block text-xs text-ink-3">{t("review.usual", { amount: f.amount(m.usual) })}</span>
             </span>
             <span className="text-right">
-              <span className="tabular block text-sm text-ink">{f.money0(m.spent)}</span>
+              <span className="tabular block text-sm text-ink">{f.amount(m.spent)}</span>
               {/* more spending reads as bad, less as good */}
               <span className={cn("tabular block text-xs font-medium", m.delta > 0 ? "text-bad" : "text-good")}>
-                {m.delta > 0 ? "▲" : "▼"} {f.money0(Math.abs(m.delta))}
+                {m.delta > 0 ? "▲" : "▼"} {f.amount(Math.abs(m.delta))}
               </span>
             </span>
           </li>

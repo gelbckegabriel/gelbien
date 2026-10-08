@@ -216,17 +216,17 @@ export function buildDemoDataset(locale: Locale, today = todayISO()): Dataset {
     {
       id: "goal_car", name: tri(["Carro", "Car", "Voiture"]), icon: "Car", color: "#3987e5", target: 18000,
       targetDate: `${addMonths(nowMonth, 15)}-01`, accountIds: ["acc_neo"], saved: 0, monthlyContribution: 700, annualReturn: 3,
-      status: "active", order: 0, notes: "", createdAt: created,
+      status: "active", order: 0, notes: "", createdAt: created, startMonth: "", afterGoalId: "", pausedMonths: [],
     },
     {
       id: "goal_home", name: tri(["Entrada do apartamento", "Home down payment", "Mise de fonds"]), icon: "Home", color: "#d9b45f", target: 60000,
       targetDate: `${addMonths(nowMonth, 54)}-01`, accountIds: ["acc_tfsa"], saved: 0, monthlyContribution: 350, annualReturn: 5,
-      status: "active", order: 1, notes: "", createdAt: created,
+      status: "active", order: 1, notes: "", createdAt: created, startMonth: "", afterGoalId: "", pausedMonths: [],
     },
     {
       id: "goal_trip", name: tri(["Viagem ao Brasil", "Trip to Brazil", "Voyage au Brésil"]), icon: "Plane", color: "#d55181", target: 3500,
       targetDate: `${addMonths(nowMonth, 9)}-01`, accountIds: [], saved: 1200, monthlyContribution: 300, annualReturn: 0,
-      status: "active", order: 2, notes: "", createdAt: created,
+      status: "active", order: 2, notes: "", createdAt: created, startMonth: "", afterGoalId: "", pausedMonths: [12],
     },
   ];
 

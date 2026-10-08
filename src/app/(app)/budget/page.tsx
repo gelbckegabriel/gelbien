@@ -14,7 +14,7 @@ import { AnimatedNumber, Badge, EmptyState, Progress, STATUS_TONE } from "@/comp
 import { SaveBar } from "@/components/ui/save-bar";
 import { committedBills, monthCharges, type BillCharge } from "@/lib/bills";
 import { useDataset, useMutate } from "@/lib/data/hooks";
-import { budgetStatus, effectiveBudget, effectiveIncome, monthlyCost, subscriptionTotals, suggestBudget, summarizeMonth } from "@/lib/finance";
+import { budgetStatus, effectiveBudget, effectiveIncome, expectedPace, monthlyCost, subscriptionTotals, suggestBudget, summarizeMonth } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
 import { growX } from "@/lib/motion";
 import { SUB_KINDS, type Dataset, type Subscription } from "@/lib/types";
@@ -73,6 +73,10 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
   const { isOverride } = effectiveBudget(ds.budgets, month);
   const hasIncomeOverride = ds.incomes.some((i) => i.month === month);
   const categories = ds.categories.filter((c) => !c.archived || parseAmount(draft.lines[c.name]) > 0);
+  const order = useUi((st) => st.limitsOrder);
+  const setOrder = useUi((st) => st.setLimitsOrder);
+  // biggest spending first (ties keep the category order); spending doesn't change while limits are typed, so rows stay put
+  const rows = order === "spent" ? [...categories].sort((a, b) => (spentBy.get(b.name) ?? 0) - (spentBy.get(a.name) ?? 0)) : categories;
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const gross = parseAmount(draft.gross);
@@ -165,15 +169,15 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
             <div className="grid grid-cols-2 items-end gap-4 sm:grid-cols-4">
               <div>
                 <p className="text-xs text-ink-3">{t("dash.kpi.income")}</p>
-                <AnimatedNumber value={net} format={f.money0} className="mt-1 block text-2xl font-semibold text-good" />
+                <AnimatedNumber smallCents value={net} format={f.amount} className="mt-1 block text-2xl font-semibold text-good" />
               </div>
               <div>
                 <p className="text-xs text-ink-3">{t("budget.plan.planned")}</p>
-                <AnimatedNumber value={planned} format={f.money0} className="mt-1 block text-2xl font-semibold text-ink" />
+                <AnimatedNumber smallCents value={planned} format={f.amount} className="mt-1 block text-2xl font-semibold text-ink" />
               </div>
               <div>
                 <p className="text-xs text-ink-3">{unallocated >= 0 ? t("budget.plan.savings") : t("budget.plan.overAllocated")}</p>
-                <AnimatedNumber value={Math.abs(unallocated)} format={f.money0} className={cn("mt-1 block text-2xl font-semibold", unallocated >= 0 ? "text-gold-bright" : "text-bad")} />
+                <AnimatedNumber smallCents value={Math.abs(unallocated)} format={f.amount} className={cn("mt-1 block text-2xl font-semibold", unallocated >= 0 ? "text-gold-bright" : "text-bad")} />
               </div>
               <div>
                 <p className="text-xs text-ink-3">{t("dash.kpi.savingsRate")}</p>
@@ -186,7 +190,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
                 {segments.map((s, i) => (
                   <motion.div
                     key={s.name}
-                    title={`${s.name}: ${f.money0(s.value)}`}
+                    title={`${s.name}: ${f.amount(s.value)}`}
                     className="h-full origin-left transition-[width] duration-500 ease-out first:rounded-l-full"
                     style={{ background: s.color, width: `${(s.value / base) * 100}%` }}
                     {...growX(i * 0.03, 90, 20)}
@@ -197,7 +201,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
                     className="gold-fill h-full rounded-r-full origin-left transition-[width] duration-500 ease-out"
                     style={{ width: `${(unallocated / base) * 100}%` }}
                     {...growX(segments.length * 0.03, 90, 20)}
-                    title={`${t("budget.plan.savings")}: ${f.money0(unallocated)}`}
+                    title={`${t("budget.plan.savings")}: ${f.amount(unallocated)}`}
                   />
                 )}
               </div>
@@ -235,15 +239,28 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
         unplanned={round2(summary.byCategory.filter((c) => !(parseAmount(draft.lines[c.name]) > 0)).reduce((a, c) => a + c.spent, 0))}
         warnAt={ds.settings.warnAt}
         committed={committed}
+        // the limits as they're being edited
+        paceByDay={expectedPace(ds, month, Object.fromEntries(categories.map((c) => [c.name, parseAmount(draft.lines[c.name])])))}
       />
 
       <Card>
         <CardHeader
           title={t("budget.plan.title")}
-          subtitle={`${t("budget.plan.planned")}: ${f.money0(planned)} · ${unallocated >= 0 ? t("budget.plan.unallocated") : t("budget.plan.overAllocated")}: ${f.money0(Math.abs(unallocated))}`}
+          subtitle={`${t("budget.plan.planned")}: ${f.amount(planned)} · ${unallocated >= 0 ? t("budget.plan.unallocated") : t("budget.plan.overAllocated")}: ${f.amount(Math.abs(unallocated))}`}
+          action={
+            <Segmented
+              size="sm"
+              value={order}
+              onChange={setOrder}
+              options={[
+                { value: "spent" as const, label: t("budget.plan.order.spent") },
+                { value: "category" as const, label: t("budget.plan.order.category") },
+              ]}
+            />
+          }
         />
         <ul className="grid grid-cols-1 gap-x-10 xl:grid-cols-2">
-          {categories.map((c, i) => {
+          {rows.map((c, i) => {
             const limit = parseAmount(draft.lines[c.name]);
             const spent = spentBy.get(c.name) ?? 0;
             const status = budgetStatus(spent, limit, ds.settings.warnAt);
@@ -287,10 +304,10 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
                   <span className="tabular min-w-20 shrink-0 whitespace-nowrap text-right text-[11px] text-ink-3 sm:min-w-28">
                     {limit > 0 ? (
                       <>
-                        <span className={cn("font-semibold", TONE_TEXT[STATUS_TONE[status]])}>{f.pct(spent / limit)}</span> · {f.money0(spent)}
+                        <span className={cn("font-semibold", TONE_TEXT[STATUS_TONE[status]])}>{f.pct(spent / limit)}</span> · {f.amount(spent)}
                       </>
                     ) : (
-                      t("budget.plan.spent", { amount: f.money0(spent) })
+                      t("budget.plan.spent", { amount: f.amount(spent) })
                     )}
                   </span>
                   <ChevronRight className="-ml-1 h-3.5 w-3.5 shrink-0 text-ink-3" />
@@ -317,6 +334,7 @@ function PlanVsActual({
   unplanned,
   warnAt,
   committed,
+  paceByDay,
 }: {
   s: ReturnType<typeof summarizeMonth>;
   planned: number;
@@ -325,6 +343,8 @@ function PlanVsActual({
   warnAt: number;
   /** bills this month with nothing logged yet */
   committed: BillCharge[];
+  /** spending on plan by day, cumulative (expectedPace) */
+  paceByDay: number[];
 }) {
   const { t, f } = useI18n();
   const openReview = useUi((st) => st.openReview);
@@ -335,8 +355,8 @@ function PlanVsActual({
   const tone = STATUS_TONE[budgetStatus(spent + bills, planned, warnAt)];
   const at = (amount: number) => Math.min(100, (amount / planned) * 100);
   const names = [...new Set(committed.map((c) => c.sub.name))];
-  // straight-line pace, same as the dashboard's pace chart
-  const expected = s.isCurrent && planned > 0 ? (planned * s.elapsed) / s.days : null;
+  // bills on their day and the rest spread evenly, same as the dashboard's pace chart
+  const expected = s.isCurrent && planned > 0 ? (paceByDay[s.elapsed - 1] ?? null) : null;
   const pace = expected === null ? 0 : expected - spent;
   const month = f.monthName(s.month);
   // a month that hasn't started has nothing to compare yet (unless something was already logged in it)
@@ -352,14 +372,14 @@ function PlanVsActual({
       <CardHeader title={t("budget.vs.title")} subtitle={subtitle} />
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <p className="flex flex-wrap items-baseline gap-x-2">
-          <AnimatedNumber value={spent} format={f.money0} className="text-2xl font-semibold text-ink" />
+          <AnimatedNumber smallCents value={spent} format={f.amount} className="text-2xl font-semibold text-ink" />
           <span className="text-sm text-ink-3">
-            {planned > 0 ? t("budget.vs.ofPlanned", { pct: f.pct(spent / planned), amount: f.money0(planned) }) : t("budget.vs.noPlan", { month })}
+            {planned > 0 ? t("budget.vs.ofPlanned", { pct: f.pct(spent / planned), amount: f.amount(planned) }) : t("budget.vs.noPlan", { month })}
           </span>
         </p>
         {compare && (
           <Badge tone={left >= 0 ? "good" : "bad"}>
-            {left < 0 ? t("budget.vs.over") : s.isPast ? t("budget.vs.under") : t("budget.vs.left")} · {f.money0(Math.abs(left))}
+            {left < 0 ? t("budget.vs.over") : s.isPast ? t("budget.vs.under") : t("budget.vs.left")} · {f.amount(Math.abs(left))}
           </Badge>
         )}
       </div>
@@ -386,7 +406,7 @@ function PlanVsActual({
             <span className="mt-0.5 h-2.5 w-3 shrink-0 rounded-sm" style={BILL_STRIPES} />
             <span>
               {t("budget.vs.bills", {
-                amount: f.money0(bills),
+                amount: f.amount(bills),
                 month,
                 names: `${names.slice(0, 3).join(", ")}${names.length > 3 ? ` +${names.length - 3}` : ""}`,
               })}
@@ -395,14 +415,14 @@ function PlanVsActual({
         )}
         {expected !== null && (
           <p>
-            {t("budget.vs.pace", { expected: f.money0(expected) })} ·{" "}
+            {t("budget.vs.pace", { expected: f.amount(expected) })} ·{" "}
             <span className={pace >= 0 ? "text-good" : "text-bad"}>
-              {pace >= 0 ? t("budget.vs.paceBehind", { amount: f.money0(pace) }) : t("budget.vs.paceAhead", { amount: f.money0(-pace) })}
+              {pace >= 0 ? t("budget.vs.paceBehind", { amount: f.amount(pace) }) : t("budget.vs.paceAhead", { amount: f.amount(-pace) })}
             </span>
           </p>
         )}
-        {s.isPast && net > 0 && <p>{t("budget.vs.savings", { actual: f.money0(net - spent), planned: f.money0(net - planned) })}</p>}
-        {unplanned > 0 && <p>{t("budget.vs.unplanned", { amount: f.money0(unplanned) })}</p>}
+        {s.isPast && net > 0 && <p>{t("budget.vs.savings", { actual: f.amount(net - spent), planned: f.amount(net - planned) })}</p>}
+        {unplanned > 0 && <p>{t("budget.vs.unplanned", { amount: f.amount(unplanned) })}</p>}
       </div>
       {s.isPast && s.count > 0 && (
         <button onClick={() => openReview(s.month)} className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-gold hover:underline">
@@ -451,7 +471,7 @@ function Subscriptions({ ds, month }: { ds: Dataset; month: string }) {
           <div key={k.label} className="flex items-baseline justify-between gap-3 rounded-xl border border-line bg-surface-2/50 px-3 py-2.5 sm:block sm:p-3">
             <p className="text-xs text-ink-3 sm:text-[11px]">{k.label}</p>
             <span className="text-right sm:text-left">
-              <AnimatedNumber value={k.value} format={f.money} className={cn("block whitespace-nowrap text-lg font-semibold sm:mt-1", k.cls)} />
+              <AnimatedNumber smallCents value={k.value} format={f.money} className={cn("block whitespace-nowrap text-lg font-semibold sm:mt-1", k.cls)} />
               {k.note && <span className="block text-[11px] text-warn">{k.note}</span>}
             </span>
           </div>

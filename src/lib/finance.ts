@@ -2,6 +2,7 @@
  * Pure analytics over a Dataset. Everything the dashboard, budget page and AI
  * context need is computed here so it can be unit-tested without React.
  */
+import { chargesBetween } from "./bills";
 import { OTHER_COLOR, REST_COLOR } from "./defaults";
 import type {
   BudgetLine,
@@ -225,10 +226,53 @@ export function summarizeMonth(ds: Dataset, month: string, today = todayISO()): 
   };
 }
 
-/** Cumulative spend by day vs. a straight-line budget pace, plus last month for context. */
+/**
+ * Spending on plan, day by day (cumulative; index 0 = day 1): recurring bills and other fixed costs
+ * on the day they land, and the rest of each category's limit spread evenly over the month — so rent
+ * on the 1st is a step at the start, not "overspending" for three weeks. A bill already logged counts
+ * where and as much as it went out (not at all if that was in another month), one still to come on
+ * its due day. A fixed cost bigger than its limit (or in a category without one) still counts in
+ * full. Empty without a budget.
+ */
+export function expectedPace(ds: Pick<Dataset, "subscriptions" | "transactions">, month: string, budget: Record<string, number>, today = todayISO()): number[] {
+  const days = daysInMonth(month);
+  if (Object.values(budget).reduce((a, b) => a + Math.max(0, b), 0) <= 0) return [];
+  const last = `${month}-${String(days).padStart(2, "0")}`;
+  const steps = new Array<number>(days).fill(0);
+  const fixedBy = new Map<string, number>();
+  const counted = new Set<string>();
+  const add = (date: string, amount: number, category: string) => {
+    steps[Number(date.slice(8, 10)) - 1] += amount;
+    fixedBy.set(category, (fixedBy.get(category) ?? 0) + amount);
+  };
+  for (const c of chargesBetween(ds, `${month}-01`, last)) {
+    if (c.paid) {
+      if (monthOf(c.paid.date) === month && !counted.has(c.paid.id)) {
+        counted.add(c.paid.id);
+        add(c.paid.date, c.paid.amount, c.paid.category);
+      }
+    } else if (last >= today) {
+      // still to come, or due and not logged yet — once the month is over, a charge nobody logged didn't happen
+      add(c.date, c.sub.amount, c.sub.category);
+    }
+  }
+  // fixed costs and bill payments not matched above (rent typed in as a fixed expense, next month's bill paid early)
+  for (const t of txInMonth(ds.transactions, month)) {
+    if ((t.type === "fixed" || t.billId) && !counted.has(t.id)) {
+      counted.add(t.id);
+      add(t.date, t.amount, t.category);
+    }
+  }
+  const even = Object.entries(budget).reduce((a, [category, limit]) => a + Math.max(0, limit - Math.max(0, fixedBy.get(category) ?? 0)), 0) / days;
+  let run = 0;
+  return steps.map((step) => round2((run += step + even)));
+}
+
+/** Cumulative spend by day vs. the planned pace (see expectedPace), plus last month for context. */
 export function paceSeries(ds: Dataset, month: string, today = todayISO()) {
   const s = summarizeMonth(ds, month, today);
   const prev = summarizeMonth(ds, addMonths(month, -1), today);
+  const pace = expectedPace(ds, month, effectiveBudget(ds.budgets, month).lines, today);
   let run = 0;
   let prevRun = 0;
   return Array.from({ length: s.days }, (_, i) => {
@@ -238,7 +282,7 @@ export function paceSeries(ds: Dataset, month: string, today = todayISO()) {
     return {
       day,
       actual: day <= s.elapsed ? round2(run) : null,
-      pace: s.budgetTotal > 0 ? round2((s.budgetTotal / s.days) * day) : null,
+      pace: pace[i] ?? null,
       last: i < prev.days ? round2(prevRun) : null,
     };
   });
@@ -447,12 +491,14 @@ export function localInsights(ds: Dataset, month: string, today = todayISO()): L
   }
 
   if (s.isCurrent && s.budgetTotal > 0 && s.elapsed >= 5) {
+    // against the planned pace, so a big bill early in the month isn't "spending ahead"
+    const expected = expectedPace(ds, month, effectiveBudget(ds.budgets, month).lines, today)[s.elapsed - 1] ?? 0;
     const spentPct = s.total / s.budgetTotal;
-    const elapsedPct = s.elapsed / s.days;
-    if (spentPct > elapsedPct + 0.1) {
-      out.push({ id: "pace-ahead", tone: "warn", key: "paceAhead", weight: 80, vars: { spentPct, elapsedPct } });
-    } else if (spentPct < elapsedPct - 0.15) {
-      out.push({ id: "pace-behind", tone: "good", key: "paceBehind", weight: 40, vars: { spentPct, elapsedPct } });
+    const expectedPct = expected / s.budgetTotal;
+    if (spentPct > expectedPct + 0.1) {
+      out.push({ id: "pace-ahead", tone: "warn", key: "paceAhead", weight: 80, vars: { spentPct, expectedPct } });
+    } else if (spentPct < expectedPct - 0.15) {
+      out.push({ id: "pace-behind", tone: "good", key: "paceBehind", weight: 40, vars: { spentPct, expectedPct } });
     }
   }
 

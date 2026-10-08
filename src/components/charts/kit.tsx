@@ -2,11 +2,11 @@
 
 import { BarChart3, Table2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader } from "../ui/card";
-import { AnimatedNumber, Delta } from "../ui/misc";
+import { AnimatedNumber, fitFont } from "../ui/misc";
 
 export const INK = { primary: "#f4f1ea", secondary: "#bdb8ad", muted: "#85817a", grid: "#ffffff0f", axis: "#ffffff1f", surface: "#131316" };
 export const GOLD = "#d9b45f";
@@ -184,8 +184,7 @@ export function StatTile({
   label,
   value,
   format,
-  sub,
-  delta,
+  detail,
   icon,
   tone,
   className,
@@ -193,43 +192,48 @@ export function StatTile({
   label: string;
   value: number;
   format: (n: number) => string;
-  sub?: React.ReactNode;
-  /** `showLabel`: keep the label on phones too (hidden there by default, where tiles are narrow) */
-  delta?: { value: number; goodWhenUp: boolean; format: (n: number) => string; label?: string; showLabel?: boolean };
+  /**
+   * A caption over a second figure ("Variable costs" / "$773.28"), and optionally something at the end of
+   * the figure's line (a change vs. last month): every tile gets the same two lines, so a row lines up.
+   */
+  detail?: { label: React.ReactNode; value: React.ReactNode; aside?: React.ReactNode };
   icon?: React.ReactNode;
   tone?: "good" | "bad" | "warn";
   className?: string;
 }) {
   return (
-    <Card className={cn("p-4", className)}>
-      <div className="flex items-start justify-between gap-2">
+    // Three rows of its grid, shared with the tiles beside it (subgrid): labels, numbers and the lines under
+    // them sit at the same height across a row, whatever wraps.
+    <Card className={cn("row-span-3 grid grid-rows-subgrid gap-y-1.5 p-4", className)}>
+      {/* at the bottom of its row, so a one-line label sits right above its number */}
+      <div className="flex items-start justify-between gap-2 self-end">
         <p className="text-[12px] font-medium text-ink-3">{label}</p>
         {icon && <span className="text-ink-3">{icon}</span>}
       </div>
-      <AnimatedNumber
-        value={value}
-        format={format}
-        className={cn(
-          "mt-1.5 block truncate text-[22px] font-semibold tracking-tight",
-          tone === "good" ? "text-good" : tone === "bad" ? "text-bad" : tone === "warn" ? "text-warn" : "text-ink",
+      {/* a size container, so the number can shrink with a narrow tile instead of being cut off (on its own
+          wrapper: containment on the tile itself would stop it sharing its row's tracks) */}
+      <div className="min-w-0 self-end @container">
+        <AnimatedNumber
+          value={value}
+          format={format}
+          smallCents
+          style={{ fontSize: fitFont(format(value), "22px") }}
+          className={cn(
+            "block truncate font-semibold leading-tight tracking-tight",
+            tone === "good" ? "text-good" : tone === "bad" ? "text-bad" : tone === "warn" ? "text-warn" : "text-ink",
+          )}
+        />
+      </div>
+      <div className="min-w-0 text-xs">
+        {detail && (
+          <>
+            <p className="line-clamp-2 text-ink-3">{detail.label}</p>
+            <p className="tabular-nums mt-0.5 flex flex-wrap items-baseline justify-between gap-x-2 text-ink-2">
+              <span>{detail.value}</span>
+              {detail.aside}
+            </p>
+          </>
         )}
-      />
-      <div className="mt-1 flex min-h-4 min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-ink-3">
-        {delta && (
-          <span className="flex min-w-0 max-w-full items-center gap-1 whitespace-nowrap">
-            <Delta value={delta.value} goodWhenUp={delta.goodWhenUp} format={delta.format} />
-            {delta.label && <span className={cn("truncate", !delta.showLabel && "hidden sm:inline")}>{delta.label}</span>}
-          </span>
-        )}
-        {/* Narrow tiles wrap between the " · " parts, never inside one (e.g. "Reserve" / "$18,000"). */}
-        {typeof sub === "string"
-          ? sub.split(" · ").map((part, i) => (
-              <Fragment key={i}>
-                {i > 0 && <span aria-hidden>·</span>}
-                <span className="whitespace-nowrap">{part}</span>
-              </Fragment>
-            ))
-          : sub}
       </div>
     </Card>
   );

@@ -43,8 +43,8 @@ export function BudgetBars({ summary, className }: { summary: MonthSummary; clas
               <div className="flex items-baseline justify-between gap-2 text-[13px]">
                 <span className="truncate text-ink-2">{c.name}</span>
                 <span className="tabular shrink-0 text-ink">
-                  {f.money0(c.spent)}
-                  {c.budget > 0 && <span className="text-ink-3"> / {f.money0(c.budget)}</span>}
+                  {f.amount(c.spent)}
+                  {c.budget > 0 && <span className="text-ink-3"> / {f.amount(c.budget)}</span>}
                 </span>
               </div>
               {c.budget > 0 ? (
@@ -92,7 +92,7 @@ export function PrioritySplit({ summary, className }: { summary: MonthSummary; c
           <li key={p} className="flex items-center gap-2.5 text-[13px]">
             <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: PRIORITY_COLORS[p] }} />
             <span className="flex-1 text-ink-2">{t(`priority.${p}`)}</span>
-            <span className="tabular text-ink">{f.money0(summary.byPriority[p])}</span>
+            <span className="tabular text-ink">{f.amount(summary.byPriority[p])}</span>
             <span className="tabular w-10 text-right text-xs text-ink-3">{f.pct(total ? summary.byPriority[p] / total : 0)}</span>
           </li>
         ))}
@@ -112,7 +112,7 @@ export function PaymentBreakdown({ summary, styles, className }: { summary: Mont
             <div className="mb-1 flex items-center gap-2 text-[13px]">
               <PaymentIcon name={p.name} styles={styles} className="h-6 w-6 rounded-md" />
               <span className="min-w-0 flex-1 truncate text-ink-2">{p.name}</span>
-              <span className="tabular text-ink">{f.money0(p.amount)}</span>
+              <span className="tabular text-ink">{f.amount(p.amount)}</span>
             </div>
             <div className="h-1.5 rounded-full bg-white/5">
               <motion.div

@@ -3,6 +3,9 @@ import {
   accountsMonthlyGrowth,
   checkInStatus,
   goalCurrent,
+  goalPlanFor,
+  goalSchedule,
+  goalsWaitingFor,
   latestBalances,
   monthsToTarget,
   netWorth,
@@ -32,6 +35,9 @@ const goal = (patch: Partial<Goal>): Goal => ({
   order: 0,
   notes: "",
   createdAt: "",
+  startMonth: "",
+  afterGoalId: "",
+  pausedMonths: [],
   ...patch,
 });
 
@@ -70,6 +76,68 @@ describe("goal math", () => {
     expect(p.onTrack).toBe(false);
     expect(p.requiredMonthly).toBeCloseTo(1333.33, 1);
     expect(p.progress).toBeCloseTo(2000 / 14000);
+  });
+});
+
+describe("contribution schedules", () => {
+  it("holds contributions back until the start month, while the money keeps growing", () => {
+    const s = { start: "2027-01", paused: [] };
+    // nothing in November or December; nine contributions from January
+    expect(monthsToTarget(1000, 10000, 1000, 0, s, "2026-10")).toBe(11);
+    expect(projectBalance(1000, 1000, 0, 4, s, "2026-10")).toEqual([1000, 1000, 1000, 2000, 3000]);
+    expect(projectBalance(1200, 100, 12, 2, { start: "2026-10", paused: [11, 12] }, "2026-10")[2]).toBeCloseTo(1200 * 1.12 ** (2 / 12), 1);
+  });
+
+  it("skips paused months every year", () => {
+    expect(monthsToTarget(0, 3000, 1000, 0, { start: "2026-10", paused: [12] }, "2026-10")).toBe(4);
+    expect(monthsToTarget(0, 3000, 1000, 0, { start: null, paused: [] }, "2026-10")).toBeNull();
+    const s = { start: "2027-03", paused: [12] };
+    const n = monthsToTarget(5000, 20000, 400, 5, s, "2026-10")!;
+    const path = projectBalance(5000, 400, 5, n, s, "2026-10");
+    expect(path[n]).toBeGreaterThanOrEqual(20000);
+    expect(path[n - 1]).toBeLessThan(20000);
+  });
+
+  it("asks more per month when fewer months contribute, and nothing helps without any", () => {
+    // ten of the next twelve months contribute
+    expect(requiredMonthly(0, 12000, 12, 0, { start: "2026-10", paused: [6, 7] }, "2026-10")).toBe(1200);
+    const s = { start: "2027-02", paused: [12] };
+    const m = requiredMonthly(2000, 14000, 18, 6, s, "2026-10");
+    expect(projectBalance(2000, m, 6, 18, s, "2026-10")[18]).toBeCloseTo(14000, 0);
+    expect(requiredMonthly(0, 12000, 3, 0, { start: "2027-06", paused: [] }, "2026-10")).toBe(Infinity);
+    const p = planGoal({ current: 0, target: 12000, monthly: 1000, annualReturn: 0, targetDate: "2027-01-01", schedule: { start: "2027-06", paused: [] } }, "2026-10-07");
+    expect(p.requiredMonthly).toBeNull();
+    expect(p.onTrack).toBe(false);
+    expect(p.eta).toBe("2028-05");
+  });
+
+  it("starts a goal the month after the one it waits for, down a chain", () => {
+    const today = "2026-10-07";
+    const car = goal({ id: "car", target: 10000, saved: 4000, monthlyContribution: 1000 });
+    const home = goal({ id: "home", target: 2000, monthlyContribution: 1000, afterGoalId: "car", pausedMonths: [12] });
+    const trip = goal({ id: "trip", target: 500, monthlyContribution: 100, afterGoalId: "home" });
+    const ds = { accounts: [], balances: [], goals: [car, home, trip] };
+    expect(goalPlanFor(ds, car, today).eta).toBe("2027-04");
+    expect(goalSchedule(ds, home, today)).toEqual({ start: "2027-05", paused: [12] });
+    expect(goalPlanFor(ds, home, today).eta).toBe("2027-06");
+    expect(goalSchedule(ds, trip, today).start).toBe("2027-07");
+    expect(goalsWaitingFor(ds.goals, "car")).toEqual(new Set(["home", "trip"]));
+
+    const withCar = (c: Goal) => ({ ...ds, goals: [c, home, trip] });
+    expect(goalSchedule(withCar({ ...car, status: "achieved" }), home, today).start).toBe("2026-10");
+    expect(goalSchedule(withCar({ ...car, saved: 10000 }), home, today).start).toBe("2026-10");
+    expect(goalSchedule(withCar({ ...car, status: "paused" }), home, today).start).toBeNull();
+    expect(goalSchedule(withCar({ ...car, monthlyContribution: 0 }), home, today).start).toBeNull();
+    expect(goalSchedule({ ...ds, goals: [home] }, home, today).start).toBe("2026-10"); // car deleted
+    // two goals waiting for each other never start, rather than looping
+    const loop = { ...ds, goals: [{ ...car, afterGoalId: "home" }, home] };
+    expect(goalSchedule(loop, home, today).start).toBeNull();
+  });
+
+  it("starts from a month that hasn't come yet", () => {
+    const ds = { accounts: [], balances: [], goals: [] };
+    expect(goalSchedule(ds, goal({ startMonth: "2027-03" }), "2026-10-07").start).toBe("2027-03");
+    expect(goalSchedule(ds, goal({ startMonth: "2026-01" }), "2026-10-07").start).toBe("2026-10");
   });
 });
 
@@ -173,5 +241,22 @@ describe("savingsPlan", () => {
     const history = { incomes: [{ month: "default", gross: 0, net: 3000, note: "" }], transactions: [spend("2026-09-05", 2500)] };
     expect(savingsPlan(ds(history), "2026-10", "2026-10-02")).toMatchObject({ planned: null, basis: 500, free: -1500 });
     expect(savingsPlan(ds({}), "2026-10", "2026-10-02")).toMatchObject({ basis: null, free: null });
+  });
+
+  it("only counts the goals that get a contribution this month", () => {
+    const goals = [
+      goal({ id: "car", monthlyContribution: 1100, target: 30000 }),
+      goal({ id: "home", monthlyContribution: 900, target: 50000, startMonth: "2027-01" }),
+      goal({ id: "trip", monthlyContribution: 200, target: 3000, pausedMonths: [10] }),
+      goal({ id: "boat", monthlyContribution: 300, target: 9000, afterGoalId: "car" }),
+    ];
+    const plan = savingsPlan(ds({ goals }), "2026-10", "2026-10-02");
+    expect(plan.active.map((g) => g.id)).toEqual(["car"]);
+    expect(plan.allocated).toBe(1100);
+    expect(plan.waiting.map(({ goal: g, from, skipping }) => [g.id, from, skipping])).toEqual([
+      ["home", "2027-01", false],
+      ["trip", null, true],
+      ["boat", "2029-03", false], // car: 28 contributions of 1,100 → Feb 2029,
+    ]);
   });
 });

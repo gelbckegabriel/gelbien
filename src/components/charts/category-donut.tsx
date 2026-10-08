@@ -61,7 +61,7 @@ export function CategoryDonut({ summary, className }: { summary: MonthSummary; c
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
             <span className="max-w-28 truncate text-[11px] text-ink-3">{focus ? focus.label : t("common.total")}</span>
-            <AnimatedNumber value={focus ? focus.value : total} format={f.money0} className="text-xl font-semibold text-ink" />
+            <AnimatedNumber smallCents value={focus ? focus.value : total} format={f.amount} className="text-xl font-semibold text-ink" />
             {focus && <span className="text-[11px] text-ink-3">{f.pct(focus.value / total)}</span>}
           </div>
         </div>
@@ -75,7 +75,7 @@ export function CategoryDonut({ summary, className }: { summary: MonthSummary; c
             >
               <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: d.color }} />
               <span className="min-w-0 flex-1 truncate text-ink-2">{d.label}</span>
-              <span className="tabular text-ink">{f.money0(d.value)}</span>
+              <span className="tabular text-ink">{f.amount(d.value)}</span>
               <span className="tabular w-10 text-right text-xs text-ink-3">{f.pct(d.value / total)}</span>
             </li>
           ))}

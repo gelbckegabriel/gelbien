@@ -99,6 +99,10 @@ export const goalSchema = z.object({
   order: z.number().finite(),
   notes: text(2000),
   createdAt: text(40),
+  // defaults: goals saved before contributions could start later or skip months
+  startMonth: z.union([z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), z.literal("")]).default(""),
+  afterGoalId: text(64).default(""),
+  pausedMonths: z.array(z.number().int().min(1).max(12)).max(12).default([]),
 });
 
 /** A full dataset (also the JSON backup format). */

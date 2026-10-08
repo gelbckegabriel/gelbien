@@ -7,22 +7,76 @@ import { growX } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /** Counts up/down to `value` whenever it changes. */
-export function AnimatedNumber({ value, format, className }: { value: number; format: (n: number) => string; className?: string }) {
+/**
+ * A formatted amount with its cents drawn smaller — "$2,578" then a small ".76" — so exact amounts fit
+ * where whole ones did. Anything without cents (a whole amount, a percentage) is left as it is.
+ */
+export function MoneyText({ text }: { text: string }) {
+  // the last separator with exactly two digits after it, then only symbols ("$2,578.76", "2 578,76 $")
+  const m = /^(.*?)([.,]\d{2})(\D*)$/.exec(text);
+  if (!m) return <>{text}</>;
+  return (
+    <>
+      {m[1]}
+      <span className="text-[0.7em]">{m[2]}</span>
+      {m[3]}
+    </>
+  );
+}
+
+// widths in em of the app font's semibold tabular figures: digits 0.6, separators 0.2, spaces ~0.25, anything else ~0.65
+const charEm = (c: string) => (/\d/.test(c) ? 0.6 : c === "." || c === "," ? 0.2 : /\s/.test(c) ? 0.25 : 0.65);
+const em = (s: string) => [...s].reduce((a, c) => a + charEm(c), 0);
+
+/** How wide `text` is, in em, drawn by MoneyText (smaller cents) — to size a number to its box */
+export function moneyTextWidth(text: string): number {
+  const m = /^(.*?)([.,]\d{2})(\D*)$/.exec(text);
+  return m ? em(m[1]) + em(m[3]) + em(m[2]) * 0.7 : em(text);
+}
+
+/**
+ * A font size that fits `text` across its container (the nearest `@container`), up to `max`:
+ * exact amounts get smaller in a narrow box instead of being cut off.
+ */
+export function fitFont(text: string, max: string): string {
+  return `min(${max}, ${(100 / (Math.max(2, moneyTextWidth(text)) * 1.04)).toFixed(2)}cqw)`;
+}
+
+export function AnimatedNumber({
+  value,
+  format,
+  className,
+  style,
+  smallCents,
+}: {
+  value: number;
+  format: (n: number) => string;
+  className?: string;
+  style?: React.CSSProperties;
+  /** draw the cents smaller (MoneyText) */
+  smallCents?: boolean;
+}) {
   const from = useRef(0);
   const [shown, setShown] = useState(0);
   useEffect(() => {
+    // counting up to a whole amount, every step is whole too — no cents flickering in and out
+    const whole = Math.round(value * 100) % 100 === 0;
     const controls = animate(from.current, value, {
       duration: 0.9,
       ease: [0.16, 1, 0.3, 1],
       onUpdate: (v) => {
         from.current = v;
-        setShown(v);
+        setShown(whole ? Math.round(v) : v);
       },
     });
     return () => controls.stop();
   }, [value]);
   // digits of equal width, so the number doesn't jiggle or re-flow every frame while it counts
-  return <span className={cn("tabular-nums", className)}>{format(shown)}</span>;
+  return (
+    <span className={cn("tabular-nums", className)} style={style}>
+      {smallCents ? <MoneyText text={format(shown)} /> : format(shown)}
+    </span>
+  );
 }
 
 export function Progress({ value, tone = "gold", className, delay = 0 }: { value: number; tone?: "gold" | "good" | "warn" | "bad"; className?: string; delay?: number }) {
