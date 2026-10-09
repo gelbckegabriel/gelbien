@@ -251,7 +251,7 @@ function PlanBars({ r }: { r: MonthReview }) {
   const scale = Math.max(1, ...rows.map((c) => Math.max(c.spent, c.budget)));
   const name = (c: CategoryRow) => (c.rest ? t("common.rest") : c.name);
   return (
-    <ChartCard
+    <ChartCard viewKey="review.categories"
       title={t("review.barsTitle")}
       subtitle={t("review.barsSubtitle")}
       legend={

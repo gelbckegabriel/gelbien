@@ -18,7 +18,7 @@ import { budgetStatus, effectiveBudget, effectiveIncome, expectedPace, monthlyCo
 import { useI18n } from "@/lib/i18n";
 import { growX } from "@/lib/motion";
 import { SUB_KINDS, type Dataset, type Subscription } from "@/lib/types";
-import { useUi } from "@/lib/ui-store";
+import { useUi, useView } from "@/lib/ui-store";
 import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
 import { addMonths, cn, parseAmount, round2, todayISO } from "@/lib/utils";
 
@@ -73,8 +73,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
   const { isOverride } = effectiveBudget(ds.budgets, month);
   const hasIncomeOverride = ds.incomes.some((i) => i.month === month);
   const categories = ds.categories.filter((c) => !c.archived || parseAmount(draft.lines[c.name]) > 0);
-  const order = useUi((st) => st.limitsOrder);
-  const setOrder = useUi((st) => st.setLimitsOrder);
+  const [order, setOrder] = useView("budget.limits", "spent", ["spent", "category"] as const);
   // biggest spending first (ties keep the category order); spending doesn't change while limits are typed, so rows stay put
   const rows = order === "spent" ? [...categories].sort((a, b) => (spentBy.get(b.name) ?? 0) - (spentBy.get(a.name) ?? 0)) : categories;
 

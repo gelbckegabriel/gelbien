@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import Link from "next/link";
-import type { MonthSummary } from "@/lib/finance";
+import type { MonthForecast, MonthSummary } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Card } from "../ui/card";
@@ -41,7 +41,21 @@ function Ring({ value, tone }: { value: number; tone: "gold" | "warn" | "bad" })
   );
 }
 
-export function Hero({ s, prevTotal, name, bills = 0 }: { s: MonthSummary; prevTotal: number; name?: string; /** still to pay this month */ bills?: number }) {
+export function Hero({
+  s,
+  prevTotal,
+  name,
+  bills = 0,
+  forecast,
+}: {
+  s: MonthSummary;
+  prevTotal: number;
+  name?: string;
+  /** still to pay this month */
+  bills?: number;
+  /** where this month is heading (the pace chart has the details) */
+  forecast?: MonthForecast | null;
+}) {
   const { t, f } = useI18n();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? t("dash.greeting.morning") : hour < 18 ? t("dash.greeting.afternoon") : t("dash.greeting.evening");
@@ -51,6 +65,11 @@ export function Hero({ s, prevTotal, name, bills = 0 }: { s: MonthSummary; prevT
   // bills still to pay this month are already spoken for
   const left = s.remaining - bills;
   const perDay = s.daysLeft > 0 ? left / s.daysLeft : 0;
+  const heading = forecast && forecast.daysLeft > 0 ? forecast.end : null;
+  const headingText =
+    heading === null ? null : (
+      <span className={cn(s.budgetTotal > 0 && heading > s.budgetTotal ? "text-warn" : "text-ink-3")}>{t("dash.fc.hero", { amount: f.amount(heading) })}</span>
+    );
 
   return (
     <Card className="p-6 sm:p-7">
@@ -75,11 +94,17 @@ export function Hero({ s, prevTotal, name, bills = 0 }: { s: MonthSummary; prevT
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             {s.budgetTotal > 0 ? (
-              <span className="text-ink-3">{t("dash.ofBudget", { budget: f.amount(s.budgetTotal) })}</span>
+              <span className="text-ink-3">
+                {t("dash.ofBudget", { budget: f.amount(s.budgetTotal) })}
+                {headingText && <> · {headingText}</>}
+              </span>
             ) : (
-              <Link href="/budget" className="text-gold underline-offset-2 hover:underline">
-                {t("dash.setBudget")} →
-              </Link>
+              <>
+                <Link href="/budget" className="text-gold underline-offset-2 hover:underline">
+                  {t("dash.setBudget")} →
+                </Link>
+                {headingText}
+              </>
             )}
             {Number.isFinite(change) && (
               <span className="inline-flex items-center gap-1.5 text-ink-3">

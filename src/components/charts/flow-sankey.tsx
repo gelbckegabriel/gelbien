@@ -17,7 +17,7 @@ export function FlowSankey({ summary, className }: { summary: MonthSummary; clas
 
   if (!flow) {
     return (
-      <ChartCard className={className} title={t("dash.flow.title")} subtitle={t("dash.flow.subtitle")}>
+      <ChartCard viewKey="dash.flow" className={className} title={t("dash.flow.title")} subtitle={t("dash.flow.subtitle")}>
         <p className="flex flex-1 items-center justify-center py-10 text-center text-sm text-ink-3">{t("dash.flow.noIncome")}</p>
       </ChartCard>
     );
@@ -45,7 +45,7 @@ export function FlowSankey({ summary, className }: { summary: MonthSummary; clas
   ];
 
   return (
-    <ChartCard
+    <ChartCard viewKey="dash.flow"
       className={className}
       title={t("dash.flow.title")}
       subtitle={t("dash.flow.subtitle")}

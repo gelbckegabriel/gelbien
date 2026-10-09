@@ -9,7 +9,10 @@ import {
   localInsights,
   monthlyCost,
   expectedPace,
+  monthForecast,
   paceSeries,
+  priorityTrend,
+  topMerchants,
   recentAverages,
   runway,
   subscriptionTotals,
@@ -427,5 +430,77 @@ describe("month review", () => {
     expect(r.suggestions.at(-1)).toMatchObject({ kind: "wellDone", under: 1480 });
     expect(r.categories).toHaveLength(7);
     expect(r.categories[6]).toMatchObject({ rest: true, spent: 70 });
+  });
+});
+
+describe("monthForecast", () => {
+  const sub = {
+    id: "netflix", name: "Netflix", category: "Subscriptions", amount: 18.99, cycle: "monthly" as const, billingDay: 15, payment: "Credit", status: "active" as const,
+    trialEnd: "", worthIt: "yes" as const, notes: "", nextCharge: "", kind: "subscription" as const, subcategory: "", merchant: "",
+  };
+  // $10 of day-to-day spending every day of August and September: a usual day of exactly $10
+  const everyDay = (month: string, days: number) => Array.from({ length: days }, (_, i) => tx({ date: `${month}-${String(i + 1).padStart(2, "0")}`, amount: 10, category: "Groceries" }));
+  const history = [...everyDay("2026-08", 31), ...everyDay("2026-09", 30), tx({ date: "2026-09-01", amount: 1650, category: "Housing", type: "fixed" })];
+  const october = [tx({ date: "2026-10-01", amount: 1650, category: "Housing", type: "fixed" }), ...everyDay("2026-10", 10)];
+
+  it("adds the bills still due and a usual day for every day left", () => {
+    const fc = monthForecast(dataset([...history, ...october], { subscriptions: [sub] }), "2026-10", "2026-10-10")!;
+    expect(fc).toMatchObject({ spent: 1750, billsDue: 18.99, usualDaily: 10, daysLeft: 21, end: 1978.99, low: 1978.99, high: 1978.99 });
+    expect(fc.path[0]).toEqual({ day: 10, value: 1750, low: 1750, high: 1750 });
+    expect(fc.path.find((p) => p.day === 15)!.value).toBe(1750 + 18.99 + 50);
+  });
+
+  it("counts a bill that's due and not logged yet tomorrow, and widens with uneven days", () => {
+    const lumpy = [...history, tx({ date: "2026-09-12", amount: 300, category: "Shopping" }), ...october];
+    const fc = monthForecast(dataset(lumpy, { subscriptions: [{ ...sub, billingDay: 5 }] }), "2026-10", "2026-10-10")!;
+    expect(fc.path.find((p) => p.day === 11)!.value - fc.path[0].value).toBeCloseTo(18.99 + fc.usualDaily, 2);
+    expect(fc.high).toBeGreaterThan(fc.end);
+    expect(fc.low).toBeLessThan(fc.end);
+    expect(fc.low).toBeGreaterThanOrEqual(fc.spent + fc.billsDue);
+  });
+
+  it("only forecasts the current month, and needs something to go on", () => {
+    expect(monthForecast(dataset([...history, ...october]), "2026-09", "2026-10-10")).toBeNull();
+    expect(monthForecast(dataset(october.slice(0, 3)), "2026-10", "2026-10-03")).toBeNull();
+    // no history yet: this month's own days, once there are a few
+    expect(monthForecast(dataset(october), "2026-10", "2026-10-10")?.usualDaily).toBe(10);
+  });
+});
+
+describe("priorityTrend", () => {
+  it("splits each month by priority, from the first with spending, the current one marked", () => {
+    const ds = dataset([
+      tx({ date: "2026-08-03", amount: 100, category: "Groceries", priority: "essential" }),
+      tx({ date: "2026-08-09", amount: 40, category: "Eating out", priority: "superfluous" }),
+      tx({ date: "2026-10-02", amount: 25.5, category: "Eating out", priority: "superfluous" }),
+    ]);
+    const points = priorityTrend(ds, "2026-10", 6, "2026-10-08");
+    expect(points.map((p) => p.month)).toEqual(["2026-08", "2026-09", "2026-10"]);
+    expect(points[0]).toMatchObject({ essential: 100, important: 0, superfluous: 40, total: 140, partial: false });
+    expect(points[1].total).toBe(0);
+    expect(points[2]).toMatchObject({ superfluous: 25.5, partial: true });
+    expect(priorityTrend(dataset([]), "2026-10")).toEqual([]);
+  });
+});
+
+describe("topMerchants", () => {
+  it("ranks day-to-day spending by merchant, leaving bills and fixed costs out", () => {
+    const ds = dataset([
+      tx({ date: "2026-09-20", amount: 5, category: "Eating out", merchant: "Starbucks" }),
+      tx({ date: "2026-10-01", amount: 1650, category: "Housing", merchant: "Landlord", type: "fixed" }),
+      tx({ date: "2026-10-02", amount: 18.99, category: "Subscriptions", merchant: "Netflix", billId: "s1" }),
+      tx({ date: "2026-10-03", amount: 6.5, category: "Eating out", merchant: "Starbucks" }),
+      tx({ date: "2026-10-05", amount: 7, category: "Eating out", merchant: "starbucks " }),
+      tx({ date: "2026-10-06", amount: 120, category: "Groceries", merchant: "Costco" }),
+      tx({ date: "2026-10-07", amount: 30, category: "Home & household", merchant: "Costco" }),
+      tx({ date: "2026-10-08", amount: -20, category: "Groceries", merchant: "Costco", description: "refund" }),
+      tx({ date: "2026-10-08", amount: 12, category: "Eating out", merchant: "" }),
+    ]);
+    expect(topMerchants(ds, "2026-10")).toEqual([
+      { name: "Costco", category: "Groceries", amount: 130, visits: 2, isNew: true },
+      { name: "Starbucks", category: "Eating out", amount: 13.5, visits: 2, isNew: false },
+    ]);
+    // nothing earlier to compare with: nothing is "new"
+    expect(topMerchants(dataset(ds.transactions.filter((t) => t.date >= "2026-10-01")), "2026-10").every((m) => !m.isNew)).toBe(true);
   });
 });

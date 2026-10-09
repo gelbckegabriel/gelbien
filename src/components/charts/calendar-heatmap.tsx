@@ -18,7 +18,7 @@ export function CalendarHeatmap({ summary, className }: { summary: MonthSummary;
   const iso = (day: number) => `${summary.month}-${String(day).padStart(2, "0")}`;
 
   return (
-    <ChartCard
+    <ChartCard viewKey="dash.calendar"
       className={className}
       title={t("dash.cal.title")}
       subtitle={t("dash.cal.subtitle")}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Paperclip, Repeat } from "lucide-react";
+import { AlertTriangle, Infinity as InfinityIcon, Paperclip, Repeat } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import type { MonthSummary } from "@/lib/finance";
@@ -19,8 +19,9 @@ export function BudgetBars({ summary, className }: { summary: MonthSummary; clas
   const { t, f } = useI18n();
   const rows = summary.byCategory.filter((c) => c.budget > 0 || c.spent > 0);
   return (
-    <ChartCard
-      className={className}
+    // two columns of categories when the card itself is wide enough (it's half the row on big screens)
+    <ChartCard viewKey="dash.budgets"
+      className={cn("@container", className)}
       title={t("dash.budgets.title")}
       subtitle={t("dash.budgets.subtitle")}
       action={
@@ -35,13 +36,25 @@ export function BudgetBars({ summary, className }: { summary: MonthSummary; clas
         />
       }
     >
-      <ul className="grid gap-x-10 gap-y-3.5 xl:grid-cols-2">
+      <ul className="grid gap-x-10 gap-y-3.5 @[34rem]:grid-cols-2">
         {rows.map((c, i) => (
-          <li key={c.name} className="flex items-center gap-3">
+          // a size container: in a narrow column the status badge shrinks to its icon so the name keeps its room
+          <li key={c.name} className="flex items-center gap-3 @container">
             <CategoryIcon icon={c.icon} color={c.color} size="sm" />
             <div className="min-w-0 flex-1">
-              <div className="flex items-baseline justify-between gap-2 text-[13px]">
-                <span className="truncate text-ink-2">{c.name}</span>
+              <div className="flex items-center justify-between gap-2 text-[13px]">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-ink-2">{c.name}</span>
+                  {/* only when it says something: a green bar already reads "on track" */}
+                  {c.status !== "within" && (
+                    <span title={t(`budgetStatus.${c.status}`)} className="shrink-0">
+                      <Badge tone={c.status === "none" ? "neutral" : STATUS_TONE[c.status]} className="px-1.5 py-0 text-[10px]">
+                        {c.status === "none" ? <InfinityIcon className="h-3 w-3 @[19rem]:hidden" aria-hidden /> : <AlertTriangle className="h-3 w-3 @[19rem]:hidden" aria-hidden />}
+                        <span className="sr-only @[19rem]:not-sr-only">{t(`budgetStatus.${c.status}`)}</span>
+                      </Badge>
+                    </span>
+                  )}
+                </span>
                 <span className="tabular shrink-0 text-ink">
                   {f.amount(c.spent)}
                   {c.budget > 0 && <span className="text-ink-3"> / {f.amount(c.budget)}</span>}
@@ -53,9 +66,6 @@ export function BudgetBars({ summary, className }: { summary: MonthSummary; clas
                 <div className="mt-1.5 h-1.5 rounded-full bg-white/5" />
               )}
             </div>
-            <Badge tone={c.status === "none" ? "neutral" : STATUS_TONE[c.status]} className="hidden w-20 justify-center sm:inline-flex">
-              {t(`budgetStatus.${c.status}`)}
-            </Badge>
           </li>
         ))}
       </ul>
@@ -67,7 +77,7 @@ export function PrioritySplit({ summary, className }: { summary: MonthSummary; c
   const { t, f } = useI18n();
   const total = PRIORITIES.reduce((a, p) => a + Math.max(0, summary.byPriority[p]), 0);
   return (
-    <ChartCard
+    <ChartCard viewKey="review.priority"
       className={className}
       title={t("dash.priority.title")}
       subtitle={t("dash.priority.subtitle")}
@@ -105,7 +115,7 @@ export function PaymentBreakdown({ summary, styles, className }: { summary: Mont
   const { t, f } = useI18n();
   const max = Math.max(...summary.byPayment.map((p) => p.amount), 1);
   return (
-    <ChartCard className={className} title={t("dash.payment.title")} table={<DataTable head={["", t("exp.col.amount")]} rows={summary.byPayment.map((p) => [p.name, f.money(p.amount)])} />}>
+    <ChartCard viewKey="dash.payment" className={className} title={t("dash.payment.title")} table={<DataTable head={["", t("exp.col.amount")]} rows={summary.byPayment.map((p) => [p.name, f.money(p.amount)])} />}>
       <ul className="space-y-3">
         {summary.byPayment.map((p, i) => (
           <li key={p.name}>

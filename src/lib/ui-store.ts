@@ -38,9 +38,9 @@ interface UiState {
   openTour: () => void;
   setTourStep: (step: number) => void;
   closeTour: () => void;
-  /** How the Budget page lists spending limits: biggest spending first, or in category order */
-  limitsOrder: "spent" | "category";
-  setLimitsOrder: (order: "spent" | "category") => void;
+  /** View choices that stick in this browser, by control (useView): a list's order, a chart shown as a table… */
+  views: Record<string, string>;
+  setView: (key: string, value: string) => void;
 }
 
 export const useUi = create<UiState>()(
@@ -73,9 +73,28 @@ export const useUi = create<UiState>()(
       openTour: () => set({ tour: { open: true, step: 0 } }),
       setTourStep: (step) => set((s) => ({ tour: { ...s.tour, step } })),
       closeTour: () => set((s) => ({ tour: { ...s.tour, open: false } })),
-      limitsOrder: "spent",
-      setLimitsOrder: (limitsOrder) => set({ limitsOrder }),
+      views: {},
+      setView: (key, value) => set((s) => ({ views: { ...s.views, [key]: value } })),
     }),
-    { name: "gelbien.ui", partialize: (s) => ({ demo: s.demo, limitsOrder: s.limitsOrder }) },
+    {
+      name: "gelbien.ui",
+      partialize: (s) => ({ demo: s.demo, views: s.views }),
+      // the budget limits' order was saved on its own before the other views
+      merge: (saved, current) => {
+        const { limitsOrder, views, ...rest } = (saved ?? {}) as Partial<UiState> & { limitsOrder?: string };
+        return { ...current, ...rest, views: { ...(limitsOrder ? { "budget.limits": limitsOrder } : {}), ...views } };
+      },
+    },
   ),
 );
+
+/**
+ * A view choice remembered in this browser — which way a list is sorted, whether a chart shows as a table.
+ * `key` names the control; `fallback` holds until a choice is made (or when a saved one isn't among `allowed`).
+ */
+export function useView<T extends string>(key: string, fallback: T, allowed?: readonly T[]): [T, (value: T) => void] {
+  const saved = useUi((s) => s.views[key]) as T | undefined;
+  const setView = useUi((s) => s.setView);
+  const value = saved !== undefined && (!allowed || allowed.includes(saved)) ? saved : fallback;
+  return [value, (v: T) => setView(key, v)];
+}

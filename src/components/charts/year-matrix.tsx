@@ -44,7 +44,7 @@ export function YearMatrix({ ds, month }: { ds: Dataset; month: string }) {
   }, [month, m.rows.length]);
 
   return (
-    <ChartCard
+    <ChartCard viewKey="dash.year"
       title={t("dash.matrix.title")}
       subtitle={t("dash.matrix.subtitle", { year })}
       table={

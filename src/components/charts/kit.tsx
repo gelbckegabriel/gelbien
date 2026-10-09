@@ -4,6 +4,7 @@ import { BarChart3, Table2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import { useView } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader } from "../ui/card";
 import { AnimatedNumber, fitFont } from "../ui/misc";
@@ -69,12 +70,16 @@ export function TooltipBox({ title, rows }: { title?: string; rows: TooltipRow[]
   );
 }
 
-export function Legend({ items }: { items: { label: string; color: string; kind?: "line" | "rect" }[] }) {
+export function Legend({ items }: { items: { label: string; color: string; kind?: "line" | "dash" | "rect" }[] }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
       {items.map((i) => (
         <span key={i.label} className="inline-flex items-center gap-1.5 text-xs text-ink-2">
-          <span className={cn(i.kind === "line" ? "h-0.5 w-3.5 rounded-full" : "h-2.5 w-2.5 rounded-[3px]")} style={{ background: i.color }} />
+          {i.kind === "dash" ? (
+            <span className="w-3.5 border-t-2 border-dashed" style={{ borderColor: i.color }} />
+          ) : (
+            <span className={cn(i.kind === "line" ? "h-0.5 w-3.5 rounded-full" : "h-2.5 w-2.5 rounded-[3px]")} style={{ background: i.color }} />
+          )}
           {i.label}
         </span>
       ))}
@@ -104,6 +109,7 @@ export function ChartCard({
   children,
   className,
   action,
+  viewKey,
 }: {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -112,9 +118,14 @@ export function ChartCard({
   children: React.ReactNode;
   className?: string;
   action?: React.ReactNode;
+  /** names the chart so the chart ⇄ table choice is remembered in this browser */
+  viewKey?: string;
 }) {
   const { t } = useI18n();
-  const [showTable, setShowTable] = useState(false);
+  const [local, setLocal] = useState(false);
+  const [saved, setSaved] = useView(`${viewKey}.table`, "chart", ["chart", "table"] as const);
+  const showTable = viewKey ? saved === "table" : local;
+  const toggleTable = () => (viewKey ? setSaved(showTable ? "chart" : "table") : setLocal((s) => !s));
   return (
     <Card className={cn("flex flex-col", className)}>
       <CardHeader
@@ -125,7 +136,7 @@ export function ChartCard({
             {action}
             {table && (
               <button
-                onClick={() => setShowTable((s) => !s)}
+                onClick={toggleTable}
                 className="grid h-8 w-8 place-items-center rounded-lg text-ink-3 transition hover:bg-white/5 hover:text-ink"
                 aria-label={showTable ? t("common.chartView") : t("common.tableView")}
                 title={showTable ? t("common.chartView") : t("common.tableView")}

@@ -7,20 +7,22 @@ import { CategoryDonut } from "@/components/charts/category-donut";
 import { FlowSankey } from "@/components/charts/flow-sankey";
 import { StatTile } from "@/components/charts/kit";
 import { PaceChart } from "@/components/charts/pace-chart";
+import { PriorityTrend } from "@/components/charts/priority-trend";
 import { ProjectionChart } from "@/components/charts/projection-chart";
 import { TrendChart } from "@/components/charts/trend-chart";
-import { WeekdayChart } from "@/components/charts/weekday-chart";
 import { YearMatrix } from "@/components/charts/year-matrix";
 import { DueBills, UpcomingBills, useSkippedBills } from "@/components/dashboard/bills";
-import { BudgetBars, PaymentBreakdown, PrioritySplit, TopExpenses } from "@/components/dashboard/breakdowns";
+import { BudgetBars, PaymentBreakdown, TopExpenses } from "@/components/dashboard/breakdowns";
+import { GoalsSnapshot } from "@/components/dashboard/goals-snapshot";
 import { Hero } from "@/components/dashboard/hero";
 import { CheckInBanner } from "@/components/goals/checkin-banner";
 import { ReviewPrompt } from "@/components/month-review";
 import { Insights } from "@/components/dashboard/insights";
+import { TopMerchants } from "@/components/dashboard/merchants";
 import { Button } from "@/components/ui/button";
 import { Card, Stagger } from "@/components/ui/card";
 import { Delta, EmptyState } from "@/components/ui/misc";
-import { recentAverages, runway, subscriptionTotals, summarizeMonth, yearMatrix } from "@/lib/finance";
+import { monthForecast, recentAverages, runway, subscriptionTotals, summarizeMonth, yearMatrix } from "@/lib/finance";
 import { committedBills } from "@/lib/bills";
 import { accountsReserve } from "@/lib/goals";
 import { useDataset, useMode } from "@/lib/data/hooks";
@@ -49,6 +51,8 @@ export default function DashboardPage() {
   const change = (a: number, b: number) => (b ? (a - b) / Math.abs(b) : NaN);
   // bills this month with nothing logged yet — taken out of what's left to spend
   const bills = round2(committedBills(ds, month, todayISO(), skipped).reduce((a, c) => a + c.sub.amount, 0));
+  // where this month is heading (the current month only)
+  const forecast = monthForecast(ds, month, todayISO(), skipped);
 
   return (
     <>
@@ -59,7 +63,7 @@ export default function DashboardPage() {
           the cards beside it stretch to that height and their charts grow to fill it — no gaps. */}
       <Stagger className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="flex flex-col gap-4 lg:col-span-8">
-          <Hero s={s} prevTotal={prev.total} name={session?.user?.name} bills={bills} />
+          <Hero s={s} prevTotal={prev.total} name={session?.user?.name} bills={bills} forecast={forecast} />
           {/* four across, except beside the insights on a laptop (lg), where four would be too narrow */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
             <StatTile
@@ -152,44 +156,55 @@ export default function DashboardPage() {
           </Card>
         ) : null}
 
-        <div className="lg:col-span-8">
-          <PaceChart ds={ds} month={month} className="h-full" />
+        {/* Below the hero, each row pairs a wide chart or list with one narrow card of about the same height, and
+            nothing narrower than a third of the page (on a laptop the narrow side gets a little more). */}
+        <div className="lg:col-span-7 xl:col-span-8">
+          <PaceChart ds={ds} month={month} forecast={forecast} budget={s.budgetTotal} className="h-full" />
         </div>
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-5 xl:col-span-4">
           <CategoryDonut summary={s} className="h-full" />
         </div>
 
-        <div className="lg:col-span-8">
+        {/* big screens: budgets beside the bills, then goals beside the projection; a laptop: budgets across,
+            bills and goals side by side, the projection across */}
+        <div className="lg:col-span-12 xl:col-span-8">
           <BudgetBars summary={s} className="h-full" />
         </div>
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-6 xl:col-span-4">
           <UpcomingBills ds={ds} className="h-full" />
         </div>
+        <div className="lg:col-span-6 xl:col-span-4">
+          <GoalsSnapshot ds={ds} className="h-full" />
+        </div>
+        <div className="lg:col-span-12 xl:col-span-8">
+          <ProjectionChart ds={ds} month={month} className="h-full" />
+        </div>
 
-        <div className="lg:col-span-8">
+        <div className="lg:col-span-7 xl:col-span-8">
           <TrendChart ds={ds} month={month} className="h-full" />
         </div>
-        <div className="lg:col-span-4">
+        <div className="lg:col-span-5 xl:col-span-4">
           <CalendarHeatmap summary={s} className="h-full" />
         </div>
 
-        <div className="lg:col-span-8">
+        <div className="lg:col-span-7 xl:col-span-8">
           <FlowSankey summary={s} className="h-full" />
         </div>
-        <div className="flex flex-col gap-4 lg:col-span-4">
-          <PrioritySplit summary={s} />
-          <PaymentBreakdown summary={s} styles={ds.settings.paymentStyles} className="flex-1" />
+        <div className="lg:col-span-5 xl:col-span-4">
+          <TopMerchants ds={ds} month={month} className="h-full" />
         </div>
 
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-5 xl:col-span-6">
           <TopExpenses summary={s} ds={ds} className="h-full" />
         </div>
-        <div className="flex flex-col gap-4 lg:col-span-7">
-          <ProjectionChart ds={ds} month={month} className="flex-1" />
-          <WeekdayChart ds={ds} className="flex-1" />
+        {/* stacked cards are never squeezed below their content (cards clip overflow, so flex would otherwise shrink them past it) */}
+        <div className="flex flex-col gap-4 lg:col-span-7 xl:col-span-6">
+          <PriorityTrend ds={ds} month={month} className="flex-auto shrink-0" />
+          <PaymentBreakdown summary={s} styles={ds.settings.paymentStyles} className="flex-auto shrink-0" />
         </div>
 
-        <div className="lg:col-span-12">
+        {/* a twelve-month grid needs the width: left out on phones and small tablets */}
+        <div className="hidden md:block lg:col-span-12">
           <YearMatrix ds={ds} month={month} />
         </div>
 

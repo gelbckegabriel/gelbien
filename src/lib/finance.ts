@@ -2,7 +2,7 @@
  * Pure analytics over a Dataset. Everything the dashboard, budget page and AI
  * context need is computed here so it can be unit-tested without React.
  */
-import { chargesBetween } from "./bills";
+import { chargesBetween, committedBills } from "./bills";
 import { OTHER_COLOR, REST_COLOR } from "./defaults";
 import type {
   BudgetLine,
@@ -373,20 +373,148 @@ export function projection(ds: Dataset, month: string, start: number, horizon = 
   }));
 }
 
-/** Average spend per weekday over the last `days` days. index 0 = Sunday */
-export function weekdayPattern(ds: Dataset, today = todayISO(), days = 90) {
-  const end = new Date(`${today}T12:00:00`);
-  const start = new Date(end);
-  start.setDate(start.getDate() - days + 1);
-  const totals = Array.from({ length: 7 }, () => 0);
-  const counts = Array.from({ length: 7 }, () => 0);
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) counts[d.getDay()] += 1;
-  const startISO = todayISO(start);
-  for (const t of ds.transactions) {
-    if (t.date < startISO || t.date > today) continue;
-    totals[new Date(`${t.date}T12:00:00`).getDay()] += t.amount;
+// ---------------------------------------------------------------------------
+// Month-end forecast
+// ---------------------------------------------------------------------------
+
+/** Day-to-day spending: not a bill payment, not a fixed cost */
+const dayToDay = (t: Transaction) => !t.billId && t.type !== "fixed";
+
+/** Day-to-day spending of each day of `month`, up to day `upTo` */
+function dayToDayDays(ds: Pick<Dataset, "transactions">, month: string, upTo = daysInMonth(month)): number[] {
+  const days = new Array<number>(upTo).fill(0);
+  for (const t of txInMonth(ds.transactions, month)) {
+    const d = Number(t.date.slice(8, 10));
+    if (d <= upTo && dayToDay(t)) days[d - 1] += t.amount;
   }
-  return totals.map((total, i) => ({ weekday: i, avg: counts[i] ? round2(total / counts[i]) : 0 }));
+  return days;
+}
+
+export interface MonthForecast {
+  /** spent by the end of the month, most likely, and the usual range around it */
+  end: number;
+  low: number;
+  high: number;
+  spent: number;
+  /** bills still to pay this month (or due and not logged) */
+  billsDue: number;
+  /** the usual day of day-to-day spending */
+  usualDaily: number;
+  daysLeft: number;
+  /** cumulative spending from today (day `from`) to the last day; index 0 = today */
+  path: { day: number; value: number; low: number; high: number }[];
+}
+
+/**
+ * Where the current month is heading: what's spent so far, the bills still due on their days (one due and
+ * not logged yet counts tomorrow), and a usual day of day-to-day spending (no bills or fixed costs) for every
+ * day left. The usual day is the average over the last three months with any spending — this month's own
+ * days when there's no history yet. The range is one standard deviation of a day, over the days left (it
+ * grows with their square root). Null for any month but the current one, or with nothing to go on.
+ */
+export function monthForecast(ds: Dataset, month: string, today = todayISO(), skipped: ReadonlySet<string> = new Set()): MonthForecast | null {
+  const s = summarizeMonth(ds, month, today);
+  if (!s.isCurrent) return null;
+  const history = monthRange(addMonths(month, -1), 12)
+    .filter((m) => txInMonth(ds.transactions, m).length > 0)
+    .slice(-3);
+  // this month alone says little until a few days have gone by
+  const sample = history.length ? history.flatMap((m) => dayToDayDays(ds, m)) : s.elapsed >= 5 ? dayToDayDays(ds, month, s.elapsed) : [];
+  if (!sample.length) return null;
+  const usual = sample.reduce((a, b) => a + b, 0) / sample.length;
+  const sd = Math.sqrt(sample.reduce((a, b) => a + (b - usual) ** 2, 0) / sample.length);
+
+  const bills = new Array<number>(s.days).fill(0);
+  for (const c of committedBills(ds, month, today, skipped)) {
+    const day = Math.min(s.days, Math.max(Number(c.date.slice(8, 10)), s.elapsed + 1));
+    bills[day - 1] += c.sub.amount;
+  }
+  const path: MonthForecast["path"] = [];
+  let run = s.total;
+  let fixed = s.total;
+  for (let day = s.elapsed; day <= s.days; day++) {
+    if (day > s.elapsed) {
+      run += bills[day - 1] + usual;
+      fixed += bills[day - 1];
+    }
+    const spread = sd * Math.sqrt(day - s.elapsed);
+    // never below what's certain: spent, plus the bills
+    path.push({ day, value: round2(run), low: round2(Math.max(fixed, run - spread)), high: round2(run + spread) });
+  }
+  const last = path[path.length - 1];
+  return {
+    end: last.value,
+    low: last.low,
+    high: last.high,
+    spent: s.total,
+    billsDue: round2(bills.reduce((a, b) => a + b, 0)),
+    usualDaily: round2(usual),
+    daysLeft: s.days - s.elapsed,
+    path,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Spending by priority, merchants
+// ---------------------------------------------------------------------------
+
+export interface PriorityMonth extends Record<Priority, number> {
+  month: string;
+  total: number;
+  /** the current month, still going */
+  partial: boolean;
+}
+
+/** Spending by priority for the `count` months up to `endMonth`, from the first with any spending. */
+export function priorityTrend(ds: Pick<Dataset, "transactions">, endMonth: string, count = 6, today = todayISO()): PriorityMonth[] {
+  const out = monthRange(endMonth, count).map((month) => {
+    const by: Record<Priority, number> = { essential: 0, important: 0, superfluous: 0 };
+    for (const t of txInMonth(ds.transactions, month)) by[t.priority] += t.amount;
+    const total = round2(by.essential + by.important + by.superfluous);
+    return { month, essential: round2(by.essential), important: round2(by.important), superfluous: round2(by.superfluous), total, partial: month === monthOf(today) };
+  });
+  const first = out.findIndex((p) => p.total !== 0);
+  return first === -1 ? [] : out.slice(first);
+}
+
+export interface MerchantSpend {
+  name: string;
+  /** where most of its spending went */
+  category: string;
+  amount: number;
+  visits: number;
+  /** first time this merchant shows up (only said when there's earlier history) */
+  isNew: boolean;
+}
+
+/**
+ * Where the month's day-to-day money went, by merchant: bills and fixed costs left out (rent would top
+ * every month), refunds netted. Biggest first.
+ */
+export function topMerchants(ds: Pick<Dataset, "transactions">, month: string): MerchantSpend[] {
+  const start = `${month}-01`;
+  const before = ds.transactions.filter((t) => t.date < start);
+  const seen = new Set(before.map((t) => normalize(t.merchant)).filter(Boolean));
+  const groups = new Map<string, { name: string; amount: number; visits: number; cats: Map<string, number> }>();
+  for (const t of txInMonth(ds.transactions, month)) {
+    const key = normalize(t.merchant);
+    if (!key || !dayToDay(t) || t.recurring) continue;
+    const g = groups.get(key) ?? { name: t.merchant.trim(), amount: 0, visits: 0, cats: new Map<string, number>() };
+    g.amount += t.amount;
+    if (t.amount > 0) g.visits += 1;
+    g.cats.set(t.category, (g.cats.get(t.category) ?? 0) + t.amount);
+    groups.set(key, g);
+  }
+  return [...groups.entries()]
+    .map(([key, g]) => ({
+      name: g.name,
+      category: [...g.cats.entries()].sort((a, b) => b[1] - a[1])[0][0],
+      amount: round2(g.amount),
+      visits: g.visits,
+      isNew: before.length > 0 && !seen.has(key),
+    }))
+    .filter((m) => m.amount > 0)
+    .sort((a, b) => b.amount - a.amount || b.visits - a.visits);
 }
 
 /** Suggest a budget per category from the average of the previous `n` months. */

@@ -36,7 +36,7 @@ export function goalHold(goal: Goal, plan: GoalPlan, month = currentMonth()): { 
 }
 
 /** Next to On track / Behind: a dashed tag for a goal nothing goes into right now, and why */
-function HoldBadge({ hold, title }: { hold: NonNullable<ReturnType<typeof goalHold>>; title?: string }) {
+export function HoldBadge({ hold, title }: { hold: NonNullable<ReturnType<typeof goalHold>>; title?: string }) {
   const { t, f } = useI18n();
   const Icon = { waiting: Hourglass, later: CalendarClock, skipping: CalendarOff }[hold.kind];
   const start = hold.start ?? "";

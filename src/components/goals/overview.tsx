@@ -136,7 +136,7 @@ export function NetWorthCard({ ds, className }: { ds: Dataset; className?: strin
   const prev = series.length > 1 ? series[series.length - 2].total : null;
 
   return (
-    <ChartCard
+    <ChartCard viewKey="goals.netWorth"
       className={className}
       title={t("nw.title")}
       subtitle={t("nw.subtitle")}

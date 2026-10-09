@@ -16,7 +16,7 @@ export function CategoryDonut({ summary, className }: { summary: MonthSummary; c
   const focus = hover !== null ? data[hover] : null;
 
   return (
-    <ChartCard
+    <ChartCard viewKey="dash.donut"
       className={className}
       title={t("dash.cat.title")}
       subtitle={t("dash.cat.subtitle")}

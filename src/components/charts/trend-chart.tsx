@@ -17,7 +17,7 @@ export function TrendChart({ ds, month, className }: { ds: Dataset; month: strin
   const hasIncome = data.some((d) => d.income > 0);
 
   return (
-    <ChartCard
+    <ChartCard viewKey="dash.trend"
       className={className}
       title={t("dash.trend.title")}
       subtitle={t("dash.trend.subtitle")}

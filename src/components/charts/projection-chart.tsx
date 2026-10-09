@@ -17,7 +17,7 @@ export function ProjectionChart({ ds, month, className }: { ds: Dataset; month: 
   const reserve = accountsReserve(ds);
   if (reserve === null) {
     return (
-      <ChartCard className={className} title={t("dash.proj.title")} subtitle={t("dash.proj.subtitle")}>
+      <ChartCard viewKey="dash.projection" className={className} title={t("dash.proj.title")} subtitle={t("dash.proj.subtitle")}>
         <EmptyState
           icon={<Landmark className="h-6 w-6" />}
           title={t("dash.proj.noAccounts")}
@@ -37,7 +37,7 @@ export function ProjectionChart({ ds, month, className }: { ds: Dataset; month: 
   const color = rising ? GOOD : BAD;
 
   return (
-    <ChartCard
+    <ChartCard viewKey="dash.projection"
       className={className}
       title={t("dash.proj.title")}
       subtitle={t("dash.proj.subtitle")}

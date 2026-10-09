@@ -16,7 +16,7 @@ import { toCsv } from "@/lib/csv";
 import { downloadFile } from "@/lib/files";
 import { useI18n } from "@/lib/i18n";
 import { PRIORITIES, type Dataset, type Priority, type Transaction } from "@/lib/types";
-import { useUi } from "@/lib/ui-store";
+import { useUi, useView } from "@/lib/ui-store";
 import { addMonths, cn, monthOf, normalize, round2, todayISO } from "@/lib/utils";
 
 const PAGE = 120;
@@ -31,19 +31,19 @@ export default function ExpensesPage() {
 
 function Expenses() {
   const ds = useDataset().data as Dataset;
-  // /expenses?category=… (from the budget page) opens with that filter applied
+  // /expenses?category=… (from the budget page) opens with that filter applied; ?q=… with that search (a merchant on the dashboard)
   const params = useSearchParams();
   const linked = params.get("category") ?? "";
   const initialCategory = ds.categories.some((c) => c.name === linked) ? linked : "";
   const month = useUi((s) => s.month);
   const openExpense = useUi((s) => s.openExpense);
   const { t, f } = useI18n();
-  const [query, setQuery] = useState("");
-  const [scope, setScope] = useState<"month" | "all">("month");
+  const [query, setQuery] = useState(params.get("q") ?? "");
+  const [scope, setScope] = useView("expenses.scope", "month", ["month", "all"] as const);
   const [category, setCategory] = useState(initialCategory);
   const [priority, setPriority] = useState<Priority | "">("");
   const [payment, setPayment] = useState("");
-  const [sort, setSort] = useState<"date" | "amount">("date");
+  const [sort, setSort] = useView("expenses.sort", "date", ["date", "amount"] as const);
   const [showFilters, setShowFilters] = useState(!!initialCategory);
   const [limit, setLimit] = useState(PAGE);
   const q = useDeferredValue(normalize(query));
