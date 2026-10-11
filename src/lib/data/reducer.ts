@@ -1,6 +1,7 @@
 import type { Dataset, Mutation } from "../types";
+import { newestFirst } from "../utils";
 
-const byDateDesc = (a: { date: string }, b: { date: string }) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+const byDateDesc = newestFirst;
 
 /**
  * Apply a mutation to an in-memory dataset. Used for optimistic updates (Google
@@ -44,6 +45,7 @@ export function applyMutationToDataset(ds: Dataset, m: Mutation): Dataset {
         transactions: ds.transactions.map((t) => ({ ...t, category: rename(t.category), subcategory: renameSub(t.category, t.subcategory) })),
         budgets: ds.budgets.map((b) => ({ ...b, category: rename(b.category) })),
         subscriptions: ds.subscriptions.map((s) => ({ ...s, category: rename(s.category), subcategory: renameSub(s.category, s.subcategory) })),
+        plans: ds.plans.map((p) => ({ ...p, category: rename(p.category), subcategory: renameSub(p.category, p.subcategory) })),
       };
     }
     case "saveBudget": {
@@ -71,6 +73,7 @@ export function applyMutationToDataset(ds: Dataset, m: Mutation): Dataset {
         settings: m.settings,
         transactions: ds.transactions.map((t) => (renames.has(t.payment) ? { ...t, payment: rename(t.payment) } : t)),
         subscriptions: ds.subscriptions.map((s) => (renames.has(s.payment) ? { ...s, payment: rename(s.payment) } : s)),
+        plans: ds.plans.map((p) => (renames.has(p.payment) ? { ...p, payment: rename(p.payment) } : p)),
       };
     }
     case "upsertAccount":
@@ -84,6 +87,7 @@ export function applyMutationToDataset(ds: Dataset, m: Mutation): Dataset {
         accounts: ds.accounts.filter((a) => a.id !== m.id),
         balances: ds.balances.filter((b) => b.accountId !== m.id),
         goals: ds.goals.map((g) => (g.accountIds.includes(m.id) ? { ...g, accountIds: g.accountIds.filter((id) => id !== m.id) } : g)),
+        plans: ds.plans.map((p) => (p.accountId === m.id ? { ...p, accountId: "" } : p)),
       };
     case "saveBalances": {
       const key = (b: { accountId: string; date: string }) => `${b.accountId}|${b.date}`;
@@ -100,6 +104,10 @@ export function applyMutationToDataset(ds: Dataset, m: Mutation): Dataset {
       };
     case "deleteGoal":
       return { ...ds, goals: ds.goals.filter((g) => g.id !== m.id) };
+    case "upsertPlan":
+      return { ...ds, plans: ds.plans.some((p) => p.id === m.plan.id) ? ds.plans.map((p) => (p.id === m.plan.id ? m.plan : p)) : [...ds.plans, m.plan] };
+    case "deletePlan":
+      return { ...ds, plans: ds.plans.filter((p) => p.id !== m.id) };
     case "replaceAll":
       return { ...m.data, transactions: [...m.data.transactions].sort(byDateDesc), meta: ds.meta };
   }

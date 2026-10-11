@@ -18,12 +18,14 @@ import { Hero } from "@/components/dashboard/hero";
 import { CheckInBanner } from "@/components/goals/checkin-banner";
 import { ReviewPrompt } from "@/components/month-review";
 import { Insights } from "@/components/dashboard/insights";
+import { Commitments } from "@/components/plans/commitments";
 import { TopMerchants } from "@/components/dashboard/merchants";
 import { Button } from "@/components/ui/button";
 import { Card, Stagger } from "@/components/ui/card";
 import { Delta, EmptyState } from "@/components/ui/misc";
 import { monthForecast, recentAverages, runway, subscriptionTotals, summarizeMonth, yearMatrix } from "@/lib/finance";
 import { committedBills } from "@/lib/bills";
+import { commitments } from "@/lib/plans";
 import { accountsReserve } from "@/lib/goals";
 import { useDataset, useMode } from "@/lib/data/hooks";
 import { useI18n } from "@/lib/i18n";
@@ -53,6 +55,8 @@ export default function DashboardPage() {
   const bills = round2(committedBills(ds, month, todayISO(), skipped).reduce((a, c) => a + c.sub.amount, 0));
   // where this month is heading (the current month only)
   const forecast = monthForecast(ds, month, todayISO(), skipped);
+  // installments and loans still being paid: their card shows only while there are some
+  const hasPlans = commitments(ds).lines.length > 0;
 
   return (
     <>
@@ -179,6 +183,11 @@ export default function DashboardPage() {
         <div className="lg:col-span-12 xl:col-span-8">
           <ProjectionChart ds={ds} month={month} className="h-full" />
         </div>
+        {hasPlans && (
+          <div className="lg:col-span-12">
+            <Commitments ds={ds} />
+          </div>
+        )}
 
         <div className="lg:col-span-7 xl:col-span-8">
           <TrendChart ds={ds} month={month} className="h-full" />

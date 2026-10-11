@@ -1,6 +1,7 @@
 "use client";
 
-import { buildDemoDataset } from "../demo";
+import { buildDemoDataset, DEMO_VERSION } from "../demo";
+import { todayISO } from "../utils";
 import type { Dataset, Locale, Mutation, SessionInfo } from "../types";
 import { applyMutationToDataset } from "./reducer";
 import { upgradeDataset } from "./upgrade";
@@ -48,57 +49,86 @@ export function googleSource(locale: Locale): DataSource {
   };
 }
 
-const DEMO_KEY = "gelbien.demo.v1";
+const DEMO_KEY = "gelbien.demo.v2";
+const OLD_DEMO_KEYS = ["gelbien.demo.v1"];
 export const MODE_KEY = "gelbien.mode";
 
-export function readDemo(): Dataset | null {
+/** The demo as kept in this browser: which version of it, the day it was built, and whether it's been changed since */
+interface StoredDemo {
+  version: number;
+  builtOn: string;
+  edited: boolean;
+  data: Dataset;
+}
+
+/**
+ * The demo is built for the day it's opened, so there's always this month's activity to look at. It's
+ * built again when an older version of the demo made it, or on a later day — once played with, it's kept
+ * a few days (anything changed in it would be lost).
+ */
+function stillFresh(d: StoredDemo, today = todayISO()): boolean {
+  if (d.version !== DEMO_VERSION || !d.data) return false;
+  if (!d.edited) return d.builtOn === today;
+  return (Date.parse(today) - Date.parse(d.builtOn)) / 86400000 <= 3;
+}
+
+function readStored(): StoredDemo | null {
   try {
+    for (const key of OLD_DEMO_KEYS) localStorage.removeItem(key);
     const raw = localStorage.getItem(DEMO_KEY);
-    return raw ? upgradeDataset(JSON.parse(raw) as Dataset) : null;
+    if (!raw) return null;
+    const d = JSON.parse(raw) as StoredDemo;
+    return stillFresh(d) ? { ...d, data: upgradeDataset(d.data) } : null;
   } catch {
     return null;
   }
 }
 
-function writeDemo(ds: Dataset) {
+function writeDemo(data: Dataset, edited: boolean, builtOn: string) {
   try {
-    localStorage.setItem(DEMO_KEY, JSON.stringify(ds));
+    localStorage.setItem(DEMO_KEY, JSON.stringify({ version: DEMO_VERSION, builtOn, edited, data } satisfies StoredDemo));
   } catch {
     /* storage full or blocked — demo keeps working in memory */
   }
 }
 
-let memoryDemo: Dataset | null = null;
+let memoryDemo: StoredDemo | null = null;
+
+function fresh(locale: Locale): StoredDemo {
+  return { version: DEMO_VERSION, builtOn: todayISO(), edited: false, data: buildDemoDataset(locale) };
+}
 
 export function demoSource(locale: Locale): DataSource {
-  const current = () => memoryDemo ?? readDemo() ?? buildDemoDataset(locale);
+  const current = () => (memoryDemo && stillFresh(memoryDemo) ? memoryDemo : (readStored() ?? fresh(locale)));
   return {
     load: async () => {
-      const ds = current();
-      memoryDemo = ds;
-      writeDemo(ds);
-      return ds;
+      const d = current();
+      memoryDemo = d;
+      writeDemo(d.data, d.edited, d.builtOn);
+      return d.data;
     },
     apply: async (m) => {
       const syncedAt = new Date().toISOString();
-      const next = applyMutationToDataset(current(), m);
-      memoryDemo = { ...next, meta: { ...next.meta, syncedAt } };
-      writeDemo(memoryDemo);
+      const d = current();
+      const next = applyMutationToDataset(d.data, m);
+      memoryDemo = { ...d, edited: true, data: { ...next, meta: { ...next.meta, syncedAt } } };
+      writeDemo(memoryDemo.data, true, memoryDemo.builtOn);
       return { syncedAt };
     },
   };
 }
 
 export function resetDemo(locale: Locale): Dataset {
-  memoryDemo = buildDemoDataset(locale);
-  writeDemo(memoryDemo);
-  return memoryDemo;
+  memoryDemo = fresh(locale);
+  writeDemo(memoryDemo.data, false, memoryDemo.builtOn);
+  return memoryDemo.data;
 }
 
 export function clearDemo() {
   memoryDemo = null;
   try {
     localStorage.removeItem(DEMO_KEY);
+    for (const key of OLD_DEMO_KEYS) localStorage.removeItem(key);
   } catch {
     /* ignore */
   }

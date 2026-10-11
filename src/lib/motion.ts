@@ -44,6 +44,42 @@ export const growX = (delay = 0, stiffness = 120, damping = 22) => ({
 /** With "reduce motion" on: rows and icons stay put */
 export const STILL: Variants = { hidden: {}, show: {} };
 
+/**
+ * A section opening or closing (see Collapse): eased, never springy — a bouncing height drags
+ * everything under it up and down. The fade is quicker so the content never shows half cut off.
+ */
+export const REVEAL: Transition = { height: { duration: 0.28, ease: EASE_OUT }, opacity: { duration: 0.18, ease: "easeOut" } };
+
+/**
+ * Keeps `el` where it is on screen while sections around it open and close — a switch's own details
+ * unfolding is fine, but one above it collapsing would pull it from under the finger. For a moment its
+ * scroll container follows the layout (until the user scrolls it themselves).
+ */
+export function holdInPlace(el: HTMLElement, ms = 450) {
+  let scroller = el.parentElement;
+  while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+  if (!scroller) return;
+  const box = scroller;
+  const offset = () => el.getBoundingClientRect().top - box.getBoundingClientRect().top;
+  const start = offset();
+  const until = performance.now() + ms;
+  let stopped = false;
+  const stop = () => (stopped = true);
+  box.addEventListener("wheel", stop, { once: true, passive: true });
+  box.addEventListener("touchstart", stop, { once: true, passive: true });
+  const tick = () => {
+    if (stopped || !el.isConnected) return;
+    const drift = offset() - start;
+    if (Math.abs(drift) >= 0.5) box.scrollTop += drift;
+    if (performance.now() < until) requestAnimationFrame(tick);
+    else {
+      box.removeEventListener("wheel", stop);
+      box.removeEventListener("touchstart", stop);
+    }
+  };
+  requestAnimationFrame(tick);
+}
+
 // ---- where the last tap happened, so a popup can unfold from the button that opened it ----
 
 let lastTap: { x: number; y: number; at: number } | null = null;

@@ -1,5 +1,6 @@
 import { effectiveBudget, effectiveIncome, monthlyCost, trend } from "../finance";
 import { goalPlanFor, latestBalances, netWorth } from "../goals";
+import { commitmentsIn, planStanding } from "../plans";
 import type { Dataset, Locale } from "../types";
 import { addMonths, currentMonth, monthOf, monthRange } from "../utils";
 
@@ -38,6 +39,12 @@ export function buildFinanceContext(ds: Dataset, anchorMonth = currentMonth()): 
   for (const c of [...ds.categories].sort((a, b) => a.order - b.order)) {
     if (c.archived) continue;
     lines.push(`- ${c.name} (budget ${(budget[c.name] ?? 0).toFixed(2)}): ${c.subcategories.join("; ")}`);
+  }
+  const committed = commitmentsIn(ds, anchorMonth);
+  if (committed.planned > 0 || committed.paid > 0) {
+    lines.push(
+      `- Commitments (an automatic budget line of its own: installments and loan payments due this month ${committed.planned.toFixed(2)}, paid so far ${committed.paid.toFixed(2)}; these payments keep their category for reporting but don't count against its budget)`,
+    );
   }
   lines.push("");
 
@@ -78,10 +85,23 @@ export function buildFinanceContext(ds: Dataset, anchorMonth = currentMonth()): 
     const latest = latestBalances(ds.balances);
     const nw = netWorth(ds);
     lines.push(`## Accounts — latest monthly check-in (net worth ${nw.total.toFixed(2)}: assets ${nw.assets.toFixed(2)}, debts ${nw.debts.toFixed(2)})`);
-    lines.push("name, institution, type, balance (for credit, lineOfCredit, loan and mortgage: amount owed), as of, state");
+    lines.push("name, institution, type, balance (for credit, lineOfCredit, loan and mortgage: amount owed), as of, state, value lost per year %");
     for (const a of ds.accounts) {
       const b = latest.get(a.id);
-      lines.push([a.name, a.institution, a.type, b ? b.balance.toFixed(2) : "-", b?.date ?? "-", a.archived ? "closed" : "open"].map(csv).join(", "));
+      lines.push([a.name, a.institution, a.type, b ? b.balance.toFixed(2) : "-", b?.date ?? "-", a.archived ? "closed" : "open", a.depreciation ? String(a.depreciation) : "-"].map(csv).join(", "));
+    }
+    lines.push("");
+  }
+
+  const plans = ds.plans.filter((p) => p.status === "active");
+  if (plans.length) {
+    lines.push("## Payment plans: installments and loans (name, kind, monthly payment, payments made of total, still owed, last payment month, yearly interest %, down payment, rate changes from a month on)");
+    for (const p of plans) {
+      const s = planStanding(p, ds);
+      if (s.done) continue;
+      lines.push(
+        [p.name, p.kind, (s.next?.amount ?? 0).toFixed(2), `${s.paid}/${s.schedule.length}`, s.owed.toFixed(2), s.end, p.rate, p.downPayment.toFixed(2), p.rateChanges.map((c) => `${c.from} ${c.rate}% (keeps the ${c.keep === "end" ? "end date" : "payment"})`).join("; ") || "-"].map(csv).join(", "),
+      );
     }
     lines.push("");
   }

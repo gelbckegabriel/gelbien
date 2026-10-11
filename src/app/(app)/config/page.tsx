@@ -20,6 +20,7 @@ import { useI18n, type MessageKey } from "@/lib/i18n";
 import type { Category, Dataset, PaymentStyle, Settings } from "@/lib/types";
 import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
 import { cn, normalize, uid } from "@/lib/utils";
+import { REVEAL } from "@/lib/motion";
 
 interface SubDraft {
   key: string;
@@ -244,7 +245,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
                   </div>
                   <AnimatePresence initial={false}>
                     {open && (
-                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={REVEAL} className="overflow-hidden">
                         <div className="border-t border-line/70 p-4">
                           <SubcategoryEditor items={c.subs} onChange={(subs) => update(c.key, { subs })} />
                           <div className="mt-4 flex flex-wrap items-center gap-2">

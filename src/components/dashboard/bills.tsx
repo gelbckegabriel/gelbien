@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Check, X } from "lucide-react";
+import { CalendarClock, CalendarRange, Check, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { create } from "zustand";
 import { addDays, billTransaction, chargeKey, dueBills, upcomingBills, type BillCharge, type LoggedCharge } from "@/lib/bills";
 import { useMutate } from "@/lib/data/hooks";
 import { useI18n } from "@/lib/i18n";
+import { commitments } from "@/lib/plans";
 import type { Dataset, Mutation } from "@/lib/types";
 import { cn, round2, todayISO } from "@/lib/utils";
 import { CategoryIcon } from "../icons";
@@ -192,6 +193,7 @@ export function UpcomingBills({ ds, className }: { ds: Dataset; className?: stri
   // active bills we can't place on a calendar (no billing day / next charge date)
   const unscheduled = ds.subscriptions.filter((s) => s.status === "active" && !(s.cycle === "monthly" && s.billingDay) && !s.nextCharge).length;
   const visible = showAll ? items : items.slice(0, 5);
+  const plansMonthly = ds.plans.length ? commitments(ds, today).thisMonth : 0;
 
   return (
     <Card className={cn("flex flex-col", className)}>
@@ -227,6 +229,13 @@ export function UpcomingBills({ ds, className }: { ds: Dataset; className?: stri
             );
           })}
         </ul>
+      )}
+      {/* installments and loans, in a line: the Budget page's Commitments card has the rest */}
+      {plansMonthly > 0 && (
+        <GuardedLink href="/budget#commitments" className="mt-3 flex items-center gap-2 rounded-xl border border-line/70 px-3 py-2 text-xs text-ink-3 transition-colors hover:text-ink">
+          <CalendarRange className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 flex-1">{t("bills.plansLine", { amount: f.money(plansMonthly) })}</span>→
+        </GuardedLink>
       )}
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3 text-[13px]">
         {items.length > 5 ? (

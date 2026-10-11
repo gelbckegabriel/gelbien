@@ -25,11 +25,15 @@ export const RECORD: Records = {
     id: "", name: "", category: "", amount: 0, cycle: "monthly", billingDay: null, payment: "", status: "active", trialEnd: "", worthIt: "maybe",
     notes: "", nextCharge: "", kind: "bill", subcategory: "", merchant: "",
   },
-  accounts: { id: "", name: "", institution: "", type: "other", color: "#6b6a72", archived: false, notes: "" },
+  accounts: { id: "", name: "", institution: "", type: "other", color: "#6b6a72", archived: false, notes: "", depreciation: 0 },
   balances: { accountId: "", date: "", balance: 0 },
   goals: {
     id: "", name: "", icon: "Target", color: "#d9b45f", target: 0, targetDate: "", accountIds: [], saved: 0, monthlyContribution: 0,
     annualReturn: 0, status: "active", order: 0, notes: "", createdAt: "", startMonth: "", afterGoalId: "", pausedMonths: [],
+  },
+  plans: {
+    id: "", kind: "other", name: "", category: "", subcategory: "", merchant: "", payment: "", price: 0, downPayment: 0, rate: 0, count: 1,
+    amortization: "price", firstDate: "", extras: [], prepayments: [], rateChanges: [], accountId: "", countAsDebt: true, status: "active", notes: "", createdAt: "",
   },
 };
 

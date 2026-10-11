@@ -7,6 +7,7 @@
  * year); the money already there keeps growing through those months.
  */
 import { recentAverages, summarizeMonth } from "./finance";
+import { installmentsOwed } from "./plans";
 import { isDebt, isLongTerm, type Account, type BalanceSnapshot, type Dataset, type Goal } from "./types";
 import { addMonths, currentMonth, daysInMonth, monthOf, monthRange, round2, todayISO } from "./utils";
 
@@ -127,10 +128,27 @@ export function latestBalances(balances: BalanceSnapshot[], asOf = todayISO()): 
   return out;
 }
 
-export function netWorth(ds: Pick<Dataset, "accounts" | "balances">, asOf = todayISO()) {
+/** What net worth reads: account balances, and the installments still to pay on purchases (a debt too) */
+type WorthData = Pick<Dataset, "accounts" | "balances"> & Partial<Pick<Dataset, "plans" | "transactions">>;
+
+/**
+ * What something that loses value (a car) is likely worth on `asOf`: its last recorded value less its
+ * yearly depreciation since then, compounded. What a check-in starts from; the user types the real one.
+ */
+export function estimatedValue(account: Pick<Account, "depreciation">, last: Pick<BalanceSnapshot, "date" | "balance">, asOf = todayISO()): number {
+  // in calendar months, so a year later it's lost exactly its yearly share
+  const [y0, m0, d0] = last.date.split("-").map(Number);
+  const [y1, m1, d1] = asOf.split("-").map(Number);
+  const years = ((y1 - y0) * 12 + (m1 - m0) + (d1 - d0) / 30.44) / 12;
+  if (!(account.depreciation > 0) || !(years > 0)) return last.balance;
+  return round2(last.balance * (1 - Math.min(100, account.depreciation) / 100) ** years);
+}
+
+export function netWorth(ds: WorthData, asOf = todayISO()) {
   const latest = latestBalances(ds.balances, asOf);
   let assets = 0;
-  let debts = 0;
+  // installments still to pay are owed just like a card balance (unless a plan says its card already counts them)
+  let debts = installmentsOwed(ds, asOf);
   for (const a of ds.accounts) {
     const b = latest.get(a.id);
     if (!b) continue;
@@ -160,7 +178,7 @@ export function accountsReserve(ds: Pick<Dataset, "accounts" | "balances">, asOf
 }
 
 /** Month-end net worth for the last `count` months, carrying each account's last known balance forward. */
-export function netWorthSeries(ds: Pick<Dataset, "accounts" | "balances">, endMonth = currentMonth(), count = 12) {
+export function netWorthSeries(ds: WorthData, endMonth = currentMonth(), count = 12) {
   if (!ds.balances.length) return [];
   const first = monthOf(ds.balances.reduce((m, b) => (b.date < m ? b.date : m), ds.balances[0].date));
   const months = monthRange(endMonth, count).filter((m) => m >= first);

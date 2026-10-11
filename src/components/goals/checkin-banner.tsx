@@ -8,6 +8,7 @@ import { checkInStatus } from "@/lib/goals";
 import { useI18n } from "@/lib/i18n";
 import type { Dataset } from "@/lib/types";
 import { cn, monthOf, todayISO } from "@/lib/utils";
+import { REVEAL } from "@/lib/motion";
 import { buttonClasses } from "../ui/button";
 
 const DISMISS_KEY = "gelbien.checkin.dismissed";
@@ -45,6 +46,7 @@ export function CheckInBanner({ ds, onUpdate, className }: { ds: Dataset; onUpda
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
+          transition={REVEAL}
           className={cn("overflow-hidden", className)}
         >
           <div className="flex flex-col gap-3 rounded-2xl border border-gold/30 bg-gradient-to-r from-gold/15 to-gold/[0.03] p-4 sm:flex-row sm:items-center">

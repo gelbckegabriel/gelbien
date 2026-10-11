@@ -17,7 +17,8 @@ import { downloadFile } from "@/lib/files";
 import { useI18n } from "@/lib/i18n";
 import { PRIORITIES, type Dataset, type Priority, type Transaction } from "@/lib/types";
 import { useUi, useView } from "@/lib/ui-store";
-import { addMonths, cn, monthOf, normalize, round2, todayISO } from "@/lib/utils";
+import { addMonths, cn, monthOf, newestFirst, normalize, round2, todayISO } from "@/lib/utils";
+import { REVEAL } from "@/lib/motion";
 
 const PAGE = 120;
 
@@ -58,7 +59,7 @@ function Expenses() {
         (!payment || tx.payment === payment) &&
         (!q || normalize(`${tx.description} ${tx.merchant} ${tx.notes} ${tx.subcategory} ${tx.category}`).includes(q)),
     );
-    return sort === "amount" ? [...out].sort((a, b) => b.amount - a.amount) : out;
+    return [...out].sort(sort === "amount" ? (a, b) => b.amount - a.amount : newestFirst);
   }, [ds.transactions, scope, month, category, priority, payment, q, sort]);
   // parts per split purchase: a purchase shows as one row when all of its parts are listed
   const groupSize = useMemo(() => {
@@ -145,7 +146,7 @@ function Expenses() {
 
       <AnimatePresence initial={false}>
         {showFilters && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={REVEAL} className="overflow-hidden">
             <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <CategorySelect
                 value={category}

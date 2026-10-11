@@ -25,6 +25,21 @@ export const isDebt = (type: AccountType) => DEBT_TYPES.includes(type);
 export const isLongTerm = (type: AccountType) => type === "property" || type === "loan" || type === "mortgage";
 export const GOAL_STATUSES: GoalStatus[] = ["active", "paused", "achieved"];
 
+/** Something paid off in monthly payments: a purchase split into installments, or a loan */
+export type PlanKind = "installments" | "mortgage" | "carLoan" | "personalLoan" | "studentLoan" | "lease" | "other";
+export const PLAN_KINDS: PlanKind[] = ["installments", "mortgage", "carLoan", "personalLoan", "studentLoan", "lease", "other"];
+/** Loans, as offered when adding one (installments come from an expense) */
+export const LOAN_KINDS: PlanKind[] = ["mortgage", "carLoan", "personalLoan", "studentLoan", "lease", "other"];
+/** "cancelled": installments refunded, or a plan stopped early. Paid off is worked out from the dates. */
+export type PlanStatus = "active" | "cancelled";
+export const PLAN_STATUSES: PlanStatus[] = ["active", "cancelled"];
+/** Fixed payments (Price, the French table) or a fixed share of the debt each month, so decreasing payments (SAC) */
+export type Amortization = "price" | "sac";
+export const AMORTIZATIONS: Amortization[] = ["price", "sac"];
+/** What a one-time extra payment does: finish sooner, or keep the end date and pay less each month */
+export type PrepayMode = "shorten" | "lower";
+export const PREPAY_MODES: PrepayMode[] = ["shorten", "lower"];
+
 export interface Transaction {
   id: string;
   /** ISO date, YYYY-MM-DD */
@@ -128,6 +143,11 @@ export interface Account {
   color: string;
   archived: boolean;
   notes: string;
+  /**
+   * % of its value lost each year — a car's, say (0: it keeps its value). Check-ins start from that
+   * estimate; net worth only ever counts the values recorded.
+   */
+  depreciation: number;
 }
 
 /** Balance of one account on one date. Credit accounts store what you owe as a positive number. */
@@ -136,6 +156,73 @@ export interface BalanceSnapshot {
   /** ISO date, YYYY-MM-DD */
   date: string;
   balance: number;
+}
+
+/** An extra amount added to every payment from `from` (YYYY-MM) on, until the next change */
+export interface PlanExtra {
+  from: string;
+  amount: number;
+}
+
+/**
+ * What a new rate changes: the payment, so the loan still ends when it would (a mortgage renewed, an
+ * adjustable rate), or the end date, keeping the payment as it is (a variable rate with fixed payments).
+ */
+export type RateKeep = "end" | "payment";
+export const RATE_KEEPS: RateKeep[] = ["end", "payment"];
+
+/**
+ * A new yearly rate from the payment in `from` (YYYY-MM) on. Payments before it stay exactly as they
+ * were: the new rate works on what's still owed by then.
+ */
+export interface RateChange {
+  from: string;
+  rate: number;
+  keep: RateKeep;
+}
+
+/** A one-time payment towards a loan, made in `month` (YYYY-MM) after that month's payment */
+export interface Prepayment {
+  month: string;
+  amount: number;
+  mode: PrepayMode;
+}
+
+/**
+ * Something paid off in monthly payments. Installments are logged as one expense per month as soon as
+ * they're bought (each linked by `billId`); a loan's payments show up like recurring bills, month by month.
+ */
+export interface Plan {
+  id: string;
+  kind: PlanKind;
+  name: string;
+  category: string;
+  subcategory: string;
+  merchant: string;
+  /** payment method */
+  payment: string;
+  /** what was bought (installments: the total, interest included) */
+  price: number;
+  /** paid upfront, from savings: not part of any month's spending */
+  downPayment: number;
+  /** yearly interest rate, % (0 for interest-free installments) */
+  rate: number;
+  /** number of payments */
+  count: number;
+  amortization: Amortization;
+  /** the first payment, YYYY-MM-DD; the others fall on the same day of the following months */
+  firstDate: string;
+  extras: PlanExtra[];
+  prepayments: Prepayment[];
+  /** the rate changing along the way (renewals, variable rates), oldest first or in any order */
+  rateChanges: RateChange[];
+  /** the debt account in Goals that holds what's still owed ("" for none) */
+  accountId: string;
+  /** installments: what's left counts as a debt in net worth (off when the card's own balance already includes it) */
+  countAsDebt: boolean;
+  status: PlanStatus;
+  notes: string;
+  createdAt: string;
 }
 
 export interface Goal {
@@ -182,6 +269,7 @@ export interface Dataset {
   accounts: Account[];
   balances: BalanceSnapshot[];
   goals: Goal[];
+  plans: Plan[];
   settings: Settings;
   meta: DatasetMeta;
 }
@@ -216,6 +304,8 @@ export type Mutation =
   | { op: "saveBalances"; balances: BalanceSnapshot[] }
   | { op: "upsertGoal"; goal: Goal }
   | { op: "deleteGoal"; id: string }
+  | { op: "upsertPlan"; plan: Plan }
+  | { op: "deletePlan"; id: string }
   | { op: "replaceAll"; data: Omit<Dataset, "meta"> };
 
 export interface SessionUser {

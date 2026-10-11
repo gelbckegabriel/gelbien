@@ -47,6 +47,8 @@ export const CATEGORY_COLORS = [
 ];
 
 export const OTHER_COLOR = "#6b6a72";
+/** How the budget's Commitments line (installments and loans) looks wherever it sits beside the categories */
+export const COMMITMENTS_STYLE = { icon: "CalendarSync", color: "#6f7fe0" } as const;
 /** Fold bucket in charts ("everything else") — darker than the "Other" category so the two never look alike. */
 export const REST_COLOR = "#46454c";
 

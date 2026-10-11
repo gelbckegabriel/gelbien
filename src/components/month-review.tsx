@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useDataset } from "@/lib/data/hooks";
 import { useI18n } from "@/lib/i18n";
-import { growX } from "@/lib/motion";
+import { growX, REVEAL } from "@/lib/motion";
 import { monthReview, type CategoryRow, type MonthReview, type Suggestion } from "@/lib/review";
 import type { Dataset } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
@@ -249,7 +249,7 @@ function PlanBars({ r }: { r: MonthReview }) {
   const { t, f } = useI18n();
   const rows = r.categories;
   const scale = Math.max(1, ...rows.map((c) => Math.max(c.spent, c.budget)));
-  const name = (c: CategoryRow) => (c.rest ? t("common.rest") : c.name);
+  const name = (c: CategoryRow) => (c.rest ? t("common.rest") : c.commitments ? t("plans.c.title") : c.name);
   return (
     <ChartCard viewKey="review.categories"
       title={t("review.barsTitle")}
@@ -272,9 +272,10 @@ function PlanBars({ r }: { r: MonthReview }) {
     >
       <ul className="space-y-3.5">
         {rows.map((c, i) => {
-          const over = c.budget > 0 && c.spent > c.budget;
+          // commitments paid beyond what was due (an extra payment) are good news, not an overrun
+          const over = !c.commitments && c.budget > 0 && c.spent > c.budget;
           return (
-            <li key={c.rest ? "rest" : c.name} title={`${name(c)}: ${f.amount(c.spent)}${c.budget > 0 ? ` / ${f.amount(c.budget)}` : ""}`}>
+            <li key={c.rest ? "rest" : c.commitments ? "commitments" : c.name} title={`${name(c)}: ${f.amount(c.spent)}${c.budget > 0 ? ` / ${f.amount(c.budget)}` : ""}`}>
               <div className="mb-1.5 flex items-center justify-between gap-3 text-[13px]">
                 <span className="flex min-w-0 items-center gap-2">
                   <CategoryIcon icon={c.icon} color={c.color} size="sm" className="h-6 w-6 rounded-md" />
@@ -382,7 +383,7 @@ export function ReviewPrompt({ ds, className }: { ds: Dataset; className?: strin
   return (
     <AnimatePresence initial={false}>
       {show && (
-        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className={cn("overflow-hidden", className)}>
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={REVEAL} className={cn("overflow-hidden", className)}>
           <div className="flex flex-col gap-3 rounded-2xl border border-gold/30 bg-gradient-to-r from-gold/15 to-gold/[0.03] p-4 sm:flex-row sm:items-center">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gold-soft text-gold">
               <ClipboardCheck className="h-5 w-5" />

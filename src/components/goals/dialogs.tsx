@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { useMutate, useSaving } from "@/lib/data/hooks";
 import { CATEGORY_COLORS, GOAL_ICONS, INSTITUTIONS } from "@/lib/defaults";
 import { recentAverages } from "@/lib/finance";
-import { accountsMonthlyGrowth, latestBalances, netWorth, signedBalance } from "@/lib/goals";
+import { accountsMonthlyGrowth, estimatedValue, latestBalances, netWorth, signedBalance } from "@/lib/goals";
+import { owedOn } from "@/lib/plans";
 import { useI18n } from "@/lib/i18n";
 import { ACCOUNT_TYPES, DEBT_TYPES, isDebt, type Account, type AccountType, type BalanceSnapshot, type Dataset, type Goal, type GoalStatus } from "@/lib/types";
 import { cn, currentMonth, isValidISODate, parseAmount, round2, todayISO, uid } from "@/lib/utils";
@@ -316,6 +317,7 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
   const [balance, setBalance] = useState(last ? String(last.balance) : "");
   const [archived, setArchived] = useState(account?.archived ?? false);
   const [notes, setNotes] = useState(account?.notes ?? "");
+  const [depreciation, setDepreciation] = useState(account?.depreciation ? String(account.depreciation) : "");
   const valid = name.trim().length > 0;
 
   const save = async () => {
@@ -328,6 +330,8 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
       color,
       archived,
       notes: notes.trim(),
+      // only something you own can lose value (a car); anything else keeps what's recorded
+      depreciation: type === "property" ? Math.max(0, Math.min(100, round2(parseAmount(depreciation)))) : 0,
     };
     const writes = [mutate.save({ op: "upsertAccount", account: next })];
     const value = round2(parseAmount(balance));
@@ -404,6 +408,15 @@ export function AccountDialog({ ds, open, account, onClose }: { ds: Dataset; ope
         <Field label={isDebt(type) ? t("acc.owed") : t("acc.balance")}>
           <MoneyInput value={balance} onChange={setBalance} placeholder="0.00" className={cn(isDebt(type) && "text-bad")} />
         </Field>
+        {type === "property" && (
+          <Field label={t("acc.depreciation")} className="sm:col-span-2">
+            <div className="relative sm:max-w-[calc(50%-0.5rem)]">
+              <Input inputMode="decimal" value={depreciation} onChange={(e) => setDepreciation(e.target.value.replace(/[^\d.,]/g, ""))} placeholder="0" className="pr-24" />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-3">{t("plans.f.rateUnit")}</span>
+            </div>
+            <p className="mt-1.5 text-xs text-ink-3">{t("acc.depreciationHint")}</p>
+          </Field>
+        )}
         <Field label={t("cfg.color")} className="sm:col-span-2">
           <ColorPicker value={color} onChange={setColor} />
         </Field>
@@ -431,8 +444,26 @@ export function CheckInDialog({ ds, open, onClose }: { ds: Dataset; open: boolea
   const active = ds.accounts.filter((a) => !a.archived);
   const latest = latestBalances(ds.balances);
   const [date, setDate] = useState(todayISO());
+  // a loan or mortgage with a payment plan: what the plan says is owed by now, unless it was updated this month
+  const plans = new Map(ds.plans.filter((p) => p.accountId && p.status === "active" && p.kind !== "installments").map((p) => [p.accountId, p]));
+  const estimated = (id: string) => {
+    const plan = plans.get(id);
+    const last = latest.get(id);
+    return plan && (!last || last.date.slice(0, 7) < date.slice(0, 7)) ? plan : null;
+  };
+  // something that loses value (a car) starts from its last value less the time since
+  const depreciating = (a: Account) => {
+    const last = latest.get(a.id);
+    return a.depreciation > 0 && last && last.date < date ? last : null;
+  };
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(active.map((a) => [a.id, latest.has(a.id) ? String(latest.get(a.id)!.balance) : ""])),
+    Object.fromEntries(
+      active.map((a) => {
+        const plan = estimated(a.id);
+        const last = latest.get(a.id);
+        return [a.id, plan ? String(owedOn(plan, ds, date)) : last ? String(estimatedValue(a, last, date)) : ""];
+      }),
+    ),
   );
 
   const draft: BalanceSnapshot[] = active
@@ -488,7 +519,13 @@ export function CheckInDialog({ ds, open, onClose }: { ds: Dataset; open: boolea
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm text-ink">{a.name}</p>
                 <p className="truncate text-[11px] text-ink-3">
-                  {prev ? t("ci.lastValue", { amount: f.amount(signedBalance(a, prev.balance)), date: f.dateShort(prev.date) }) : a.institution}
+                  {estimated(a.id)
+                    ? t("ci.fromPlan", { name: estimated(a.id)!.name })
+                    : depreciating(a) && prev
+                      ? t("ci.depreciated", { amount: f.amount(prev.balance), date: f.dateShort(prev.date), pct: f.rate(a.depreciation) })
+                      : prev
+                        ? t("ci.lastValue", { amount: f.amount(signedBalance(a, prev.balance)), date: f.dateShort(prev.date) })
+                        : a.institution}
                 </p>
               </div>
               <div className="w-32 shrink-0">

@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 import { BillCheck, useSkippedBills } from "@/components/dashboard/bills";
+import { OVER_STRIPES } from "@/components/charts/kit";
 import { CategoryIcon } from "@/components/icons";
 import { GuardedLink } from "@/components/shell/unsaved";
 import { Button } from "@/components/ui/button";
@@ -19,8 +20,10 @@ import { useI18n } from "@/lib/i18n";
 import { growX } from "@/lib/motion";
 import { SUB_KINDS, type Dataset, type Subscription } from "@/lib/types";
 import { useUi, useView } from "@/lib/ui-store";
+import { Commitments } from "@/components/plans/commitments";
 import { stashDraft, useStashedDraft, useUnsavedChanges } from "@/lib/unsaved";
 import { addMonths, cn, parseAmount, round2, todayISO } from "@/lib/utils";
+import { COMMITMENTS_STYLE } from "@/lib/defaults";
 
 type Scope = "month" | "default";
 
@@ -56,6 +59,7 @@ export default function BudgetPage() {
     <Stagger className="space-y-4">
       <BudgetEditor key={version} ds={ds} month={month} />
       <Subscriptions ds={ds} month={month} />
+      <Commitments ds={ds} />
     </Stagger>
   );
 }
@@ -67,7 +71,9 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
   const draftId = `budget:${month}`;
   const [draft, setDraft] = useStashedDraft<Draft>(draftId, () => initial);
   const summary = summarizeMonth(ds, month);
-  const spentBy = new Map(summary.byCategory.map((c) => [c.name, c.spent]));
+  // against each limit: without installments and loans, which are a line of their own (Commitments)
+  const spentBy = new Map(summary.byCategory.map((c) => [c.name, c.own]));
+  const plans = summary.commitments;
   const skipped = useSkippedBills();
   const committed = useMemo(() => committedBills(ds, month, todayISO(), skipped), [ds, month, skipped]);
   const { isOverride } = effectiveBudget(ds.budgets, month);
@@ -80,7 +86,9 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const gross = parseAmount(draft.gross);
   const net = parseAmount(draft.net);
-  const planned = categories.reduce((a, c) => a + parseAmount(draft.lines[c.name]), 0);
+  const limits = categories.reduce((a, c) => a + parseAmount(draft.lines[c.name]), 0);
+  // what installments and loans take this month is planned already: it counts without being typed in
+  const planned = round2(limits + plans.planned);
   const unallocated = net - planned;
   const taxRate = gross > 0 && net > 0 ? 1 - net / gross : 0;
 
@@ -118,10 +126,14 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
 
   // allocation bar: each category's share of net income, then what's left to save
   const base = Math.max(net, planned, 1);
-  const segments = categories
-    .map((c) => ({ name: c.name, color: c.color, value: parseAmount(draft.lines[c.name]) }))
-    .filter((s) => s.value > 0)
-    .sort((a, b) => b.value - a.value);
+  const segments = [
+    // commitments first: they're spoken for before any limit is set
+    ...(plans.planned > 0 ? [{ name: t("plans.c.title"), color: COMMITMENTS_STYLE.color, value: plans.planned }] : []),
+    ...categories
+      .map((c) => ({ name: c.name, color: c.color, value: parseAmount(draft.lines[c.name]) }))
+      .filter((s) => s.value > 0)
+      .sort((a, b) => b.value - a.value),
+  ];
 
   return (
     <>
@@ -185,7 +197,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
             </div>
 
             <div>
-              <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-white/5">
+              <div className="relative flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-white/5">
                 {segments.map((s, i) => (
                   <motion.div
                     key={s.name}
@@ -195,6 +207,16 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
                     {...growX(i * 0.03, 90, 20)}
                   />
                 ))}
+                {/* planned past the income: money that isn't there, hatched in red */}
+                {unallocated < 0 && net > 0 && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-y-0 rounded-r-full"
+                    style={{ left: `${(net / base) * 100}%`, width: `${(-unallocated / base) * 100}%`, background: OVER_STRIPES }}
+                    title={`${t("budget.plan.overAllocated")}: ${f.amount(-unallocated)}`}
+                  />
+                )}
+                {unallocated < 0 && net > 0 && <div aria-hidden className="absolute inset-y-0 w-0.5 bg-ink" style={{ left: `calc(${(net / base) * 100}% - 1px)` }} />}
                 {unallocated > 0 && (
                   <motion.div
                     className="gold-fill h-full rounded-r-full origin-left transition-[width] duration-500 ease-out"
@@ -235,7 +257,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
         planned={planned}
         net={net}
         // spending the plan doesn't cover: categories without a limit
-        unplanned={round2(summary.byCategory.filter((c) => !(parseAmount(draft.lines[c.name]) > 0)).reduce((a, c) => a + c.spent, 0))}
+        unplanned={round2(summary.byCategory.filter((c) => !(parseAmount(draft.lines[c.name]) > 0)).reduce((a, c) => a + c.own, 0))}
         warnAt={ds.settings.warnAt}
         committed={committed}
         // the limits as they're being edited
@@ -245,7 +267,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
       <Card>
         <CardHeader
           title={t("budget.plan.title")}
-          subtitle={`${t("budget.plan.planned")}: ${f.amount(planned)} · ${unallocated >= 0 ? t("budget.plan.unallocated") : t("budget.plan.overAllocated")}: ${f.amount(Math.abs(unallocated))}`}
+          subtitle={`${t("budget.plan.planned")}: ${f.amount(planned)}${plans.planned > 0 ? ` (${t("budget.plan.inclCommitments", { amount: f.amount(plans.planned) })})` : ""} · ${unallocated >= 0 ? t("budget.plan.unallocated") : t("budget.plan.overAllocated")}: ${f.amount(Math.abs(unallocated))}`}
           action={
             <Segmented
               size="sm"
@@ -259,6 +281,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
           }
         />
         <ul className="grid grid-cols-1 gap-x-10 xl:grid-cols-2">
+          {(plans.planned > 0 || plans.paid > 0) && <CommitmentsRow planned={plans.planned} paid={plans.paid} extra={plans.extra} />}
           {rows.map((c, i) => {
             const limit = parseAmount(draft.lines[c.name]);
             const spent = spentBy.get(c.name) ?? 0;
@@ -319,6 +342,51 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
 
       <SaveBar show={dirty} label={t("budget.unsaved")} onSave={save} onReset={() => setDraft(initial)} />
     </>
+  );
+}
+
+/**
+ * The plan's Commitments line: what installments and loans take this month, filled in from the plans (so
+ * not typed), with what's been logged for them. Paying them is what's meant to happen, so the bar only
+ * fills up — never a warning — and an extra payment shows as the good news it is. The row opens the
+ * Commitments card below.
+ */
+function CommitmentsRow({ planned, paid, extra }: { planned: number; paid: number; extra: number }) {
+  const { t, f } = useI18n();
+  return (
+    <li className="group relative isolate grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-line/50 py-3 sm:gap-y-1.5">
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-1.5 -left-1.5 right-[calc(6rem+0.75rem)] -z-10 rounded-xl bg-white/[0.04] opacity-0 transition-opacity group-has-[a:hover]:opacity-100 sm:right-[calc(8rem+0.75rem)]"
+      />
+      <CategoryIcon icon={COMMITMENTS_STYLE.icon} color={COMMITMENTS_STYLE.color} className="row-span-2" />
+      <div className="flex min-w-0 items-center gap-2">
+        <a
+          href="#commitments"
+          className="truncate text-sm text-ink outline-none after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-gold/60"
+        >
+          {t("plans.c.title")}
+        </a>
+        <Badge tone="neutral" className="px-1.5 sm:px-2">
+          {t("budget.plan.auto")}
+        </Badge>
+      </div>
+      {/* filled in by the plans, so it reads like the limit fields but isn't one */}
+      <div
+        className="relative z-10 flex h-10 w-24 items-center justify-end rounded-xl border border-dashed border-line px-3.5 text-base text-ink-2 tabular-nums sm:row-span-2 sm:w-32"
+        title={t("budget.plan.autoHint")}
+      >
+        {f.amount(planned)}
+      </div>
+      <div className="col-span-2 col-start-2 flex items-center gap-2 sm:col-span-1">
+        {planned > 0 ? <Progress value={Math.min(1, paid / planned)} tone="good" className="h-1.5" /> : <div className="h-1.5 flex-1 rounded-full bg-white/5" />}
+        <span className="tabular min-w-20 shrink-0 whitespace-nowrap text-right text-[11px] text-ink-3 sm:min-w-28">
+          {t("budget.plan.paidOf", { paid: f.amount(paid) })}
+          {extra > 0 && <span className="text-good"> · {t("budget.plan.extraPaid", { amount: f.amount(extra) })}</span>}
+        </span>
+        <ChevronRight className="-ml-1 h-3.5 w-3.5 shrink-0 text-ink-3" />
+      </div>
+    </li>
   );
 }
 

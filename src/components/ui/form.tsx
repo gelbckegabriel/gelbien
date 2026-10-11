@@ -5,7 +5,9 @@ import { motion } from "motion/react";
 import { Popover, Select as SelectPrimitive } from "radix-ui";
 import { forwardRef, useId, useLayoutEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import { holdInPlace } from "@/lib/motion";
 import { cn, currentMonth } from "@/lib/utils";
+import { Collapse } from "./collapse";
 import { MonthGrid } from "./month-grid";
 
 // 16px text: iOS Safari zooms the page into any focused field smaller than that.
@@ -182,7 +184,10 @@ export function Segmented<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
-            onClick={() => onChange(o.value)}
+            onClick={(e) => {
+              holdInPlace(e.currentTarget);
+              onChange(o.value);
+            }}
             className={cn(
               "relative flex-1 whitespace-nowrap rounded-lg font-medium transition-colors",
               size === "sm" ? "h-7 px-2 text-xs" : "h-9 px-3 text-[13px]",
@@ -210,6 +215,20 @@ export function Segmented<T extends string>({
   );
 }
 
+/** The switch itself: a track and its knob */
+function SwitchTrack({ checked }: { checked: boolean }) {
+  return (
+    <span className={cn("relative h-6 w-11 shrink-0 rounded-full border transition-colors", checked ? "border-gold/50 bg-gold/80" : "border-line-strong bg-surface-3")}>
+      <motion.span
+        layout
+        className={cn("absolute top-0.5 h-[18px] w-[18px] rounded-full shadow", checked ? "bg-[#1b1406]" : "bg-ink-2")}
+        style={{ left: checked ? 22 : 2 }}
+        transition={{ type: "spring", stiffness: 600, damping: 35 }}
+      />
+    </span>
+  );
+}
+
 export function Switch({ checked, onChange, label, id }: { checked: boolean; onChange: (v: boolean) => void; label?: React.ReactNode; id?: string }) {
   return (
     <button
@@ -217,19 +236,108 @@ export function Switch({ checked, onChange, label, id }: { checked: boolean; onC
       type="button"
       role="switch"
       aria-checked={checked}
-      onClick={() => onChange(!checked)}
+      onClick={(e) => {
+        holdInPlace(e.currentTarget);
+        onChange(!checked);
+      }}
       className="group inline-flex items-center gap-3 text-sm text-ink-2"
     >
-      <span className={cn("relative h-6 w-11 rounded-full border transition-colors", checked ? "border-gold/50 bg-gold/80" : "border-line-strong bg-surface-3")}>
-        <motion.span
-          layout
-          className={cn("absolute top-0.5 h-[18px] w-[18px] rounded-full shadow", checked ? "bg-[#1b1406]" : "bg-ink-2")}
-          style={{ left: checked ? 22 : 2 }}
-          transition={{ type: "spring", stiffness: 600, damping: 35 }}
-        />
-      </span>
+      <SwitchTrack checked={checked} />
       {label && <span className="group-hover:text-ink">{label}</span>}
     </button>
+  );
+}
+
+/** A choice between a few options, each a card: an icon, its name and what picking it means. */
+export function ChoiceCards<T extends string>({
+  value,
+  onChange,
+  options,
+  className,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; icon: React.ReactNode; title: React.ReactNode; hint?: React.ReactNode }[];
+  className?: string;
+}) {
+  return (
+    <div role="radiogroup" className={cn("grid gap-2 sm:grid-cols-2", className)}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={(e) => {
+              holdInPlace(e.currentTarget);
+              onChange(o.value);
+            }}
+            className={cn("flex items-start gap-3 rounded-2xl border p-3 text-left transition-colors", on ? "border-gold/40 bg-gold-soft/50" : "border-line hover:border-line-strong")}
+          >
+            <span className={cn("mt-0.5 shrink-0 transition-colors [&>svg]:h-4 [&>svg]:w-4", on ? "text-gold" : "text-ink-3")}>{o.icon}</span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-ink">{o.title}</span>
+              {o.hint && <span className="mt-0.5 block text-xs leading-relaxed text-ink-3">{o.hint}</span>}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * A setting as a card: an icon, what it does in a line, and the switch — the whole card toggles it.
+ * `children` show under it while it's on (what turning it on will do, say).
+ */
+export function ToggleCard({
+  checked,
+  onChange,
+  icon,
+  title,
+  description,
+  children,
+  className,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  icon?: React.ReactNode;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  children?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("rounded-2xl border transition-colors", checked ? "border-gold/30 bg-gold-soft/40" : "border-line bg-surface-2/40", className)}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={(e) => {
+          holdInPlace(e.currentTarget);
+          onChange(!checked);
+        }}
+        className="flex w-full items-center gap-3 p-3.5 text-left"
+      >
+        {icon && (
+          <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl transition-colors [&>svg]:h-4 [&>svg]:w-4", checked ? "bg-gold/15 text-gold" : "bg-white/5 text-ink-3")}>
+            {icon}
+          </span>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-ink">{title}</span>
+          {description && <span className="mt-0.5 block text-xs leading-relaxed text-ink-3">{description}</span>}
+        </span>
+        <SwitchTrack checked={checked} />
+      </button>
+      {children && (
+        <Collapse show={checked}>
+          <div className="px-3.5 pb-3.5">{children}</div>
+        </Collapse>
+      )}
+    </div>
   );
 }
 

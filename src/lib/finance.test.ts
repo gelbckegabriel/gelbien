@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultCategories, defaultSettings } from "./defaults";
 import { buildDemoDataset } from "./demo";
+import { netWorth } from "./goals";
 import {
   budgetStatus,
   effectiveBudget,
@@ -56,6 +57,7 @@ function dataset(transactions: Transaction[], extra: Partial<Dataset> = {}): Dat
     accounts: [],
     balances: [],
     goals: [],
+    plans: [],
     settings: defaultSettings("en"),
     meta: { source: "demo", syncedAt: "" },
     ...extra,
@@ -356,14 +358,36 @@ describe("reducer", () => {
 });
 
 describe("demo data", () => {
-  it("is deterministic and spans six months up to today", () => {
+  it("is deterministic and spans a year up to today", () => {
     const a = buildDemoDataset("pt", "2026-09-25");
     const b = buildDemoDataset("pt", "2026-09-25");
     expect(a.transactions.length).toBe(b.transactions.length);
-    expect(a.transactions.length).toBeGreaterThan(150);
-    expect(a.transactions.every((t) => t.date <= "2026-09-25" && t.date >= "2026-04-01")).toBe(true);
+    expect(a.transactions.length).toBeGreaterThan(400);
+    // everything happened by today, except the installments still to come on the purchases in installments
+    expect(a.transactions.every((t) => (t.date <= "2026-09-25" || t.billId === "plan_sofa" || t.billId === "plan_phone") && t.date >= "2025-10-01")).toBe(true);
+    expect(a.transactions.filter((t) => t.billId === "plan_sofa")).toHaveLength(10);
+    expect(a.transactions.filter((t) => t.billId === "plan_phone")).toHaveLength(12);
+    // the car loan's payments since it was added (a year ago), logged
+    const loan = a.transactions.filter((t) => t.billId === "plan_car").map((t) => t.date);
+    expect(loan).toHaveLength(12);
+    expect([loan[0], loan.at(-1)]).toEqual(["2026-09-15", "2025-10-15"]);
     expect(a.categories[0].name).toBe("Moradia");
     expect(buildDemoDataset("fr", "2026-09-25").categories[0].name).toBe("Logement");
+  });
+
+  it("has something to show everywhere: commitments in the budget, the car in net worth, goals in each state", () => {
+    const ds = buildDemoDataset("en", "2026-09-25");
+    const s = summarizeMonth(ds, "2026-09", "2026-09-25");
+    expect(s.commitments.planned).toBeGreaterThan(700);
+    // planned spending leaves room to save
+    expect(s.income.net - s.budgetTotal).toBeGreaterThan(500);
+    const worth = netWorth(ds, "2026-09-25");
+    expect(worth.assets).toBeGreaterThan(30000);
+    expect(worth.debts).toBeGreaterThan(15000);
+    expect(new Set(ds.goals.map((g) => g.status))).toEqual(new Set(["active", "achieved"]));
+    expect(ds.goals.some((g) => g.afterGoalId)).toBe(true);
+    // twelve months of check-ins but this one
+    expect(new Set(ds.balances.map((b) => b.date)).size).toBe(11);
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   accountsMonthlyGrowth,
   checkInStatus,
+  estimatedValue,
   goalCurrent,
   goalPlanFor,
   goalSchedule,
@@ -19,7 +20,7 @@ import {
 import { defaultCategories, defaultSettings } from "./defaults";
 import type { Account, BalanceSnapshot, Dataset, Goal, Transaction } from "./types";
 
-const acct = (id: string, type: Account["type"] = "savings"): Account => ({ id, name: id, institution: "", type, color: "#000", archived: false, notes: "" });
+const acct = (id: string, type: Account["type"] = "savings"): Account => ({ id, name: id, institution: "", type, color: "#000", archived: false, notes: "", depreciation: 0 });
 const goal = (patch: Partial<Goal>): Goal => ({
   id: "g",
   name: "Car",
@@ -142,6 +143,19 @@ describe("contribution schedules", () => {
 });
 
 describe("accounts", () => {
+  it("estimates what a car is worth from its last value and what it loses a year", () => {
+    const car = { depreciation: 15 };
+    const last = { date: "2026-01-01", balance: 30000 };
+    expect(estimatedValue(car, last, "2026-01-01")).toBe(30000);
+    expect(estimatedValue(car, last, "2027-01-01")).toBe(25500);
+    expect(estimatedValue(car, last, "2028-01-01")).toBe(21675);
+    // halfway through the year: compounded, a little less than half of the 15% gone
+    expect(estimatedValue(car, last, "2026-07-01")).toBeCloseTo(30000 * Math.sqrt(0.85), 2);
+    // a home keeps its value, and nothing is estimated backwards
+    expect(estimatedValue({ depreciation: 0 }, last, "2030-01-01")).toBe(30000);
+    expect(estimatedValue(car, last, "2025-06-01")).toBe(30000);
+  });
+
   const accounts = [acct("neo"), acct("visa", "credit"), acct("tfsa", "investment")];
   const balances: BalanceSnapshot[] = [
     { accountId: "neo", date: "2026-07-01", balance: 5000 },
@@ -219,7 +233,7 @@ describe("savingsPlan", () => {
   const ds = (extra: Partial<Dataset>): Dataset => ({
     transactions: [], categories: defaultCategories("en"), budgets: [], incomes: [], subscriptions: [], accounts: [], balances: [],
     goals: [goal({ id: "car", monthlyContribution: 1100, target: 30000 }), goal({ id: "home", monthlyContribution: 900, target: 50000 })],
-    settings: defaultSettings("en"), meta: { source: "demo", syncedAt: "" }, ...extra,
+    plans: [], settings: defaultSettings("en"), meta: { source: "demo", syncedAt: "" }, ...extra,
   });
 
   it("weighs goals against planned savings, with what was actually saved alongside", () => {

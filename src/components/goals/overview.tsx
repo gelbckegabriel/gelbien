@@ -11,7 +11,7 @@ import { growX } from "@/lib/motion";
 import type { Dataset } from "@/lib/types";
 import { useMutate } from "@/lib/data/hooks";
 import { cn, currentMonth } from "@/lib/utils";
-import { axisProps, ChartArea, ChartCard, DataTable, GOLD, INK, TooltipBox } from "../charts/kit";
+import { axisProps, ChartArea, ChartCard, DataTable, GOLD, INK, OVER_STRIPES, TooltipBox } from "../charts/kit";
 import { ACCOUNT_TYPE_ICON, CategoryIcon } from "../icons";
 import { GuardedLink } from "../shell/unsaved";
 import { Button } from "../ui/button";
@@ -29,6 +29,9 @@ export function PlanCard({ ds }: { ds: Dataset }) {
   const perMonth = (n: number) => t("budget.subs.perMonth", { amount: f.amount(n) });
   // saving less than planned: spending has run over the budget
   const shortfall = planned && actual ? planned.saved - actual.saved : 0;
+  // contributions past what there is to save: money that isn't there, hatched in red on the bar
+  const room = basis !== null ? Math.max(0, basis) : null;
+  const over = room !== null && allocated > room ? allocated - room : 0;
 
   return (
     <Card>
@@ -66,6 +69,14 @@ export function PlanCard({ ds }: { ds: Dataset }) {
             {...growX(i * 0.05, 90, 20)}
           />
         ))}
+        {over > 0 && room !== null && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 rounded-r-full"
+            style={{ left: `${(room / scale) * 100}%`, width: `${(over / scale) * 100}%`, background: OVER_STRIPES }}
+            title={t("goals.plan.overLegend", { amount: f.amount(over) })}
+          />
+        )}
         {/* marker for what there is to save */}
         {marker > 0 && <div className="absolute inset-y-0 w-0.5 bg-ink" style={{ left: `calc(${(marker / scale) * 100}% - 1px)` }} />}
       </div>
@@ -79,6 +90,11 @@ export function PlanCard({ ds }: { ds: Dataset }) {
         {marker > 0 && (
           <li className="inline-flex items-center gap-1.5 text-xs text-ink-2">
             <span className="h-3 w-0.5 bg-ink" /> {t(planned ? "goals.plan.plannedMarker" : "goals.plan.avgSaved", { amount: f.amount(marker) })}
+          </li>
+        )}
+        {over > 0 && (
+          <li className="inline-flex items-center gap-1.5 text-xs text-bad">
+            <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: OVER_STRIPES }} /> {t("goals.plan.overLegend", { amount: f.amount(over) })}
           </li>
         )}
       </ul>

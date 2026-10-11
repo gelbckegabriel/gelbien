@@ -3,6 +3,7 @@
 import { AlertTriangle, Infinity as InfinityIcon, Paperclip, Repeat } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
+import { COMMITMENTS_STYLE } from "@/lib/defaults";
 import type { MonthSummary } from "@/lib/finance";
 import { useI18n } from "@/lib/i18n";
 import { growX } from "@/lib/motion";
@@ -17,7 +18,15 @@ import { Badge, Progress, STATUS_TONE } from "../ui/misc";
 
 export function BudgetBars({ summary, className }: { summary: MonthSummary; className?: string }) {
   const { t, f } = useI18n();
-  const rows = summary.byCategory.filter((c) => c.budget > 0 || c.spent > 0);
+  // the Commitments line first (installments and loans: due vs. paid), then each category against its limit
+  const { planned, paid } = summary.commitments;
+  const rows = [
+    ...(planned > 0 || paid > 0
+      ? // paying them is what's meant to happen: the bar fills up green, never a warning
+        [{ name: t("plans.c.title"), ...COMMITMENTS_STYLE, own: paid, budget: planned, used: planned > 0 ? Math.min(1, paid / planned) : 0, status: "within" as const }]
+      : []),
+    ...summary.byCategory.filter((c) => c.budget > 0 || c.own > 0).sort((a, b) => b.own - a.own || b.budget - a.budget),
+  ];
   return (
     // two columns of categories when the card itself is wide enough (it's half the row on big screens)
     <ChartCard viewKey="dash.budgets"
@@ -32,7 +41,7 @@ export function BudgetBars({ summary, className }: { summary: MonthSummary; clas
       table={
         <DataTable
           head={[t("exp.col.category"), t("budget.plan.spent", { amount: "" }).trim(), t("nav.budget"), ""]}
-          rows={rows.map((c) => [c.name, f.money(c.spent), c.budget ? f.money(c.budget) : "—", t(`budgetStatus.${c.status}`)])}
+          rows={rows.map((c) => [c.name, f.money(c.own), c.budget ? f.money(c.budget) : "—", t(`budgetStatus.${c.status}`)])}
         />
       }
     >
@@ -56,7 +65,7 @@ export function BudgetBars({ summary, className }: { summary: MonthSummary; clas
                   )}
                 </span>
                 <span className="tabular shrink-0 text-ink">
-                  {f.amount(c.spent)}
+                  {f.amount(c.own)}
                   {c.budget > 0 && <span className="text-ink-3"> / {f.amount(c.budget)}</span>}
                 </span>
               </div>

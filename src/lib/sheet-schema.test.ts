@@ -37,8 +37,8 @@ describe("sheet schema", () => {
         { id: "s1", name: "Spotify", category: "Subscriptions", amount: 11.99, cycle: "monthly", billingDay: 5, payment: "Credit", status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "2026-10-05", kind: "subscription", subcategory: "Music streaming", merchant: "Spotify AB" },
       ],
       accounts: [
-        { id: "a1", name: "HISA", institution: "Neo Financial", type: "savings", color: "#199e70", archived: false, notes: "" },
-        { id: "a2", name: "Visa", institution: "Scotiabank", type: "credit", color: "#e0707a", archived: true, notes: "closed" },
+        { id: "a1", name: "HISA", institution: "Neo Financial", type: "savings", color: "#199e70", archived: false, notes: "", depreciation: 0 },
+        { id: "a2", name: "Visa", institution: "Scotiabank", type: "credit", color: "#e0707a", archived: true, notes: "closed", depreciation: 0 },
       ],
       balances: [
         { accountId: "a1", date: "2026-08-01", balance: 4200.5 },
@@ -53,6 +53,20 @@ describe("sheet schema", () => {
         {
           id: "g2", name: "Trip", icon: "Plane", color: "#d9b45f", target: 3500, targetDate: "", accountIds: [], saved: 1200,
           monthlyContribution: 150, annualReturn: 0, status: "paused", order: 1, notes: "Brazil", createdAt: "", startMonth: "", afterGoalId: "", pausedMonths: [],
+        },
+      ],
+      plans: [
+        {
+          id: "p1", kind: "mortgage", name: "Our home", category: "Housing", subcategory: "Mortgage", merchant: "RBC", payment: "Debit", price: 480000,
+          downPayment: 96000, rate: 4.89, count: 300, amortization: "sac", firstDate: "2026-11-01", extras: [{ from: "2027-01", amount: 300 }],
+          prepayments: [{ month: "2027-10", amount: 10000, mode: "shorten" }, { month: "2028-10", amount: 5000.5, mode: "lower" }], accountId: "a2",
+          rateChanges: [{ from: "2031-11", rate: 4.29, keep: "end" }, { from: "2036-11", rate: 3.9, keep: "payment" }],
+          countAsDebt: true, status: "active", notes: "", createdAt: "2026-10-10T00:00:00.000Z",
+        },
+        {
+          id: "p2", kind: "installments", name: "MacBook Air", category: "Shopping", subcategory: "", merchant: "Apple", payment: "Credit", price: 1299.99,
+          downPayment: 0, rate: 0, count: 12, amortization: "price", firstDate: "2026-10-10", extras: [], prepayments: [], rateChanges: [], accountId: "",
+          countAsDebt: false, status: "cancelled", notes: "refunded", createdAt: "2026-10-10T00:00:00.000Z",
         },
       ],
       settings: { ...defaultSettings("en"), reserve: 15000, checkInDay: 5, tourSeen: 1, paymentStyles: { Credit: { icon: "Gift", color: "#d55181" } } },

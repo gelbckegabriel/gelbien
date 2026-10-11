@@ -111,3 +111,9 @@ export function normalize(s: string | null | undefined): string {
     .toLowerCase()
     .trim();
 }
+
+/** Expenses newest first: by date, and within a day the one added last on top. */
+export function newestFirst(a: { date: string; createdAt: string }, b: { date: string; createdAt: string }): number {
+  if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+  return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0;
+}

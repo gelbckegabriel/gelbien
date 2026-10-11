@@ -11,6 +11,8 @@ import { AnimatedNumber, fitFont } from "../ui/misc";
 
 export const INK = { primary: "#f4f1ea", secondary: "#bdb8ad", muted: "#85817a", grid: "#ffffff0f", axis: "#ffffff1f", surface: "#131316" };
 export const GOLD = "#d9b45f";
+/** Hatching for money planned that isn't there (more than income, more than there is to save): red stripes over what's beneath */
+export const OVER_STRIPES = "repeating-linear-gradient(135deg, #f2605fe6 0 3px, #14141899 3px 6px)";
 export const GOOD = "#36c47c";
 export const BAD = "#f2605f";
 export const PRIORITY_COLORS = { essential: "#36c47c", important: "#3987e5", superfluous: "#f2605f" } as const;

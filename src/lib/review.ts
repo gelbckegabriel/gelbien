@@ -3,8 +3,10 @@
  * and what to change. Pure (built on summarizeMonth) so it is unit-tested and identical in demo
  * and Google mode.
  */
+import { COMMITMENTS_STYLE } from "./defaults";
 import { monthlyCost, summarizeMonth, type MonthSummary } from "./finance";
 import { accountsReserve } from "./goals";
+import { planPaymentTest } from "./plans";
 import type { Dataset, Transaction } from "./types";
 import { addMonths, daysInMonth, round2, todayISO } from "./utils";
 
@@ -25,6 +27,8 @@ export interface CategoryRow {
   budget: number;
   /** the folded "everything else" row */
   rest?: boolean;
+  /** the Commitments line: installments and loans, against what they were due to take */
+  commitments?: boolean;
 }
 
 /** A category that moved against its usual level (average of the months before) */
@@ -56,14 +60,22 @@ export type Suggestion = { impact: number } & (
 
 const roundUp = (n: number, to = 10) => Math.ceil(n / to) * to;
 const spentIn = (s: MonthSummary, name: string) => s.byCategory.find((c) => c.name === name)?.spent ?? 0;
+// against a limit: without installments and loans, which have their own line
+const ownIn = (s: MonthSummary, name: string) => s.byCategory.find((c) => c.name === name)?.own ?? 0;
 const budgetIn = (s: MonthSummary, name: string) => s.byCategory.find((c) => c.name === name)?.budget ?? 0;
 
-/** Top `n` categories by spending (plus any with a limit), the rest folded into one row */
+/** The Commitments line first (when there are any), then the top `n` categories by spending against their limits, the rest folded into one row */
 export function categoryRows(s: MonthSummary, n = 6): CategoryRow[] {
-  const rows = s.byCategory.filter((c) => c.spent > 0 || c.budget > 0).map(({ name, color, icon, spent, budget }) => ({ name, color, icon, spent, budget }));
-  if (rows.length <= n + 1) return rows;
+  const { planned, paid } = s.commitments;
+  const commitments: CategoryRow[] = planned > 0 || paid > 0 ? [{ name: "", commitments: true, ...COMMITMENTS_STYLE, spent: paid, budget: planned }] : [];
+  const rows = s.byCategory
+    .filter((c) => c.own > 0 || c.budget > 0)
+    .sort((a, b) => b.own - a.own || b.budget - a.budget)
+    .map(({ name, color, icon, own, budget }) => ({ name, color, icon, spent: own, budget }));
+  if (rows.length <= n + 1) return [...commitments, ...rows];
   const rest = rows.slice(n);
   return [
+    ...commitments,
     ...rows.slice(0, n),
     { name: "", rest: true, color: "#46454c", icon: "Package", spent: round2(rest.reduce((a, r) => a + r.spent, 0)), budget: round2(rest.reduce((a, r) => a + r.budget, 0)) },
   ];
@@ -92,33 +104,34 @@ export function movers(s: MonthSummary, prior: MonthSummary[], n = 4): Mover[] {
  */
 export function suggestions(ds: Dataset, s: MonthSummary, recent: MonthSummary[], n = 4): Suggestion[] {
   const out: Suggestion[] = [];
+  const paysPlan = planPaymentTest(ds.plans);
   for (const c of s.byCategory.filter((x) => x.budget > 0)) {
     const window = recent.filter((r) => budgetIn(r, c.name) > 0);
-    const overMonths = window.filter((r) => spentIn(r, c.name) > budgetIn(r, c.name)).length;
-    const average = round2(window.reduce((a, r) => a + spentIn(r, c.name), 0) / Math.max(1, window.length));
-    if (c.spent > c.budget && overMonths >= 2) {
+    const overMonths = window.filter((r) => ownIn(r, c.name) > budgetIn(r, c.name)).length;
+    const average = round2(window.reduce((a, r) => a + ownIn(r, c.name), 0) / Math.max(1, window.length));
+    if (c.own > c.budget && overMonths >= 2) {
       const suggested = roundUp(average);
       if (suggested > c.budget) {
-        out.push({ kind: "raiseLimit", category: c.name, limit: c.budget, average, suggested, months: overMonths, impact: round2(c.spent - c.budget) });
+        out.push({ kind: "raiseLimit", category: c.name, limit: c.budget, average, suggested, months: overMonths, impact: round2(c.own - c.budget) });
         continue;
       }
     }
     // a few dollars over isn't worth a suggestion
-    if (c.spent - c.budget >= Math.max(20, 0.05 * c.budget)) {
-      const biggest = ds.transactions.filter((t) => t.category === c.name && t.date.startsWith(s.month)).sort((a, b) => b.amount - a.amount)[0] ?? null;
-      out.push({ kind: "overspent", category: c.name, over: round2(c.spent - c.budget), biggest, impact: round2(c.spent - c.budget) });
+    if (c.own - c.budget >= Math.max(20, 0.05 * c.budget)) {
+      const biggest = ds.transactions.filter((t) => t.category === c.name && t.date.startsWith(s.month) && !paysPlan(t)).sort((a, b) => b.amount - a.amount)[0] ?? null;
+      out.push({ kind: "overspent", category: c.name, over: round2(c.own - c.budget), biggest, impact: round2(c.own - c.budget) });
       continue;
     }
-    if (c.spent > c.budget) continue;
+    if (c.own > c.budget) continue;
     // a limit that's barely touched, three months running
-    if (window.length >= 3 && window.every((r) => spentIn(r, c.name) <= 0.6 * budgetIn(r, c.name))) {
+    if (window.length >= 3 && window.every((r) => ownIn(r, c.name) <= 0.6 * budgetIn(r, c.name))) {
       const suggested = Math.max(10, roundUp(average * 1.1));
       if (c.budget - suggested >= 20) out.push({ kind: "lowerLimit", category: c.name, limit: c.budget, average, suggested, impact: c.budget - suggested });
     }
   }
-  const unplanned = s.byCategory.filter((x) => x.budget <= 0 && x.spent >= 50);
+  const unplanned = s.byCategory.filter((x) => x.budget <= 0 && x.own >= 50);
   if (unplanned.length) {
-    const spent = round2(unplanned.reduce((a, c) => a + c.spent, 0));
+    const spent = round2(unplanned.reduce((a, c) => a + c.own, 0));
     out.push({ kind: "unplanned", categories: unplanned.map((c) => c.name), spent, impact: spent });
   }
   const doubtful = ds.subscriptions.filter((x) => x.status === "active" && x.kind === "subscription" && x.worthIt !== "yes");
@@ -145,7 +158,7 @@ export function monthReview(ds: Dataset, month: string, today = todayISO()) {
   // the three months before, with spending: "usual" levels and repeating patterns
   const prior = [1, 2, 3].map((i) => summarizeMonth(ds, addMonths(month, -i), today)).filter((x) => x.count > 0);
   const budgeted = s.byCategory.filter((c) => c.budget > 0);
-  const line = (c: (typeof s.byCategory)[number], amount: number): ReviewLine => ({ name: c.name, spent: c.spent, budget: c.budget, amount: round2(amount) });
+  const line = (c: (typeof s.byCategory)[number], amount: number): ReviewLine => ({ name: c.name, spent: c.own, budget: c.budget, amount: round2(amount) });
   const monthEnd = (m: string) => `${m}-${String(daysInMonth(m)).padStart(2, "0")}`;
   const nwStart = accountsReserve(ds, monthEnd(addMonths(month, -1)));
   const nwEnd = accountsReserve(ds, monthEnd(month));
@@ -162,11 +175,11 @@ export function monthReview(ds: Dataset, month: string, today = todayISO()) {
     prevTotal: prev.total,
     change: prev.total > 0 ? (s.total - prev.total) / prev.total : null,
     /** up to 3 categories that went over, biggest overrun first */
-    over: budgeted.filter((c) => c.spent > c.budget).map((c) => line(c, c.spent - c.budget)).sort((a, b) => b.amount - a.amount).slice(0, 3),
+    over: budgeted.filter((c) => c.own > c.budget).map((c) => line(c, c.own - c.budget)).sort((a, b) => b.amount - a.amount).slice(0, 3),
     /** up to 3 categories with the most left over */
-    under: budgeted.filter((c) => c.spent < c.budget).map((c) => line(c, c.budget - c.spent)).sort((a, b) => b.amount - a.amount).slice(0, 3),
-    /** spending in categories without a limit */
-    unplanned: round2(s.byCategory.filter((c) => c.budget <= 0).reduce((a, c) => a + c.spent, 0)),
+    under: budgeted.filter((c) => c.own < c.budget).map((c) => line(c, c.budget - c.own)).sort((a, b) => b.amount - a.amount).slice(0, 3),
+    /** spending in categories without a limit (installments and loans have their own line) */
+    unplanned: round2(s.byCategory.filter((c) => c.budget <= 0).reduce((a, c) => a + c.own, 0)),
     largest: s.largest,
     /** net worth at the end of the previous month vs. the end of this one, when balances exist for both */
     netWorth: nwStart !== null && nwEnd !== null ? { start: nwStart, end: nwEnd, change: round2(nwEnd - nwStart) } : null,

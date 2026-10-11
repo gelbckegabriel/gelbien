@@ -9,6 +9,8 @@ import {
   accountToRow,
   balanceToRow,
   goalToRow,
+  planToRow,
+  rowToPlan,
   rowToBalance,
   rowToGoal,
   rowToTransaction,
@@ -136,6 +138,7 @@ export async function createSpreadsheet(at: string, locale: Locale, ownerName: s
     accounts: [],
     balances: [],
     goals: [],
+    plans: [],
   };
   await writeValues(at, id, [
     ...TAB_KEYS.map((k) => ({ range: `${TABS[k].title}!A1`, values: [[...TABS[k].headers] as Row, ...seed[k]] })),
@@ -371,8 +374,8 @@ export async function applyMutation(at: string, id: string, m: Mutation): Promis
       if (!m.paymentRenames?.length) return;
       // Rewrite only the payment column (G) of expenses and recurring payments, where a name changed.
       const renames = new Map(m.paymentRenames.map((r) => [r.from, r.to]));
-      const current = await readRanges(at, id, ["transactions", "subscriptions"]);
-      const columns = (["transactions", "subscriptions"] as const)
+      const current = await readRanges(at, id, ["transactions", "subscriptions", "plans"]);
+      const columns = (["transactions", "subscriptions", "plans"] as const)
         .filter((k) => current[k].some((r) => renames.has(String(r[6] ?? ""))))
         .map((k) => ({ range: `${TABS[k].title}!G2`, values: current[k].map((r) => [renames.get(String(r[6] ?? "")) ?? String(r[6] ?? "")]) }));
       return writeValues(at, id, columns);
@@ -381,7 +384,7 @@ export async function applyMutation(at: string, id: string, m: Mutation): Promis
       const { cats, subs } = categoriesToRows(m.categories);
       const updates: Partial<Record<TabKey, Row[]>> = { categories: cats, subcategories: subs };
       if (m.renames.length || m.subRenames?.length) {
-        const current = await readRanges(at, id, ["transactions", "budgets", "subscriptions"]);
+        const current = await readRanges(at, id, ["transactions", "budgets", "subscriptions", "plans"]);
         const rename = (name: unknown) => {
           const hit = m.renames.find((r) => r.from === String(name ?? ""));
           return hit ? hit.to : name;
@@ -397,6 +400,8 @@ export async function applyMutation(at: string, id: string, m: Mutation): Promis
         updates.subscriptions = current.subscriptions.map((r) =>
           r.map((c, i) => (i === 2 ? (rename(c) as string) : i === 13 ? renameSub(String(r[2] ?? ""), String(c ?? "")) : c)),
         );
+        // category (D) and subcategory (E)
+        updates.plans = current.plans.map((r) => r.map((c, i) => (i === 3 ? (rename(c) as string) : i === 4 ? renameSub(String(r[3] ?? ""), String(c ?? "")) : c)));
       }
       return replaceTabs(at, id, updates);
     }
@@ -420,14 +425,18 @@ export async function applyMutation(at: string, id: string, m: Mutation): Promis
     case "upsertAccount":
       return upsertRow(at, id, "accounts", m.account.id, accountToRow(m.account));
     case "deleteAccount": {
-      // Drop the account, its balance history, and any goal links to it.
-      const current = await readRanges(at, id, ["balances", "goals"]);
+      // Drop the account, its balance history, and any goal or plan links to it.
+      const current = await readRanges(at, id, ["balances", "goals", "plans"]);
       await replaceTabs(at, id, {
         balances: current.balances.filter((r) => String(r[0] ?? "") !== m.id),
         goals: current.goals
           .map((r, i) => rowToGoal(r, i))
           .filter((g) => g !== null)
           .map((g) => goalToRow({ ...g, accountIds: g.accountIds.filter((a) => a !== m.id) })),
+        plans: current.plans
+          .map(rowToPlan)
+          .filter((p) => p !== null)
+          .map((p) => planToRow(p.accountId === m.id ? { ...p, accountId: "" } : p)),
       });
       return deleteRow(at, id, "accounts", m.id);
     }
@@ -443,6 +452,10 @@ export async function applyMutation(at: string, id: string, m: Mutation): Promis
       return upsertRow(at, id, "goals", m.goal.id, goalToRow(m.goal));
     case "deleteGoal":
       return deleteRow(at, id, "goals", m.id);
+    case "upsertPlan":
+      return upsertRow(at, id, "plans", m.plan.id, planToRow(m.plan));
+    case "deletePlan":
+      return deleteRow(at, id, "plans", m.id);
     case "replaceAll":
       return replaceTabs(at, id, datasetToRanges(m.data));
     default: {

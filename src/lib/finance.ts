@@ -2,8 +2,9 @@
  * Pure analytics over a Dataset. Everything the dashboard, budget page and AI
  * context need is computed here so it can be unit-tested without React.
  */
-import { chargesBetween, committedBills } from "./bills";
+import { chargesBetween, committedBills, type BillsData } from "./bills";
 import { OTHER_COLOR, REST_COLOR } from "./defaults";
+import { commitmentsIn, planPaymentTest } from "./plans";
 import type {
   BudgetLine,
   Category,
@@ -82,10 +83,16 @@ export interface CategorySpend {
   name: string;
   color: string;
   icon: string;
+  /** everything that went to this category (where the money went) */
   spent: number;
+  /** of `spent`, what paid installments and loans — those count on the budget's Commitments line */
+  committed: number;
+  /** what counts against the limit: `spent` less `committed` */
+  own: number;
   budget: number;
+  /** budget − own */
   remaining: number;
-  /** spent / budget (0 when no budget) */
+  /** own / budget (0 when no budget) */
   used: number;
   /** spent / month total */
   share: number;
@@ -108,11 +115,14 @@ export interface MonthSummary {
   fixed: number;
   variable: number;
   byCategory: CategorySpend[];
+  /** the budget's Commitments line: what installments and loans take this month, and what's been logged for them */
+  commitments: { planned: number; paid: number; extra: number };
   byPriority: Record<Priority, number>;
   byPayment: { name: string; amount: number }[];
   top: Transaction[];
   largest: Transaction | null;
   daily: number[];
+  /** the categories' limits plus the month's commitments (0 without limits) */
   budgetTotal: number;
   budgetIsOverride: boolean;
   remaining: number;
@@ -143,10 +153,12 @@ export function summarizeMonth(ds: Dataset, month: string, today = todayISO()): 
   const { lines: budgetLines, isOverride } = effectiveBudget(ds.budgets, month);
   const warnAt = ds.settings.warnAt || 0.85;
 
-  const spentByCat = new Map<string, { spent: number; count: number }>();
+  const paysPlan = planPaymentTest(ds.plans);
+  const spentByCat = new Map<string, { spent: number; committed: number; count: number }>();
   for (const t of txs) {
-    const cur = spentByCat.get(t.category) ?? { spent: 0, count: 0 };
+    const cur = spentByCat.get(t.category) ?? { spent: 0, committed: 0, count: 0 };
     cur.spent += t.amount;
+    if (paysPlan(t)) cur.committed += t.amount;
     cur.count += 1;
     spentByCat.set(t.category, cur);
   }
@@ -155,17 +167,21 @@ export function summarizeMonth(ds: Dataset, month: string, today = todayISO()): 
   const byCategory: CategorySpend[] = [...names].map((name) => {
     const cat = lookup(name);
     const spent = round2(spentByCat.get(name)?.spent ?? 0);
+    const committed = round2(spentByCat.get(name)?.committed ?? 0);
+    const own = round2(spent - committed);
     const budget = round2(budgetLines[name] ?? 0);
     return {
       name,
       color: cat?.color ?? OTHER_COLOR,
       icon: cat?.icon ?? "Package",
       spent,
+      committed,
+      own,
       budget,
-      remaining: round2(budget - spent),
-      used: budget > 0 ? spent / budget : 0,
+      remaining: round2(budget - own),
+      used: budget > 0 ? own / budget : 0,
       share: total > 0 ? spent / total : 0,
-      status: budgetStatus(spent, budget, warnAt),
+      status: budgetStatus(own, budget, warnAt),
       count: spentByCat.get(name)?.count ?? 0,
     };
   });
@@ -186,7 +202,10 @@ export function summarizeMonth(ds: Dataset, month: string, today = todayISO()): 
   }
 
   const sorted = [...txs].sort((a, b) => b.amount - a.amount);
-  const budgetTotal = round2(Object.values(budgetLines).reduce((a, b) => a + b, 0));
+  // installments and loans are a line of their own, on top of the categories' limits
+  const commitments = commitmentsIn(ds, month);
+  const limits = Object.values(budgetLines).reduce((a, b) => a + b, 0);
+  const budgetTotal = limits > 0 ? round2(limits + commitments.planned) : 0;
   const income = effectiveIncome(ds.incomes, month);
   const saved = round2(income.net - total);
 
@@ -204,6 +223,7 @@ export function summarizeMonth(ds: Dataset, month: string, today = todayISO()): 
     fixed: round2(fixed),
     variable: round2(variable),
     byCategory,
+    commitments,
     byPriority: {
       essential: round2(byPriority.essential),
       important: round2(byPriority.important),
@@ -232,15 +252,19 @@ export function summarizeMonth(ds: Dataset, month: string, today = todayISO()): 
  * on the 1st is a step at the start, not "overspending" for three weeks. A bill already logged counts
  * where and as much as it went out (not at all if that was in another month), one still to come on
  * its due day. A fixed cost bigger than its limit (or in a category without one) still counts in
- * full. Empty without a budget.
+ * full. Installments and loan payments land on their day too, but on the Commitments line: they don't
+ * use up their category's limit. Empty without a budget.
  */
-export function expectedPace(ds: Pick<Dataset, "subscriptions" | "transactions">, month: string, budget: Record<string, number>, today = todayISO()): number[] {
+export function expectedPace(ds: BillsData, month: string, budget: Record<string, number>, today = todayISO()): number[] {
   const days = daysInMonth(month);
   if (Object.values(budget).reduce((a, b) => a + Math.max(0, b), 0) <= 0) return [];
   const last = `${month}-${String(days).padStart(2, "0")}`;
   const steps = new Array<number>(days).fill(0);
   const fixedBy = new Map<string, number>();
   const counted = new Set<string>();
+  const paysPlan = planPaymentTest(ds.plans);
+  // not a category name anyone could type: plan payments are kept apart from every category's limit
+  const PLANS = "\u0000plans";
   const add = (date: string, amount: number, category: string) => {
     steps[Number(date.slice(8, 10)) - 1] += amount;
     fixedBy.set(category, (fixedBy.get(category) ?? 0) + amount);
@@ -249,18 +273,18 @@ export function expectedPace(ds: Pick<Dataset, "subscriptions" | "transactions">
     if (c.paid) {
       if (monthOf(c.paid.date) === month && !counted.has(c.paid.id)) {
         counted.add(c.paid.id);
-        add(c.paid.date, c.paid.amount, c.paid.category);
+        add(c.paid.date, c.paid.amount, c.plan || paysPlan(c.paid) ? PLANS : c.paid.category);
       }
     } else if (last >= today) {
       // still to come, or due and not logged yet — once the month is over, a charge nobody logged didn't happen
-      add(c.date, c.sub.amount, c.sub.category);
+      add(c.date, c.sub.amount, c.plan ? PLANS : c.sub.category);
     }
   }
   // fixed costs and bill payments not matched above (rent typed in as a fixed expense, next month's bill paid early)
   for (const t of txInMonth(ds.transactions, month)) {
     if ((t.type === "fixed" || t.billId) && !counted.has(t.id)) {
       counted.add(t.id);
-      add(t.date, t.amount, t.category);
+      add(t.date, t.amount, paysPlan(t) ? PLANS : t.category);
     }
   }
   const even = Object.entries(budget).reduce((a, [category, limit]) => a + Math.max(0, limit - Math.max(0, fixedBy.get(category) ?? 0)), 0) / days;
@@ -521,8 +545,10 @@ export function topMerchants(ds: Pick<Dataset, "transactions">, month: string): 
 export function suggestBudget(ds: Dataset, month: string, n = 3): Record<string, number> {
   const months = monthRange(addMonths(month, -1), n);
   const totals = new Map<string, number>();
+  const paysPlan = planPaymentTest(ds.plans);
   for (const t of ds.transactions) {
-    if (!months.includes(monthOf(t.date))) continue;
+    // installments and loans have their own line, filled in by themselves
+    if (!months.includes(monthOf(t.date)) || paysPlan(t)) continue;
     totals.set(t.category, (totals.get(t.category) ?? 0) + t.amount);
   }
   const out: Record<string, number> = {};
@@ -606,13 +632,14 @@ export function localInsights(ds: Dataset, month: string, today = todayISO()): L
   if (s.count === 0 && s.budgetTotal === 0) return out;
 
   const fixedByCat = new Map<string, number>();
-  for (const t of txInMonth(ds.transactions, month)) if (t.type === "fixed") fixedByCat.set(t.category, (fixedByCat.get(t.category) ?? 0) + t.amount);
+  const paysPlan = planPaymentTest(ds.plans);
+  for (const t of txInMonth(ds.transactions, month)) if (t.type === "fixed" && !paysPlan(t)) fixedByCat.set(t.category, (fixedByCat.get(t.category) ?? 0) + t.amount);
 
   for (const c of s.byCategory) {
     // Rent & co. always land near their budget — only flag fixed-cost categories when actually over.
-    const mostlyFixed = c.spent > 0 && (fixedByCat.get(c.name) ?? 0) / c.spent >= 0.8;
+    const mostlyFixed = c.own > 0 && (fixedByCat.get(c.name) ?? 0) / c.own >= 0.8;
     if (c.status === "over") {
-      out.push({ id: `over-${c.name}`, tone: "bad", key: "over", weight: 90 + c.used, vars: { category: c.name, spent: c.spent, budget: c.budget, pct: c.used } });
+      out.push({ id: `over-${c.name}`, tone: "bad", key: "over", weight: 90 + c.used, vars: { category: c.name, spent: c.own, budget: c.budget, pct: c.used } });
     } else if (c.status === "attention" && s.daysLeft > 3 && !mostlyFixed) {
       out.push({ id: `att-${c.name}`, tone: "warn", key: "attention", weight: 70 + c.used, vars: { category: c.name, pct: c.used, days: s.daysLeft } });
     }

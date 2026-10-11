@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Ban, Camera, ExternalLink, FileText, Loader2, Paperclip, Plus, Sparkles, Split, Trash2, X } from "lucide-react";
+import { AlertTriangle, Ban, Camera, ExternalLink, FileText, Loader2, Paperclip, Plus, Repeat, Sparkles, Split, Trash2, Undo2, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { useDataset, useMode, useMutate } from "@/lib/data/hooks";
 import { errorReason } from "@/lib/data/errors";
 import { uploadReceiptFile } from "@/lib/data/sources";
 import { billFromTransaction, looksLikeBill } from "@/lib/bills";
+import { extraPaymentLink, installmentTransactions } from "@/lib/plans";
 import { knownMerchants, suggestFromHistory } from "@/lib/finance";
 import { prepareReceipt, receiptFromTransfer, type PreparedReceipt } from "@/lib/files";
 import { useI18n } from "@/lib/i18n";
@@ -18,10 +19,12 @@ import { useUi } from "@/lib/ui-store";
 import { cn, isValidISODate, normalize, parseAmount, round2, todayISO, uid } from "@/lib/utils";
 import { CategoryIcon } from "./icons";
 import { GuardedLink } from "./shell/unsaved";
+import { installmentPlan, InstallmentsFields, NO_INSTALLMENTS, type InstallmentsDraft } from "./plans/installments-fields";
+import { Collapse } from "./ui/collapse";
 import { newItem, newPart, partTotal, SplitEditor, type SplitPart } from "./split-editor";
 import { Button } from "./ui/button";
 import { PaymentSelect } from "./pickers";
-import { Field, Input, MoneyInput, RichSelect, Segmented, Select, Switch, Textarea } from "./ui/form";
+import { Field, Input, MoneyInput, RichSelect, Segmented, Select, Switch, Textarea, ToggleCard } from "./ui/form";
 import { Sheet } from "./ui/sheet";
 
 interface FormState {
@@ -178,6 +181,9 @@ function ExpenseForm({
   const [aiNote, setAiNote] = useState<{ tone: "gold" | "bad" | "muted"; text: string } | null>(null);
   const [suggestedFrom, setSuggestedFrom] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(() => !!editing && (!!editing.notes || editing.recurring || editing.amount < 0));
+  // a new purchase can be split into installments: one expense per month (not a refund, not split by category)
+  const [inst, setInst] = useState<InstallmentsDraft>(NO_INSTALLMENTS);
+  const canInstall = !editing && !(groupTxs && groupTxs.length > 1) && !split && !form.refund;
   const [saving, setSaving] = useState(false);
   const linkedBill = (draft ?? editing)?.billId ?? "";
   // null: picked automatically (see `bill` below)
@@ -199,7 +205,10 @@ function ExpenseForm({
   );
   // the one this expense looks like it pays (same category, its name or merchant), else a new one
   const matchedBill = !split && form.category ? bills.find((s) => looksLikeBill(form, s)) : undefined;
-  const bill = !form.recurring ? NO_BILL : (billPick ?? matchedBill?.id ?? (wasRecurring ? NO_BILL : NEW_BILL));
+  // an installment, a loan payment or an extra payment on a loan: its link to the plan is kept as it is
+  // (it's what counts it towards the plan), whatever is edited
+  const linkedPlan = linkedBill ? ds.plans.find((p) => linkedBill === p.id || linkedBill === extraPaymentLink(p.id)) : undefined;
+  const bill = linkedPlan ? linkedBill : !form.recurring ? NO_BILL : (billPick ?? matchedBill?.id ?? (wasRecurring ? NO_BILL : NEW_BILL));
   // what a new one would look like — a split goes under its first part's category
   const lead = split?.[0] ?? form;
   const newBillFrom = (amount: number) =>
@@ -420,6 +429,37 @@ function ExpenseForm({
       group: "",
       billId: "",
     };
+    if (canInstall && inst.on) {
+      // the plan, and one expense per month ("Laptop · 3/12"), each in its own month's budget
+      const plan = installmentPlan(
+        inst,
+        { amount: value, date: base.date, name: base.description || base.merchant || base.category, category: base.category, subcategory: base.subcategory, merchant: base.merchant, payment: base.payment },
+        uid("plan"),
+        now,
+      );
+      const parts = installmentTransactions(
+        plan,
+        { category: base.category, subcategory: base.subcategory, payment: base.payment, type: base.type, priority: base.priority, merchant: base.merchant, recurring: false, notes: base.notes, receiptUrl: "", createdAt: now, updatedAt: now },
+        () => uid("t"),
+      );
+      parts[0].receiptUrl = receiptUrl;
+      mutate.mutate({ op: "upsertPlan", plan });
+      mutate.mutate({ op: "addTransactions", txs: parts });
+      setSaving(false);
+      toast.success(t("plans.inst.saved", { n: parts.length }), {
+        description: `${f.money(parts[0].amount)} × ${parts.length} · ${base.category}`,
+        action: {
+          label: t("common.undo"),
+          onClick: () => {
+            mutate.mutate({ op: "deleteTransactions", ids: parts.map((x) => x.id) });
+            mutate.mutate({ op: "deletePlan", id: plan.id });
+          },
+        },
+      });
+      if (another) onAnother();
+      else onClose();
+      return;
+    }
     const newBill = bill === NEW_BILL ? newBillFrom(value) : null;
     base.billId = newBill?.id ?? (bill === NO_BILL ? "" : bill);
     // A split is one row per category sharing a group id, so budgets and charts need nothing special
@@ -553,12 +593,9 @@ function ExpenseForm({
             setAiNote(null);
           }}
         />
-        <AnimatePresence>
+        <Collapse show={!!aiNote} gap="pb-5">
           {aiNote && (
-            <motion.p
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
+            <p
               className={cn(
                 "flex items-start gap-2 rounded-xl border px-3 py-2 text-[13px]",
                 aiNote.tone === "gold" && "border-gold/25 bg-gold-soft text-gold-bright",
@@ -575,9 +612,9 @@ function ExpenseForm({
                   </GuardedLink>
                 )}
               </span>
-            </motion.p>
+            </p>
           )}
-        </AnimatePresence>
+        </Collapse>
 
         {/* Amount + date */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -637,9 +674,12 @@ function ExpenseForm({
               {split ? t("split.title") : t("form.category")}
               {flag("category")}
             </span>
-            <button type="button" onClick={split ? mergeSplit : startSplit} className="inline-flex items-center gap-1 text-[13px] font-medium text-gold hover:underline">
-              <Split className="h-3.5 w-3.5" /> {split ? t("split.merge") : t("split.start")}
-            </button>
+            {/* a plan's payment stays one expense: split, it would count twice towards the plan */}
+            {!linkedPlan && (
+              <button type="button" onClick={split ? mergeSplit : startSplit} className="inline-flex items-center gap-1 text-[13px] font-medium text-gold hover:underline">
+                <Split className="h-3.5 w-3.5" /> {split ? t("split.merge") : t("split.start")}
+              </button>
+            )}
           </div>
           {split ? (
             <SplitEditor parts={split} onChange={setSplit} categories={ds.categories} currency={currencySymbol} missingCategory={missingCategory} />
@@ -691,9 +731,9 @@ function ExpenseForm({
         </div>
 
         {/* Subcategory chips */}
-        <AnimatePresence initial={false}>
-          {!split && currentCat && currentCat.subcategories.length > 0 && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+        <Collapse show={!split && !!currentCat && currentCat.subcategories.length > 0} gap="pb-5">
+          {currentCat && (
+            <>
               <div className="mb-2 flex items-center justify-between text-[13px] font-medium text-ink-2">
                 <span>{t("form.subcategory")}</span>
                 {flag("subcategory")}
@@ -723,9 +763,9 @@ function ExpenseForm({
                   );
                 })}
               </div>
-            </motion.div>
+            </>
           )}
-        </AnimatePresence>
+        </Collapse>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("form.payment")} hint={flag("payment")} highlight={aiFields.has("payment")} htmlFor="payment">
@@ -743,6 +783,19 @@ function ExpenseForm({
           </Field>
         </div>
 
+        <Collapse show={canInstall} gap="pb-5">
+          <InstallmentsFields
+            value={inst}
+            onChange={(d) => {
+              setInst(d);
+              // installments aren't a recurring bill
+              if (d.on && form.recurring) set({ recurring: false });
+            }}
+            amount={parseAmount(form.amount)}
+            date={isValidISODate(form.date) ? form.date : todayISO()}
+          />
+        </Collapse>
+
         <Field label={t("form.priority")} hint={flag("priority")}>
           <Segmented
             value={form.priority}
@@ -759,18 +812,27 @@ function ExpenseForm({
           <button type="button" onClick={() => setShowMore((s) => !s)} className="text-[13px] font-medium text-ink-3 hover:text-ink">
             {showMore ? "−" : "+"} {t("form.notes")} · {t("form.recurring").toLowerCase()} · {t("exp.refund").toLowerCase()}
           </button>
-          <AnimatePresence initial={false}>
-            {showMore && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                <div className="space-y-4 pt-4">
-                  <Textarea value={form.notes} placeholder={t("form.notesPh")} onChange={(e) => set({ notes: e.target.value })} maxLength={1000} />
-                  <div className="flex flex-wrap gap-6">
-                    <Switch checked={form.recurring} onChange={(v) => set({ recurring: v })} label={t("form.recurring")} />
-                    <Switch checked={form.refund} onChange={(v) => set({ refund: v })} label={t("form.refund")} />
-                  </div>
-                  {/* a recurring expense is one of the Budget page's recurring expenses (or becomes one) */}
-                  {form.recurring && (
-                    <div className="grid gap-3 sm:grid-cols-2">
+          <Collapse show={showMore}>
+            <div className="space-y-4 pt-4">
+              <Textarea value={form.notes} placeholder={t("form.notesPh")} onChange={(e) => set({ notes: e.target.value })} maxLength={1000} />
+              <div className="space-y-2.5">
+                {linkedPlan ? (
+                  <p className="flex items-center gap-2.5 rounded-2xl border border-line bg-surface-2/40 p-3.5 text-xs leading-relaxed text-ink-3">
+                    <Repeat className="h-4 w-4 shrink-0 text-gold" /> {t("form.planLink", { name: linkedPlan.name })}
+                  </p>
+                ) : (
+                  <ToggleCard
+                    checked={form.recurring}
+                    onChange={(v) => {
+                      set({ recurring: v });
+                      if (v) setInst((i) => ({ ...i, on: false }));
+                    }}
+                    icon={<Repeat />}
+                    title={t("form.recurring")}
+                    description={t("form.recurringDesc")}
+                  >
+                    {/* a recurring expense is one of the Budget page's recurring expenses (or becomes one) */}
+                    <div className="grid gap-3 border-t border-line/60 pt-3.5 sm:grid-cols-2">
                       <Field label={t("form.bill.label")} className={cn(bill !== NEW_BILL && "sm:col-span-2")}>
                         <RichSelect
                           value={bill}
@@ -806,11 +868,12 @@ function ExpenseForm({
                         </p>
                       )}
                     </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  </ToggleCard>
+                )}
+                <ToggleCard checked={form.refund} onChange={(v) => set({ refund: v })} icon={<Undo2 />} title={t("form.refund")} description={t("form.refundDesc")} />
+              </div>
+            </div>
+          </Collapse>
         </div>
         {/* last, so these never-visible inputs don't hold up the sections cascading in above */}
         <input ref={fileInput} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />

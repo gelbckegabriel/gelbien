@@ -20,6 +20,9 @@ import type {
   GoalStatus,
   IncomeLine,
   Locale,
+  Plan,
+  Prepayment,
+  RateChange,
   Priority,
   Settings,
   SubKind,
@@ -28,8 +31,8 @@ import type {
   Transaction,
   WorthIt,
 } from "./types";
-import { ACCOUNT_TYPES, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PRIORITIES, SUB_KINDS, SUB_STATUSES, WORTH_IT } from "./types";
-import { parseAmount, serialToISO } from "./utils";
+import { ACCOUNT_TYPES, AMORTIZATIONS, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PLAN_KINDS, PLAN_STATUSES, PREPAY_MODES, PRIORITIES, RATE_KEEPS, SUB_KINDS, SUB_STATUSES, WORTH_IT } from "./types";
+import { newestFirst, parseAmount, serialToISO } from "./utils";
 
 export const TABS = {
   transactions: {
@@ -46,11 +49,16 @@ export const TABS = {
     headers: ["id", "name", "category", "amount", "cycle", "billingDay", "payment", "status", "trialEnd", "worthIt", "notes", "nextCharge", "kind", "subcategory", "merchant"],
   },
   settings: { title: "Settings", headers: ["key", "value"] },
-  accounts: { title: "Accounts", headers: ["id", "name", "institution", "type", "color", "archived", "notes"] },
+  accounts: { title: "Accounts", headers: ["id", "name", "institution", "type", "color", "archived", "notes", "depreciation"] },
   balances: { title: "Balances", headers: ["accountId", "date", "balance"] },
   goals: {
     title: "Goals",
     headers: ["id", "name", "icon", "color", "target", "targetDate", "accountIds", "saved", "monthlyContribution", "annualReturn", "status", "order", "notes", "createdAt", "startMonth", "afterGoal", "pausedMonths"],
+  },
+  plans: {
+    title: "Plans",
+    // payment stays in column G, as on Transactions and Subscriptions (renaming a payment method rewrites that column)
+    headers: ["id", "kind", "name", "category", "subcategory", "merchant", "payment", "price", "downPayment", "rate", "payments", "amortization", "firstDate", "extras", "prepayments", "account", "(unused)", "countAsDebt", "status", "notes", "createdAt", "rateChanges"],
   },
 } as const;
 
@@ -209,10 +217,11 @@ export function rowToAccount(r: Row): Account | null {
     color: str(r[4]) || "#6b6a72",
     archived: bool(r[5]),
     notes: str(r[6]),
+    depreciation: Math.max(0, Math.min(100, num(r[7]))),
   };
 }
 
-export const accountToRow = (a: Account): Row => [a.id, a.name, a.institution, a.type, a.color, a.archived, a.notes];
+export const accountToRow = (a: Account): Row => [a.id, a.name, a.institution, a.type, a.color, a.archived, a.notes, a.depreciation];
 
 export function rowToBalance(r: Row): BalanceSnapshot | null {
   const accountId = str(r[0]);
@@ -253,6 +262,64 @@ export function rowToGoal(r: Row, index: number): Goal | null {
 export const goalToRow = (g: Goal): Row => [
   g.id, g.name, g.icon, g.color, g.target, g.targetDate, g.accountIds.join("|"), g.saved, g.monthlyContribution, g.annualReturn,
   g.status, g.order, g.notes, g.createdAt, g.startMonth, g.afterGoalId, g.pausedMonths.join("|"),
+];
+
+const isMonth = (s: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(s);
+
+export function rowToPlan(r: Row): Plan | null {
+  const id = str(r[0]);
+  const name = str(r[2]);
+  const firstDate = date(r[12]);
+  if (!id || !name || !/^\d{4}-\d{2}-\d{2}$/.test(firstDate)) return null;
+  return {
+    id,
+    // camelCase codes ("carLoan"), matched whatever the case typed into the sheet
+    kind: PLAN_KINDS.find((k) => k.toLowerCase() === str(r[1]).toLowerCase()) ?? "other",
+    name,
+    category: str(r[3]),
+    subcategory: str(r[4]),
+    merchant: str(r[5]),
+    payment: str(r[6]),
+    price: Math.max(0, num(r[7])),
+    downPayment: Math.max(0, num(r[8])),
+    rate: Math.max(0, num(r[9])),
+    count: Math.max(1, Math.round(num(r[10])) || 1),
+    amortization: oneOf(r[11], AMORTIZATIONS, "price"),
+    firstDate,
+    // stored as "2026-11:300|2027-06:500" so the sheet stays readable
+    extras: str(r[13])
+      .split("|")
+      .map((x) => x.split(":"))
+      .filter(([m, a]) => isMonth(m?.trim() ?? "") && a !== undefined)
+      .map(([m, a]) => ({ from: m.trim(), amount: Math.max(0, parseAmount(a)) })),
+    // "2027-10:10000:shorten|2028-10:5000:lower"
+    prepayments: str(r[14])
+      .split("|")
+      .map((x) => x.split(":"))
+      .filter(([m, a]) => isMonth(m?.trim() ?? "") && a !== undefined)
+      .map(([m, a, mode]): Prepayment => ({ month: m.trim(), amount: Math.max(0, parseAmount(a)), mode: oneOf(mode, PREPAY_MODES, "shorten") })),
+    accountId: str(r[15]),
+    // on unless the sheet says otherwise
+    countAsDebt: str(r[17]) === "" ? true : bool(r[17]),
+    status: oneOf(r[18], PLAN_STATUSES, "active"),
+    notes: str(r[19]),
+    createdAt: str(r[20]),
+    // "2028-11:4.29:end|2031-11:3.9:payment"
+    rateChanges: str(r[21])
+      .split("|")
+      .map((x) => x.split(":"))
+      .filter(([m, rate]) => isMonth(m?.trim() ?? "") && rate !== undefined)
+      .map(([m, rate, keep]): RateChange => ({ from: m.trim(), rate: Math.max(0, Math.min(100, parseAmount(rate))), keep: oneOf(keep, RATE_KEEPS, "end") })),
+  };
+}
+
+export const planToRow = (p: Plan): Row => [
+  p.id, p.kind, p.name, p.category, p.subcategory, p.merchant, p.payment, p.price, p.downPayment, p.rate, p.count, p.amortization, p.firstDate,
+  p.extras.map((e) => `${e.from}:${e.amount}`).join("|"),
+  p.prepayments.map((x) => `${x.month}:${x.amount}:${x.mode}`).join("|"),
+  // column Q held "logs itself" (loans now always ask "were these paid?"): kept empty so the columns after it stay put
+  p.accountId, "", p.countAsDebt, p.status, p.notes, p.createdAt,
+  p.rateChanges.map((x) => `${x.from}:${x.rate}:${x.keep}`).join("|"),
 ];
 
 export function rowsToSettings(rows: Row[], fallbackLocale: Locale): Settings {
@@ -312,7 +379,7 @@ export function settingsToRows(s: Settings): Row[] {
 export function datasetFromRanges(ranges: Record<TabKey, Row[]>, fallbackLocale: Locale): Omit<Dataset, "meta"> {
   const pick = <T>(rows: Row[], f: (r: Row) => T | null) => rows.map(f).filter((x): x is T => x !== null);
   return {
-    transactions: pick(ranges.transactions, rowToTransaction).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
+    transactions: pick(ranges.transactions, rowToTransaction).sort(newestFirst),
     categories: rowsToCategories(ranges.categories, ranges.subcategories),
     budgets: pick(ranges.budgets, rowToBudget),
     incomes: pick(ranges.income, rowToIncome),
@@ -323,6 +390,7 @@ export function datasetFromRanges(ranges: Record<TabKey, Row[]>, fallbackLocale:
       .map((r, i) => rowToGoal(r, i))
       .filter((g): g is Goal => g !== null)
       .sort((a, b) => a.order - b.order),
+    plans: pick(ranges.plans ?? [], rowToPlan),
     settings: rowsToSettings(ranges.settings, fallbackLocale),
   };
 }
@@ -341,5 +409,6 @@ export function datasetToRanges(data: Omit<Dataset, "meta">): Record<TabKey, Row
     accounts: data.accounts.map(accountToRow),
     balances: data.balances.map(balanceToRow),
     goals: data.goals.map(goalToRow),
+    plans: data.plans.map(planToRow),
   };
 }

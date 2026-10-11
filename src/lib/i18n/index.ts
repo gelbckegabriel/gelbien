@@ -65,6 +65,8 @@ export function makeFormatters(locale: Locale, currency: string) {
   const pctFmt = new Intl.NumberFormat(intl, { style: "percent", maximumFractionDigits: 0 });
   const pct1Fmt = new Intl.NumberFormat(intl, { style: "percent", maximumFractionDigits: 1 });
   const num = new Intl.NumberFormat(intl, { maximumFractionDigits: 1 });
+  // rates as typed: 4.89% stays 4.89% (three places covers any lender's)
+  const rateFmt = new Intl.NumberFormat(intl, { maximumFractionDigits: 3 });
   const monthLong = new Intl.DateTimeFormat(intl, { month: "long", year: "numeric" });
   const monthOnly = new Intl.DateTimeFormat(intl, { month: "long" });
   const monthShort = new Intl.DateTimeFormat(intl, { month: "short" });
@@ -97,6 +99,8 @@ export function makeFormatters(locale: Locale, currency: string) {
     pct: (x: number) => pctFmt.format(Number.isFinite(x) ? x : 0),
     pct1: (x: number) => pct1Fmt.format(Number.isFinite(x) ? x : 0),
     num: (n: number) => num.format(n),
+    /** an interest or depreciation rate, without the % sign, never rounded to fewer places than typed (up to 3) */
+    rate: (n: number) => rateFmt.format(n),
     monthLong: (month: string) => capitalize(monthLong.format(toDate(`${month}-01`))),
     monthName: (month: string) => capitalize(monthOnly.format(toDate(`${month}-01`))),
     monthShort: (month: string) => capitalize(monthShort.format(toDate(`${month}-01`)).replace(".", "")),

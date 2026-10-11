@@ -1,10 +1,20 @@
 /**
- * Synthetic demo data — plausible Calgary spending generated from a fixed seed.
+ * Synthetic demo data — plausible Calgary spending generated from a fixed seed: a year of expenses up to
+ * today, a car loan and two purchases in installments, accounts with a monthly check-in, goals in each state.
  * Nothing here comes from a real person's records.
  */
 import { defaultCategories, defaultSettings } from "./defaults";
-import type { Account, BalanceSnapshot, BudgetLine, Dataset, ExpenseType, Goal, IncomeLine, Locale, Priority, Subscription, Transaction } from "./types";
+import { billTransaction } from "./bills";
+import { estimatedValue } from "./goals";
+import { balanceAt, installmentTransactions, planCharges } from "./plans";
+import type { Account, BalanceSnapshot, BudgetLine, Dataset, ExpenseType, Goal, IncomeLine, Locale, Plan, Priority, Subscription, Transaction } from "./types";
 import { addMonths, currentMonth, monthOf, round2, todayISO } from "./utils";
+
+/**
+ * Bump when the demo itself changes (new features to show): a copy kept in the browser from an older
+ * version is then built again. See demoSource.
+ */
+export const DEMO_VERSION = 2;
 
 type Tri = [string, string, string];
 const L: Record<Locale, 0 | 1 | 2> = { pt: 0, en: 1, fr: 2 };
@@ -33,7 +43,7 @@ const WINTER = [1.6, 1.5, 1.3, 1.05, 0.8, 0.7, 0.7, 0.7, 0.85, 1.1, 1.35, 1.6];
 const FIXED: Fixed[] = [
   { day: 1, c: 0, s: 0, m: "Bow River Apartments", d: ["Aluguel", "Rent", "Loyer"], min: 1650, max: 1650, pr: "essential", ty: "fixed", pay: 3, rec: true },
   { day: 3, c: 0, s: 2, m: "Square One", d: ["Seguro do inquilino", "Tenant insurance", "Assurance locataire"], min: 24.5, max: 24.5, pr: "essential", ty: "fixed", pay: 0, rec: true },
-  { day: 1, c: 4, s: 0, m: "Calgary Transit", d: ["Passe mensal", "Monthly transit pass", "Laissez-passer mensuel"], min: 115, max: 115, pr: "essential", ty: "fixed", pay: 1, rec: true },
+  { day: 6, c: 4, s: 4, m: "Intact Insurance", d: ["Seguro do carro", "Car insurance", "Assurance auto"], min: 168, max: 168, pr: "essential", ty: "fixed", pay: 4, rec: true },
   { day: 9, c: 1, s: 0, m: "ENMAX", d: ["Conta de luz", "Electricity bill", "Facture d'électricité"], min: 62, max: 78, pr: "essential", ty: "fixed", pay: 4, rec: true, season: WINTER },
   { day: 12, c: 1, s: 1, m: "ATCO", d: ["Conta de gás", "Natural gas bill", "Facture de gaz"], min: 55, max: 70, pr: "essential", ty: "fixed", pay: 4, rec: true, season: WINTER },
   { day: 15, c: 1, s: 3, m: "TELUS", d: ["Internet de casa", "Home internet", "Internet résidentiel"], min: 75, max: 75, pr: "essential", ty: "fixed", pay: 0, rec: true },
@@ -57,7 +67,9 @@ const VARIABLE: (Tpl & { freq: number; weekend?: boolean })[] = [
   { freq: 2, c: 3, s: 0, m: "Native Tongues", d: ["Jantar fora", "Dinner out", "Souper au restaurant"], min: 38, max: 92, pr: "superfluous", pay: 0, weekend: true },
   { freq: 1.6, c: 3, s: 2, m: "SkipTheDishes", d: ["Delivery", "Delivery", "Livraison"], min: 24, max: 48, pr: "superfluous", pay: 0 },
   { freq: 1, c: 3, s: 5, m: "Cold Garden", d: ["Happy hour", "Happy hour", "5 à 7"], min: 22, max: 55, pr: "superfluous", pay: 0, weekend: true },
-  { freq: 1.5, c: 4, s: 2, m: "Uber", d: ["Corrida de Uber", "Uber ride", "Course Uber"], min: 11, max: 29, pr: "important", pay: 0 },
+  { freq: 2.2, c: 4, s: 3, m: "Costco Gas", d: ["Gasolina", "Fuel", "Essence"], min: 48, max: 78, pr: "essential", pay: 0 },
+  { freq: 1.5, c: 4, s: 6, m: "Calgary Parking", d: ["Estacionamento", "Parking", "Stationnement"], min: 4, max: 16, pr: "important", pay: 0 },
+  { freq: 0.8, c: 4, s: 2, m: "Uber", d: ["Corrida de Uber", "Uber ride", "Course Uber"], min: 11, max: 29, pr: "important", pay: 0 },
   { freq: 1.2, c: 4, s: 7, m: "Bird", d: ["Patinete", "Scooter ride", "Trottinette"], min: 3, max: 7, pr: "superfluous", pay: 0 },
   { freq: 0.9, c: 5, s: 2, m: "Shoppers Drug Mart", d: ["Farmácia", "Pharmacy", "Pharmacie"], min: 9, max: 42, pr: "essential", pay: 1 },
   { freq: 1, c: 6, s: 0, m: "Winners", d: ["Roupas", "Clothes", "Vêtements"], min: 28, max: 120, pr: "important", pay: 0 },
@@ -70,9 +82,14 @@ const VARIABLE: (Tpl & { freq: number; weekend?: boolean })[] = [
 
 /** One-off purchases pinned to a month offset from today (0 = this month) */
 const ONE_OFFS: (Tpl & { offset: number; day: number })[] = [
+  { offset: -11, day: 20, c: 4, s: 5, m: "Kal Tire", d: ["Pneus de inverno", "Winter tires", "Pneus d'hiver"], min: 780, max: 780, pr: "essential", pay: 0 },
+  { offset: -9, day: 6, c: 4, s: 5, m: "Midas", d: ["Troca de óleo", "Oil change", "Vidange"], min: 96.5, max: 96.5, pr: "essential", pay: 0 },
+  { offset: -8, day: 19, c: 5, s: 4, m: "Specsavers", d: ["Óculos novos", "New glasses", "Nouvelles lunettes"], min: 265, max: 265, pr: "essential", pay: 0 },
+  { offset: -6, day: 11, c: 9, s: 2, m: "Calgary Flames", d: ["Jogo de hóquei", "Hockey game", "Match de hockey"], min: 142, max: 142, pr: "superfluous", pay: 0 },
+  { offset: -5, day: 2, c: 10, s: 0, m: "Bow Valley College", d: ["Curso de inglês", "English course", "Cours d'anglais"], min: 280, max: 280, pr: "important", pay: 0 },
   { offset: -4, day: 14, c: 5, s: 1, m: "Bridgeland Dental", d: ["Limpeza no dentista", "Dental cleaning", "Nettoyage dentaire"], min: 185, max: 185, pr: "essential", pay: 0 },
   { offset: -3, day: 8, c: 10, s: 1, m: "SAIT", d: ["Curso de certificação", "Certification course", "Cours de certification"], min: 320, max: 320, pr: "important", pay: 0 },
-  { offset: -2, day: 22, c: 7, s: 0, m: "Structube", d: ["Sofá novo", "New sofa", "Nouveau canapé"], min: 649, max: 649, pr: "important", pay: 0 },
+  { offset: -2, day: 22, c: 7, s: 4, m: "HomeSense", d: ["Decoração da sala", "Living room decor", "Déco du salon"], min: 129, max: 129, pr: "superfluous", pay: 0 },
   { offset: -1, day: 16, c: 9, s: 1, m: "Scotiabank Saddledome", d: ["Show", "Concert", "Concert"], min: 138, max: 138, pr: "superfluous", pay: 0 },
   { offset: 0, day: 4, c: 6, s: 1, m: "Mountain Warehouse", d: ["Casaco de inverno", "Winter coat", "Manteau d'hiver"], min: 229, max: 229, pr: "essential", pay: 0 },
 ];
@@ -95,11 +112,12 @@ export function buildDemoDataset(locale: Locale, today = todayISO()): Dataset {
   const categories = defaultCategories(locale);
   const settings = defaultSettings(locale);
   settings.reserve = 18000;
-  settings.savingsGoal = 800;
+  settings.savingsGoal = 700;
   const pays = settings.paymentMethods;
   const rand = mulberry32(20260925);
   const nowMonth = currentMonth(new Date(`${today}T12:00:00`));
-  const startMonth = addMonths(nowMonth, -5);
+  // a year of history: the 12-month charts, the year at a glance and net worth all have something to show
+  const startMonth = addMonths(nowMonth, -11);
   const txs: Transaction[] = [];
   let seq = 0;
 
@@ -127,7 +145,7 @@ export function buildDemoDataset(locale: Locale, today = todayISO()): Dataset {
     };
   };
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 12; i++) {
     const month = addMonths(startMonth, i);
     const [y, m] = month.split("-").map(Number);
     const days = new Date(y, m, 0).getDate();
@@ -166,11 +184,12 @@ export function buildDemoDataset(locale: Locale, today = todayISO()): Dataset {
   );
   txs.sort((a, b) => (a.date < b.date ? 1 : -1));
 
-  const budgetAmounts = [1700, 330, 640, 320, 170, 90, 200, 150, 40, 170, 50, 0, 220];
+  // the categories' limits leave out the car loan and the installments: those are the budget's Commitments line
+  const budgetAmounts = [1700, 330, 640, 320, 360, 100, 160, 150, 40, 170, 50, 0, 220];
   const budgets: BudgetLine[] = categories
     .map((c, i) => ({ month: "default", category: c.name, amount: budgetAmounts[i] ?? 0 }))
     .filter((b) => b.amount > 0);
-  const incomes: IncomeLine[] = [{ month: "default", gross: 6500, net: 4980, note: "" }];
+  const incomes: IncomeLine[] = [{ month: "default", gross: 7600, net: 5750, note: "" }];
 
   const trialEnd = new Date(`${today}T12:00:00`);
   trialEnd.setDate(trialEnd.getDate() + 9);
@@ -189,46 +208,99 @@ export function buildDemoDataset(locale: Locale, today = todayISO()): Dataset {
     { id: "sub_7", name: "GoodLife Fitness", category: categories[5].name, amount: 54.99, cycle: "monthly", billingDay: gymDay, payment: pays[0], status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "subscription", subcategory: categories[5].subcategories[8], merchant: "GoodLife Fitness" },
     { id: "sub_0", name: ["Aluguel", "Rent", "Loyer"][li], category: categories[0].name, amount: 1650, cycle: "monthly", billingDay: 1, payment: pays[3], status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill", subcategory: categories[0].subcategories[0], merchant: "Bow River Apartments" },
     { id: "sub_8", name: "CAA", category: categories[4].name, amount: 128, cycle: "annual", billingDay: null, payment: pays[0], status: "active", trialEnd: "", worthIt: "maybe", notes: "", nextCharge: todayISO(caaDue), kind: "bill", subcategory: "", merchant: "CAA" },
+    { id: "sub_9", name: "Intact Insurance", category: categories[4].name, amount: 168, cycle: "monthly", billingDay: 6, payment: pays[4] ?? pays[0], status: "active", trialEnd: "", worthIt: "yes", notes: "", nextCharge: "", kind: "bill", subcategory: categories[4].subcategories[4], merchant: "Intact Insurance" },
   ];
+
+  // the car, bought fifteen months ago with a loan and an extra $1,500 paid off four
+  // months ago; a sofa in 10 interest-free installments two months ago; a phone in 12, five months ago
+  const tri = (x: Tri) => x[li];
+  const created = new Date(`${startMonth}-01T12:00:00`).toISOString();
+  const car: Plan = {
+    id: "plan_car", kind: "carLoan", name: tri(["Financiamento do carro", "Car loan", "Prêt auto"]), category: categories[4].name, subcategory: "",
+    merchant: "Toyota Financial", payment: pays[4] ?? pays[0], price: 34000, downPayment: 6000, rate: 6.49, count: 60, amortization: "price",
+    firstDate: `${addMonths(nowMonth, -14)}-15`, extras: [], prepayments: [{ month: addMonths(nowMonth, -4), amount: 1500, mode: "shorten" }], rateChanges: [],
+    accountId: "acc_carloan", countAsDebt: true, status: "active", notes: "", createdAt: created,
+  };
+  const bought = `${addMonths(nowMonth, -15)}-20`;
 
   // Accounts with a check-in on the 1st of each previous month. This month's check-in is
   // deliberately missing so the demo shows the monthly reminder.
-  const tri = (x: Tri) => x[li];
   const accounts: Account[] = [
-    { id: "acc_neo", name: tri(["Poupança (HISA)", "Savings (HISA)", "Épargne (CÉIE)"]), institution: "Neo Financial", type: "savings", color: "#199e70", archived: false, notes: "" },
-    { id: "acc_chq", name: tri(["Conta corrente", "Chequing", "Compte chèques"]), institution: "Scotiabank", type: "chequing", color: "#3987e5", archived: false, notes: "" },
-    { id: "acc_visa", name: "Visa", institution: "Scotiabank", type: "credit", color: "#e0707a", archived: false, notes: "" },
-    { id: "acc_tfsa", name: tri(["TFSA", "TFSA", "CELI"]), institution: "Wealthsimple", type: "investment", color: "#9085e9", archived: false, notes: "" },
+    { id: "acc_neo", name: tri(["Poupança (HISA)", "Savings (HISA)", "Épargne (CÉIE)"]), institution: "Neo Financial", type: "savings", color: "#199e70", archived: false, notes: "", depreciation: 0 },
+    { id: "acc_chq", name: tri(["Conta corrente", "Chequing", "Compte chèques"]), institution: "Scotiabank", type: "chequing", color: "#3987e5", archived: false, notes: "", depreciation: 0 },
+    { id: "acc_visa", name: "Visa", institution: "Scotiabank", type: "credit", color: "#e0707a", archived: false, notes: "", depreciation: 0 },
+    { id: "acc_tfsa", name: tri(["TFSA", "TFSA", "CELI"]), institution: "Wealthsimple", type: "investment", color: "#9085e9", archived: false, notes: "", depreciation: 0 },
+    { id: "acc_car", name: "Toyota Corolla", institution: "", type: "property", color: "#c98500", archived: false, notes: "", depreciation: 15 },
+    { id: "acc_carloan", name: tri(["Financiamento do carro — empréstimo", "Car loan — loan", "Prêt auto — prêt"]), institution: "Toyota Financial", type: "loan", color: "#d55181", archived: false, notes: "", depreciation: 0 },
   ];
   const balances: BalanceSnapshot[] = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 12; i++) {
     const date = `${addMonths(startMonth, i)}-01`;
     if (monthOf(date) >= nowMonth) break;
     balances.push(
-      { accountId: "acc_neo", date, balance: round2(6200 + i * 560 + rand() * 90) },
+      { accountId: "acc_neo", date, balance: round2(6900 + i * 470 + rand() * 90) },
       { accountId: "acc_chq", date, balance: round2(2800 + rand() * 1300) },
       { accountId: "acc_visa", date, balance: round2(550 + rand() * 700) },
-      { accountId: "acc_tfsa", date, balance: round2(4000 * Math.pow(1.004, i) + i * 330 + rand() * 60) },
+      { accountId: "acc_tfsa", date, balance: round2(4000 * Math.pow(1.004, i) + i * 120 + rand() * 60) },
+      // what the car would sell for (losing 15% a year) and what's still owed on it
+      { accountId: "acc_car", date, balance: estimatedValue({ depreciation: 15 }, { date: bought, balance: 34000 }, date) },
+      { accountId: "acc_carloan", date, balance: balanceAt(car, date, settings.currency) },
     );
   }
-  const created = new Date(`${startMonth}-01T12:00:00`).toISOString();
   const goals: Goal[] = [
     {
-      id: "goal_car", name: tri(["Carro", "Car", "Voiture"]), icon: "Car", color: "#3987e5", target: 18000,
-      targetDate: `${addMonths(nowMonth, 15)}-01`, accountIds: ["acc_neo"], saved: 0, monthlyContribution: 700, annualReturn: 3,
+      id: "goal_emergency", name: tri(["Reserva de emergência", "Emergency fund", "Fonds d'urgence"]), icon: "ShieldCheck", color: "#199e70", target: 15000,
+      targetDate: `${addMonths(nowMonth, 18)}-01`, accountIds: ["acc_neo"], saved: 0, monthlyContribution: 450, annualReturn: 3,
       status: "active", order: 0, notes: "", createdAt: created, startMonth: "", afterGoalId: "", pausedMonths: [],
     },
     {
-      id: "goal_home", name: tri(["Entrada do apartamento", "Home down payment", "Mise de fonds"]), icon: "Home", color: "#d9b45f", target: 60000,
-      targetDate: `${addMonths(nowMonth, 54)}-01`, accountIds: ["acc_tfsa"], saved: 0, monthlyContribution: 350, annualReturn: 5,
-      status: "active", order: 1, notes: "", createdAt: created, startMonth: "", afterGoalId: "", pausedMonths: [],
+      id: "goal_trip", name: tri(["Viagem ao Brasil", "Trip to Brazil", "Voyage au Brésil"]), icon: "Plane", color: "#d55181", target: 3500,
+      targetDate: `${addMonths(nowMonth, 9)}-01`, accountIds: [], saved: 1200, monthlyContribution: 250, annualReturn: 0,
+      status: "active", order: 1, notes: "", createdAt: created, startMonth: "", afterGoalId: "", pausedMonths: [12],
     },
     {
-      id: "goal_trip", name: tri(["Viagem ao Brasil", "Trip to Brazil", "Voyage au Brésil"]), icon: "Plane", color: "#d55181", target: 3500,
-      targetDate: `${addMonths(nowMonth, 9)}-01`, accountIds: [], saved: 1200, monthlyContribution: 300, annualReturn: 0,
-      status: "active", order: 2, notes: "", createdAt: created, startMonth: "", afterGoalId: "", pausedMonths: [12],
+      // saved for once the emergency fund is there: shows a goal waiting for another
+      id: "goal_home", name: tri(["Entrada do apartamento", "Home down payment", "Mise de fonds"]), icon: "Home", color: "#d9b45f", target: 60000,
+      targetDate: `${addMonths(nowMonth, 72)}-01`, accountIds: ["acc_tfsa"], saved: 0, monthlyContribution: 600, annualReturn: 5,
+      status: "active", order: 2, notes: "", createdAt: created, startMonth: "", afterGoalId: "goal_emergency", pausedMonths: [],
+    },
+    {
+      id: "goal_laptop", name: tri(["Notebook novo", "New laptop", "Nouvel ordinateur"]), icon: "Laptop", color: "#3987e5", target: 1800,
+      targetDate: `${addMonths(nowMonth, -3)}-01`, accountIds: [], saved: 1800, monthlyContribution: 0, annualReturn: 0,
+      status: "achieved", order: 3, notes: "", createdAt: created, startMonth: "", afterGoalId: "", pausedMonths: [],
     },
   ];
+
+  const nextId = () => `demo_${(seq++).toString(36).padStart(4, "0")}`;
+  const parts = (p: Plan, priority: Priority) => {
+    const stamp = `${p.firstDate}T12:00:00.000Z`;
+    txs.push(
+      ...installmentTransactions(
+        p,
+        { category: p.category, subcategory: p.subcategory, payment: p.payment, type: "variable", priority, merchant: p.merchant, recurring: false, notes: "", receiptUrl: "", createdAt: stamp, updatedAt: stamp },
+        nextId,
+      ),
+    );
+  };
+  const sofaDate = `${addMonths(nowMonth, -2)}-08`;
+  const sofa: Plan = {
+    id: "plan_sofa", kind: "installments", name: tri(["Sofá", "Sofa", "Canapé"]), category: categories[7].name, subcategory: categories[7].subcategories[0], merchant: "Structube",
+    payment: pays[0], price: 1499.9, downPayment: 0, rate: 0, count: 10, amortization: "price", firstDate: sofaDate, extras: [], prepayments: [], rateChanges: [],
+    accountId: "", countAsDebt: true, status: "active", notes: "", createdAt: `${sofaDate}T12:00:00.000Z`,
+  };
+  const phoneDate = `${addMonths(nowMonth, -5)}-12`;
+  const phone: Plan = {
+    id: "plan_phone", kind: "installments", name: "iPhone 16", category: categories[6].name, subcategory: categories[6].subcategories[6], merchant: "Apple",
+    payment: pays[0], price: 1199, downPayment: 0, rate: 0, count: 12, amortization: "price", firstDate: phoneDate, extras: [], prepayments: [], rateChanges: [],
+    accountId: "", countAsDebt: true, status: "active", notes: "", createdAt: `${phoneDate}T12:00:00.000Z`,
+  };
+  parts(sofa, "important");
+  parts(phone, "important");
+  // the loan payments since it was added, already marked paid
+  for (const c of planCharges(car, `${startMonth}-01`, today, settings.currency)) {
+    txs.push({ ...billTransaction(c, { transactions: txs, settings }, `${c.date}T12:00:00.000Z`), id: nextId() });
+  }
+  txs.sort((a, b) => (a.date < b.date ? 1 : -1));
 
   return {
     transactions: txs,
@@ -239,6 +311,7 @@ export function buildDemoDataset(locale: Locale, today = todayISO()): Dataset {
     accounts,
     balances,
     goals,
+    plans: [car, phone, sofa],
     settings,
     meta: { source: "demo", syncedAt: new Date().toISOString() },
   };

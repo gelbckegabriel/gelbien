@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
 import { Dialog } from "radix-ui";
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { EASE_OUT, coverRadius, tapOrigin } from "@/lib/motion";
 import { useMediaQuery } from "@/lib/use-media";
 import { cn } from "@/lib/utils";
@@ -51,6 +51,36 @@ function SheetLayer({ onOpenChange, title, description, children, footer, classN
     // the wave is a 160px glow: scaled until it reaches the farthest corner
     return { p, x, y, inkScale: Math.ceil((coverRadius(p) * 2) / 160) };
   });
+  // The contents cascade in only as it opens: a section that opens later (a switch's details, say)
+  // would otherwise wait for its turn in the cascade, blank, and then float up.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setSettled(true), 1400);
+    return () => window.clearTimeout(id);
+  }, []);
+  // Larger screens: centred as it opens, then its top stays where it is — a section opening inside
+  // grows it downwards (it moves up only to stay on screen), so the header and fields never jump.
+  // (a callback ref: the portal renders the panel after this component's first layout pass)
+  const [panel, setPanel] = useState<HTMLDivElement | null>(null);
+  const [top, setTop] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = panel;
+    if (mobile || !el) return;
+    const fit = () => {
+      const vh = window.innerHeight;
+      const margin = vh * 0.05; // what max-h-[90dvh] leaves above and below
+      const h = el.offsetHeight;
+      setTop((cur) => Math.max(margin, Math.min(cur ?? (vh - h) / 2, vh - margin - h)));
+    };
+    fit();
+    const watch = new ResizeObserver(fit);
+    watch.observe(el);
+    window.addEventListener("resize", fit);
+    return () => {
+      watch.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  }, [mobile, panel]);
 
   return (
     <Dialog.Portal forceMount>
@@ -98,15 +128,18 @@ function SheetLayer({ onOpenChange, title, description, children, footer, classN
         }}
       >
         <motion.div
+          ref={setPanel}
           className={cn(
-            "fixed z-50 flex flex-col overflow-hidden border border-line-strong bg-[#141418] shadow-2xl shadow-black/60 focus:outline-none data-[state=closed]:pointer-events-none",
+            // clip, not hidden: the opening glow sits at the tap, which can be outside the panel — an
+            // overflow-hidden box that wide gets scrolled sideways by focus, shifting everything left
+            "fixed z-50 flex flex-col overflow-clip border border-line-strong bg-[#141418] shadow-2xl shadow-black/60 focus:outline-none data-[state=closed]:pointer-events-none",
             mobile
               ? "sheet-up inset-x-0 bottom-0 max-h-[94dvh] rounded-t-[28px] pb-[env(safe-area-inset-bottom)]"
-              : cn("sheet-in left-1/2 top-1/2 max-h-[90dvh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-3xl", wide ? "max-w-3xl" : "max-w-lg"),
+              : cn("sheet-in left-1/2 max-h-[90dvh] w-[calc(100vw-2rem)] -translate-x-1/2 rounded-3xl", top === null && "top-1/2 -translate-y-1/2", wide ? "max-w-3xl" : "max-w-lg"),
             className,
           )}
           // it grows out of the tap, not from its own centre
-          style={{ transformOrigin: `${origin.x} ${origin.y}` }}
+          style={{ transformOrigin: `${origin.x} ${origin.y}`, top: mobile || top === null ? undefined : top }}
           exit={
             reduce
               ? { opacity: 0 }
@@ -129,7 +162,7 @@ function SheetLayer({ onOpenChange, title, description, children, footer, classN
               <div className="h-1.5 w-10 rounded-full bg-white/20" />
             </div>
           )}
-          <div className="rise-in flex items-start justify-between gap-4 px-5 pb-2 pt-3 [--rise-delay:40ms] sm:px-6 sm:pt-6" onPointerDown={(e) => mobile && drag.start(e)}>
+          <div className={cn("flex items-start justify-between gap-4 px-5 pb-2 pt-3 [--rise-delay:40ms] sm:px-6 sm:pt-6", !settled && "rise-in")} onPointerDown={(e) => mobile && drag.start(e)}>
             <div>
               <Dialog.Title className="text-lg font-semibold tracking-tight text-ink">{title}</Dialog.Title>
               {description ? (
@@ -142,8 +175,8 @@ function SheetLayer({ onOpenChange, title, description, children, footer, classN
               <X className="h-5 w-5" />
             </Dialog.Close>
           </div>
-          <div className="rise-in min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-5 pt-2 sm:px-6">{children}</div>
-          {footer && <div className="rise-in border-t border-line px-5 py-4 [--rise-delay:260ms] sm:px-6">{footer}</div>}
+          <div className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-5 pt-2 sm:px-6", !settled && "rise-in")}>{children}</div>
+          {footer && <div className={cn("border-t border-line px-5 py-4 [--rise-delay:260ms] sm:px-6", !settled && "rise-in")}>{footer}</div>}
         </motion.div>
       </Dialog.Content>
     </Dialog.Portal>

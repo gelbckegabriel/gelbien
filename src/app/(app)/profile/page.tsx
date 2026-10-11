@@ -354,10 +354,11 @@ function DataCard() {
       how === "replace"
         ? {
             ...pending.data,
-            // The workbook has no accounts/goals — never wipe the ones set up in the app.
+            // The workbook has no accounts, goals or plans — never wipe the ones set up in the app.
             accounts: ds.accounts,
             balances: ds.balances,
             goals: ds.goals,
+            plans: ds.plans,
             settings: { ...pending.data.settings, locale: ds.settings.locale, currency: ds.settings.currency, checkInDay: ds.settings.checkInDay, tourSeen: ds.settings.tourSeen },
           }
         : mergeImport(current, pending.data);
@@ -421,6 +422,7 @@ function DataCard() {
                   accounts: ds.accounts,
                   balances: ds.balances,
                   goals: ds.goals,
+                  plans: ds.plans,
                   settings: ds.settings,
                 };
                 downloadFile(`gelbien-backup-${stamp}.json`, JSON.stringify(data, null, 2), "application/json");

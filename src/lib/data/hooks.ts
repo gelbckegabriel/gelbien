@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useI18n, usePrefs } from "../i18n";
-import type { Dataset, Mutation, SessionInfo } from "../types";
+import { linkedPaymentChanges, linkedPlanChanges } from "../plans";
+import type { Dataset, Mutation, PrepayMode, SessionInfo } from "../types";
 import { useUi } from "../ui-store";
 import { errorReason } from "./errors";
 import { applyMutationToDataset } from "./reducer";
@@ -65,18 +66,51 @@ interface Vars extends MutateOptions {
   kept?: boolean;
 }
 
+/**
+ * Writes that go along with one (see linkedPlanChanges and linkedPaymentChanges: an extra payment's
+ * expense deleted takes it off its loan; a loan corrected updates the payments logged at its old figure).
+ * Worked out when the change is applied — against everything written before it — and sent right after it.
+ */
+const followUps = new WeakMap<Vars, Mutation[]>();
+/** how removed extra payments affected their loan, so an undo puts them back as they were */
+const removedModes = new Map<string, PrepayMode>();
+
+let writes: Promise<unknown> = Promise.resolve();
+/** Runs `fn` after every write queued before it has settled (succeeded or failed). */
+function inOrder<T>(fn: () => Promise<T>): Promise<T> {
+  const run = writes.then(fn, fn);
+  writes = run.catch(() => undefined);
+  return run;
+}
+
 export function useMutate() {
   const qc = useQueryClient();
   const { key, source, mode } = useSource();
   const { t } = useI18n();
   const { mutate, mutateAsync } = useMutation<{ syncedAt: string }, Error, Vars, { prev?: Dataset }>({
-    // Serialize writes so row lookups in the sheet never race each other.
-    scope: { id: "sheet-writes" },
-    mutationFn: ({ m }) => source!.apply(m),
-    onMutate: async ({ m }) => {
+    // Writes go one at a time, in order, so row lookups in the sheet never race each other. Our own queue
+    // rather than a mutation scope: a scoped write waiting its turn only resumes while the page has focus,
+    // so a second write (an extra payment's expense after the loan) sat at "Saving…" in a background tab.
+    mutationFn: (vars) =>
+      inOrder(async () => {
+        let res = await source!.apply(vars.m);
+        for (const f of followUps.get(vars) ?? []) res = await source!.apply(f);
+        return res;
+      }),
+    onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: key });
       const prev = qc.getQueryData<Dataset>(key);
-      if (prev) qc.setQueryData<Dataset>(key, applyMutationToDataset(prev, m));
+      if (prev) {
+        let next = applyMutationToDataset(prev, vars.m);
+        // an extra payment's expense changed: its loan follows…
+        const plans = linkedPlanChanges(prev, next, removedModes);
+        for (const f of plans) next = applyMutationToDataset(next, f);
+        // …and a loan changed (by the user or just above): its logged payments follow
+        const payments = linkedPaymentChanges(prev, next, next.settings.currency);
+        for (const f of payments) next = applyMutationToDataset(next, f);
+        followUps.set(vars, [...plans, ...payments]);
+        qc.setQueryData<Dataset>(key, next);
+      }
       return { prev };
     },
     // Defined here rather than per mutate() call so it still runs after the calling form unmounts.

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { guessKind } from "./defaults";
-import { ACCOUNT_TYPES, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PRIORITIES, SUB_KINDS, SUB_STATUSES, WORTH_IT, type Dataset, type Mutation } from "./types";
+import { ACCOUNT_TYPES, AMORTIZATIONS, CYCLES, EXPENSE_TYPES, GOAL_STATUSES, PLAN_KINDS, PLAN_STATUSES, PREPAY_MODES, PRIORITIES, RATE_KEEPS, SUB_KINDS, SUB_STATUSES, WORTH_IT, type Dataset, type Mutation } from "./types";
 
 const text = (max = 500) => z.string().max(max);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -80,6 +80,7 @@ export const accountSchema = z.object({
   color: text(20),
   archived: z.boolean(),
   notes: text(1000),
+  depreciation: z.number().min(0).max(100).default(0),
 });
 
 export const balanceSchema = z.object({ accountId: text(64).min(1), date: isoDate, balance: money });
@@ -105,6 +106,32 @@ export const goalSchema = z.object({
   pausedMonths: z.array(z.number().int().min(1).max(12)).max(12).default([]),
 });
 
+const yearMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+
+export const planSchema = z.object({
+  id: text(64).min(1),
+  kind: z.enum(PLAN_KINDS),
+  name: text(120).min(1),
+  category: text(120),
+  subcategory: text(160),
+  merchant: text(160),
+  payment: text(120),
+  price: money.gte(0),
+  downPayment: money.gte(0),
+  rate: z.number().finite().gte(0).lte(100),
+  count: z.number().int().min(1).max(1200),
+  amortization: z.enum(AMORTIZATIONS),
+  firstDate: isoDate,
+  extras: z.array(z.object({ from: yearMonth, amount: money.gte(0) })).max(120),
+  prepayments: z.array(z.object({ month: yearMonth, amount: money.gte(0), mode: z.enum(PREPAY_MODES) })).max(240),
+  rateChanges: z.array(z.object({ from: yearMonth, rate: z.number().finite().gte(0).lte(100), keep: z.enum(RATE_KEEPS) })).max(120).default([]),
+  accountId: text(64),
+  countAsDebt: z.boolean(),
+  status: z.enum(PLAN_STATUSES),
+  notes: text(2000),
+  createdAt: text(40),
+});
+
 /** A full dataset (also the JSON backup format). */
 export const datasetSchema = z.object({
   transactions: z.array(transactionSchema).max(50000),
@@ -115,6 +142,8 @@ export const datasetSchema = z.object({
   accounts: z.array(accountSchema).max(200).default([]),
   balances: z.array(balanceSchema).max(20000).default([]),
   goals: z.array(goalSchema).max(200).default([]),
+  // backups made before payment plans existed still restore
+  plans: z.array(planSchema).max(500).default([]),
   settings: settingsSchema,
 });
 
@@ -152,6 +181,8 @@ export const mutationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("saveBalances"), balances: z.array(balanceSchema).min(1).max(200) }),
   z.object({ op: z.literal("upsertGoal"), goal: goalSchema }),
   z.object({ op: z.literal("deleteGoal"), id: text(64).min(1) }),
+  z.object({ op: z.literal("upsertPlan"), plan: planSchema }),
+  z.object({ op: z.literal("deletePlan"), id: text(64).min(1) }),
   z.object({ op: z.literal("replaceAll"), data: datasetSchema }),
 ]);
 
