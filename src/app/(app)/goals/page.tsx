@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardCheck, Plus, Target } from "lucide-react";
+import { Calculator, ClipboardCheck, Plus, Target } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { CheckInBanner } from "@/components/goals/checkin-banner";
@@ -8,6 +8,7 @@ import { AccountDialog, AddMoneyDialog, CheckInDialog, GoalDialog } from "@/comp
 import { GoalCard } from "@/components/goals/goal-card";
 import { AccountsCard, NetWorthCard, PlanCard } from "@/components/goals/overview";
 import { Simulator } from "@/components/goals/simulator";
+import { LoanCalculator } from "@/components/plans/loan-calculator";
 import { Button } from "@/components/ui/button";
 import { Card, FillGrid, PageHeader, Stagger } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/misc";
@@ -21,7 +22,8 @@ type Dialog =
   | { kind: "simulate"; goal: Goal }
   | { kind: "addMoney"; goal: Goal }
   | { kind: "account"; account: Account | null }
-  | { kind: "checkin" };
+  | { kind: "checkin" }
+  | { kind: "loan" };
 
 export default function GoalsPage() {
   return (
@@ -63,6 +65,10 @@ function Goals() {
         subtitle={t("goals.subtitle")}
         action={
           <>
+            {/* a mortgage or a loan, tried before taking it on (a home or a car being saved for, say) */}
+            <Button size="sm" variant="ghost" onClick={() => open({ kind: "loan" })}>
+              <Calculator className="h-4 w-4" /> {t("calc.open")}
+            </Button>
             {hasAccounts && (
               <Button size="sm" variant="ghost" onClick={() => open({ kind: "checkin" })}>
                 <ClipboardCheck className="h-4 w-4" /> {t("ci.button")}
@@ -134,6 +140,7 @@ function Goals() {
       <AddMoneyDialog key={`m${nonce}`} open={dialog?.kind === "addMoney"} goal={dialog?.kind === "addMoney" ? dialog.goal : null} onClose={close} />
       <AccountDialog key={`a${nonce}`} ds={ds} open={dialog?.kind === "account"} account={dialog?.kind === "account" ? dialog.account : null} onClose={close} />
       {hasAccounts && <CheckInDialog key={`c${nonce}`} ds={ds} open={dialog?.kind === "checkin"} onClose={close} />}
+      <LoanCalculator ds={ds} open={dialog?.kind === "loan"} onClose={close} />
     </div>
   );
 }

@@ -30,7 +30,7 @@ export const PLAN_ICON: Record<PlanKind, typeof Home> = {
 };
 
 // quick picks for the term, in months
-const TERMS: Partial<Record<PlanKind, number[]>> = {
+export const TERMS: Partial<Record<PlanKind, number[]>> = {
   mortgage: [180, 240, 300, 360],
   carLoan: [36, 48, 60, 72],
   personalLoan: [12, 24, 36, 60],
@@ -39,12 +39,12 @@ const TERMS: Partial<Record<PlanKind, number[]>> = {
   other: [12, 24, 36],
 };
 // down payment quick picks, as a share of the price
-const DOWN: Partial<Record<PlanKind, number[]>> = { mortgage: [0.05, 0.1, 0.2], carLoan: [0.1, 0.2], lease: [0.1], other: [0.1, 0.2] };
+export const DOWN: Partial<Record<PlanKind, number[]>> = { mortgage: [0.05, 0.1, 0.2], carLoan: [0.1, 0.2], lease: [0.1], other: [0.1, 0.2] };
 // what a loan is usually for: the category with this icon
 const CATEGORY_ICON: Partial<Record<PlanKind, string[]>> = { mortgage: ["Home"], carLoan: ["Bus", "Car"], lease: ["Bus", "Car"], studentLoan: ["GraduationCap", "BookOpen"] };
 // kinds that hold what's borrowed against something owned (an asset worth the price)
 const OWNED: PlanKind[] = ["mortgage", "carLoan"];
-const NO_DOWN: PlanKind[] = ["personalLoan", "studentLoan"];
+export const NO_DOWN: PlanKind[] = ["personalLoan", "studentLoan"];
 
 /** "25 years", "5 years 6 months", "18 months" */
 export function termText(t: ReturnType<typeof useI18n>["t"], months: number): string {
@@ -68,6 +68,7 @@ export function PlanDialog({
   onClose,
   onSimulate,
   onExtra,
+  initial,
 }: {
   ds: Dataset;
   open: boolean;
@@ -76,10 +77,12 @@ export function PlanDialog({
   onClose: () => void;
   onSimulate?: (plan: Plan) => void;
   onExtra?: (plan: Plan) => void;
+  /** a new loan's starting values (from the loan calculator) */
+  initial?: Partial<Plan>;
 }) {
   const { t, f } = useI18n();
   if (plan?.kind === "installments") return <InstallmentsView ds={ds} open={open} plan={plan} onClose={onClose} />;
-  return <PlanForm ds={ds} open={open} plan={plan} onClose={onClose} onSimulate={onSimulate} onExtra={onExtra} t={t} f={f} />;
+  return <PlanForm ds={ds} open={open} plan={plan} onClose={onClose} onSimulate={onSimulate} onExtra={onExtra} initial={plan ? undefined : initial} t={t} f={f} />;
 }
 
 function PlanForm({
@@ -89,6 +92,7 @@ function PlanForm({
   onClose,
   onSimulate,
   onExtra,
+  initial,
   t,
   f,
 }: {
@@ -98,6 +102,7 @@ function PlanForm({
   onClose: () => void;
   onSimulate?: (plan: Plan) => void;
   onExtra?: (plan: Plan) => void;
+  initial?: Partial<Plan>;
   t: ReturnType<typeof useI18n>["t"];
   f: ReturnType<typeof useI18n>["f"];
 }) {
@@ -109,30 +114,30 @@ function PlanForm({
   const categoryFor = (k: PlanKind) => shown.find((c) => CATEGORY_ICON[k]?.includes(c.icon))?.name ?? shown[0]?.name ?? "";
 
   const [mode, setMode] = useState<"loan" | "installments">("loan");
-  const [kind, setKind] = useState<PlanKind>(plan?.kind ?? "mortgage");
-  const [name, setName] = useState(plan?.name ?? "");
-  const [category, setCategory] = useState(plan?.category ?? categoryFor("mortgage"));
+  const [kind, setKind] = useState<PlanKind>(plan?.kind ?? initial?.kind ?? "mortgage");
+  const [name, setName] = useState(plan?.name ?? initial?.name ?? "");
+  const [category, setCategory] = useState(plan?.category ?? categoryFor(initial?.kind ?? "mortgage"));
   const [subcategory, setSubcategory] = useState(plan?.subcategory ?? "");
   const [merchant, setMerchant] = useState(plan?.merchant ?? "");
   const [payment, setPayment] = useState(plan?.payment ?? ds.settings.paymentMethods[0] ?? "");
   // a lease, say: only the monthly payment is known (stored as interest-free payments adding up to the price)
   const [knowPayment, setKnowPayment] = useState(!!plan && plan.rate === 0);
-  const [price, setPrice] = useState(plan ? String(plan.price) : "");
-  const [down, setDown] = useState(plan?.downPayment ? String(plan.downPayment) : "");
+  const [price, setPrice] = useState(plan ? String(plan.price) : initial?.price ? String(initial.price) : "");
+  const [down, setDown] = useState(plan?.downPayment ? String(plan.downPayment) : initial?.downPayment ? String(initial.downPayment) : "");
   // the payment as the form shows it at first: unchanged (with the term and down payment), the price stays
   // exactly as saved — worked back from a rounded payment, it would drift by cents
   const [startMonthly] = useState(() => (plan && plan.rate === 0 ? String(round2((plan.price - plan.downPayment) / plan.count)) : ""));
   const [monthlyIn, setMonthlyIn] = useState(startMonthly);
-  const [rate, setRate] = useState(plan ? String(plan.rate) : "");
-  const [count, setCountValue] = useState(plan?.count ?? 300);
+  const [rate, setRate] = useState(plan ? String(plan.rate) : initial?.rate ? String(initial.rate) : "");
+  const [count, setCountValue] = useState(plan?.count ?? initial?.count ?? 300);
   // the term as typed: it can be emptied on the way to a new number (count keeps the last valid one)
-  const [countText, setCountText] = useState(String(plan?.count ?? 300));
+  const [countText, setCountText] = useState(String(plan?.count ?? initial?.count ?? 300));
   const setCount = (n: number) => {
     setCountValue(n);
     setCountText(String(n));
   };
-  const [firstDate, setFirstDate] = useState(plan?.firstDate ?? `${addMonths(currentMonth(), 1)}-01`);
-  const [amortization, setAmortization] = useState<Amortization>(plan?.amortization ?? "price");
+  const [firstDate, setFirstDate] = useState(plan?.firstDate ?? initial?.firstDate ?? `${addMonths(currentMonth(), 1)}-01`);
+  const [amortization, setAmortization] = useState<Amortization>(plan?.amortization ?? initial?.amortization ?? "price");
   const [addAccounts, setAddAccounts] = useState(!plan);
   // what the home or car loses a year, until typed: a car about 15%, a home nothing
   const [lossIn, setLossIn] = useState<string | null>(null);
@@ -146,7 +151,7 @@ function PlanForm({
   // extra payments made (or planned in the simulator): removed here, gone on save
   const [prepayments, setPrepayments] = useState(plan?.prepayments ?? []);
   // what's added to every payment from a month on (set from the simulator)
-  const [extras, setExtras] = useState(plan?.extras ?? []);
+  const [extras, setExtras] = useState(plan?.extras ?? initial?.extras ?? []);
   // new rates along the way (renewals, variable rates), from a payment on
   const [rateChanges, setRateChanges] = useState(plan?.rateChanges ?? []);
 

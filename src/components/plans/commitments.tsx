@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, Calculator, Plus } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
@@ -14,6 +14,7 @@ import { Card, CardHeader } from "../ui/card";
 import { MoneyText } from "../ui/misc";
 import { PlanDialog } from "./plan-dialog";
 import { ExtraPaymentDialog } from "./extra-payment";
+import { LoanCalculator } from "./loan-calculator";
 import { PlanSimulator } from "./plan-simulator";
 
 // the timeline's window: five years from this month
@@ -33,6 +34,7 @@ export function Commitments({ ds }: { ds: Dataset }) {
   const [simulating, setSimulating] = useState<{ plan: Plan | null; open: boolean }>({ plan: null, open: false });
   const [paying, setPaying] = useState<{ plan: Plan | null; open: boolean; nonce: number }>({ plan: null, open: false, nonce: 0 });
   const edit = (plan: Plan | null) => setEditing({ plan, nonce: Date.now(), open: true });
+  const [calculating, setCalculating] = useState(false);
   const cats = new Map(ds.categories.map((x) => [x.name, x]));
   const monthsFrom = (m: string) => (Number(m.slice(0, 4)) - Number(month.slice(0, 4))) * 12 + Number(m.slice(5, 7)) - Number(month.slice(5, 7));
   const pos = (m: string) => Math.max(0, Math.min(1, monthsFrom(m) / SPAN));
@@ -45,9 +47,15 @@ export function Commitments({ ds }: { ds: Dataset }) {
         title={t("plans.c.title")}
         subtitle={t("plans.c.subtitle")}
         action={
-          <Button size="sm" variant="outline" onClick={() => edit(null)}>
-            <Plus className="h-4 w-4" /> {t("plans.c.new")}
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {/* try one before taking it on */}
+            <Button size="sm" variant="ghost" onClick={() => setCalculating(true)}>
+              <Calculator className="h-4 w-4" /> <span className="hidden sm:inline">{t("plans.simulate")}</span>
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => edit(null)}>
+              <Plus className="h-4 w-4" /> {t("plans.c.new")}
+            </Button>
+          </div>
         }
       />
       {c.lines.length === 0 ? (
@@ -164,6 +172,7 @@ export function Commitments({ ds }: { ds: Dataset }) {
       />
       <ExtraPaymentDialog key={`extra-${paying.nonce}`} ds={ds} plan={paying.plan} open={paying.open} onClose={() => setPaying((x) => ({ ...x, open: false }))} />
       <PlanSimulator ds={ds} plan={simulating.plan} open={simulating.open} onClose={() => setSimulating((x) => ({ ...x, open: false }))} />
+      <LoanCalculator ds={ds} open={calculating} onClose={() => setCalculating(false)} />
     </Card>
   );
 }

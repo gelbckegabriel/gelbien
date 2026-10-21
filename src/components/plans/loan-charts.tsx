@@ -53,8 +53,23 @@ export function PaymentSplit({ label, principal, interest, className }: { label:
  * where each year's payments go — paying the loan down, or interest (early on, mostly interest). Both have
  * the numbers as a table.
  */
-export function LoanCharts({ plan, scenario, currency, marker }: { plan: Plan; scenario: Plan; currency: string; marker?: string }) {
+export function LoanCharts({
+  plan,
+  scenario,
+  currency,
+  marker,
+  labels,
+}: {
+  plan: Plan;
+  scenario: Plan;
+  currency: string;
+  marker?: string;
+  /** what the two lines are called (default: with the extras / the current plan) */
+  labels?: { scenario: string; plan: string };
+}) {
   const { t, f } = useI18n();
+  const withLabel = labels?.scenario ?? t("plans.sim.withExtras");
+  const planLabel = labels?.plan ?? t("plans.sim.current");
   const [view, setView] = useView("plans.chart", "owed", ["owed", "split"] as const);
   const [shown, setShown] = useView("plans.chart.table", "chart", ["chart", "table"] as const);
   const today = todayISO();
@@ -82,7 +97,7 @@ export function LoanCharts({ plan, scenario, currency, marker }: { plan: Plan; s
 
   const table = (
     <DataTable
-      head={[t("plans.split.year"), t("plans.split.principal"), t("plans.split.interest"), t("plans.split.owedEnd"), ...(changed ? [t("plans.sim.current")] : [])]}
+      head={[t("plans.split.year"), t("plans.split.principal"), t("plans.split.interest"), t("plans.split.owedEnd"), ...(changed ? [planLabel] : [])]}
       rows={years.map((y) => [y.year, f.money(y.principal), f.money(y.interest), f.money(y.balance), ...(changed ? [f.money(baseYears.get(y.year)?.balance ?? 0)] : [])])}
     />
   );
@@ -116,8 +131,8 @@ export function LoanCharts({ plan, scenario, currency, marker }: { plan: Plan; s
         <div className="mt-3">
           <Legend
             items={[
-              { label: t("plans.sim.withExtras"), color: GOLD, kind: "line" },
-              { label: t("plans.sim.current"), color: INK.secondary, kind: "line" },
+              { label: withLabel, color: GOLD, kind: "line" },
+              { label: planLabel, color: INK.secondary, kind: "line" },
             ]}
           />
           <div className="mt-2 h-56 w-full sm:h-64">
@@ -140,8 +155,8 @@ export function LoanCharts({ plan, scenario, currency, marker }: { plan: Plan; s
                       <TooltipBox
                         title={f.monthLong(String(label))}
                         rows={[
-                          { label: t("plans.sim.withExtras"), value: f.amount(Number(payload.find((p) => p.dataKey === "scenario")?.value ?? 0)), color: GOLD },
-                          { label: t("plans.sim.current"), value: f.amount(Number(payload.find((p) => p.dataKey === "current")?.value ?? 0)), color: INK.secondary },
+                          { label: withLabel, value: f.amount(Number(payload.find((p) => p.dataKey === "scenario")?.value ?? 0)), color: GOLD },
+                          { label: planLabel, value: f.amount(Number(payload.find((p) => p.dataKey === "current")?.value ?? 0)), color: INK.secondary },
                         ]}
                       />
                     ) : null
