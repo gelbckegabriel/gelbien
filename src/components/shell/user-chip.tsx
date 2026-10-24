@@ -35,9 +35,9 @@ export function Avatar({ name, picture, className }: { name: string; picture?: s
     .toUpperCase();
   return picture ? (
     // eslint-disable-next-line @next/next/no-img-element -- Google avatar URLs; no need for the image optimizer
-    <img src={picture} alt="" referrerPolicy="no-referrer" className={cn("h-9 w-9 rounded-full border border-line object-cover", className)} />
+    <img src={picture} alt="" referrerPolicy="no-referrer" className={cn("h-9 w-9 shrink-0 rounded-full border border-line object-cover", className)} />
   ) : (
-    <span className={cn("grid h-9 w-9 place-items-center rounded-full border border-gold/30 bg-gold-soft text-xs font-semibold text-gold-bright", className)}>
+    <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-full border border-gold/30 bg-gold-soft text-xs font-semibold text-gold-bright", className)}>
       {initials || <Sparkles className="h-4 w-4" />}
     </span>
   );

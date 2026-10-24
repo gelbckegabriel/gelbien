@@ -22,7 +22,7 @@ import { buttonClasses } from "../ui/button";
 import { Skeleton } from "../ui/misc";
 import { WelcomeTour } from "../welcome-tour";
 import { MonthPicker } from "./month-picker";
-import { BottomNav, DesktopFab, RouteWarmup, Sidebar } from "./nav";
+import { BottomNav, DesktopFab, RouteWarmup, Sidebar, TapThroughTransitions } from "./nav";
 import { LoadError, WriteBlocked } from "./load-error";
 import { GuardedLink, UnsavedDialog } from "./unsaved";
 import { AccountMenu, guideHref } from "./user-chip";
@@ -321,6 +321,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       <BottomNav />
       <RouteWarmup />
+      <TapThroughTransitions />
       {ready && (
         <>
           <DesktopFab />

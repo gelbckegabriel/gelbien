@@ -20,14 +20,15 @@ const SIZES: Record<Size, string> = {
   sm: "h-8 px-3 text-sm gap-1.5 rounded-lg",
   md: "h-10 px-4 text-sm gap-2 rounded-xl",
   lg: "h-12 px-5 text-base gap-2 rounded-xl",
-  icon: "h-10 w-10 rounded-xl",
-  "icon-sm": "h-8 w-8 rounded-lg",
+  // squares never give way to a field beside them
+  icon: "h-10 w-10 shrink-0 rounded-xl",
+  "icon-sm": "h-8 w-8 shrink-0 rounded-lg",
 };
 
 /** Button look for links (<a>/<Link>) — never nest a <button> inside a link. */
 export function buttonClasses(variant: Variant = "secondary", size: Size = "md", className?: string) {
   return cn(
-    "inline-flex select-none items-center justify-center whitespace-nowrap transition-[background,border,filter,color] duration-200",
+    "inline-flex select-none items-center justify-center whitespace-nowrap transition-[background,border,filter,color] duration-200 [&_svg]:shrink-0",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
     VARIANTS[variant],
     SIZES[size],
@@ -51,7 +52,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled}
       whileTap={disabled ? undefined : { scale: 0.96 }}
       className={cn(
-        "inline-flex select-none items-center justify-center whitespace-nowrap transition-[background,border,filter,color] duration-200",
+        "inline-flex select-none items-center justify-center whitespace-nowrap transition-[background,border,filter,color] duration-200 [&_svg]:shrink-0",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
         "disabled:cursor-not-allowed disabled:opacity-50",
         VARIANTS[variant],

@@ -6,6 +6,8 @@ import { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useI18n, type MessageKey } from "@/lib/i18n";
+import { askToLeave, hasUnsaved } from "@/lib/unsaved";
+import { activeTransition, skipActiveTransition } from "@/lib/view-transition";
 import { useIntroDelay } from "@/lib/motion";
 import { useUi } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
@@ -122,6 +124,35 @@ export function RouteWarmup() {
 /** On the app's first screen, a bar arrives from its edge as the intro parts (see .intro-drop & co. in globals.css). */
 function introEntrance(intro: number, className: string, after = 120) {
   return intro > 0 ? { className, style: { ["--intro-delay" as string]: `${intro + after}ms` } } : { className: undefined, style: undefined };
+}
+
+/**
+ * Taps on links while a page change is still under way. React's events are off while it commits, and with
+ * a view transition that lasts until the browser has captured the old page — a link tapped then never
+ * reaches the router, and the browser loads the page from scratch (a white flash and a full reload).
+ * So those taps are caught first: the transition finishes at once and the app navigates, as the link
+ * would have (asking about unsaved edits the same way).
+ */
+export function TapThroughTransitions() {
+  const router = useRouter();
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!activeTransition() || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download")) return;
+      const url = new URL(a.href, location.href);
+      if (url.origin !== location.origin) return;
+      e.preventDefault();
+      e.stopPropagation();
+      skipActiveTransition();
+      const href = url.pathname + url.search + url.hash;
+      if (url.pathname !== location.pathname && hasUnsaved()) askToLeave(() => router.push(href));
+      else router.push(href);
+    };
+    window.addEventListener("click", onClick, { capture: true });
+    return () => window.removeEventListener("click", onClick, { capture: true });
+  }, [router]);
+  return null;
 }
 
 export function Sidebar() {

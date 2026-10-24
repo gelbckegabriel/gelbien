@@ -138,7 +138,7 @@ function Expenses() {
           <option value="month">{f.monthLong(month)}</option>
           <option value="all">{t("exp.allTime")}</option>
         </Select>
-        <Button variant={showFilters || filtersActive ? "outline" : "secondary"} onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters}>
+        <Button variant={showFilters || filtersActive ? "outline" : "secondary"} onClick={() => setShowFilters((s) => !s)} aria-expanded={showFilters} aria-label={t("exp.filters")} title={t("exp.filters")}>
           <SlidersHorizontal className="h-4 w-4" />
           {filtersActive && <span className="h-1.5 w-1.5 rounded-full bg-gold" />}
         </Button>

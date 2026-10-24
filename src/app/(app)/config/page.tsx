@@ -449,7 +449,7 @@ function SubcategoryEditor({ items, onChange }: { items: SubDraft[]; onChange: (
         }}
       >
         <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={t("cfg.subPh")} className="h-10" maxLength={80} />
-        <Button type="submit" variant="secondary" className="h-10">
+        <Button type="submit" variant="secondary" className="h-10 shrink-0">
           <Plus className="h-4 w-4" /> {t("cfg.addSub")}
         </Button>
       </form>

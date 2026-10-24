@@ -15,9 +15,7 @@ export function GuardedLink({ href, onNavigate, ...props }: Omit<React.Component
     <Link
       href={href}
       onNavigate={(e) => {
-        // tapped while the last page change is still sliding in: finish it now — the next page would
-        // otherwise wait for it (browsers without activeViewTransition just wait out the few ms left)
-        (document as Document & { activeViewTransition?: { skipTransition(): void } | null }).activeViewTransition?.skipTransition();
+        // (a tap while a page change is still under way never gets here: see TapThroughTransitions)
         onNavigate?.(e);
         if (href === path || !hasUnsaved()) return;
         e.preventDefault();

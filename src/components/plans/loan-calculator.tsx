@@ -155,7 +155,8 @@ export function LoanCalculator({ ds, open, onClose }: { ds: Dataset; open: boole
         }
       >
         <div className="space-y-5">
-          <div className="flex flex-wrap gap-1.5">
+          {/* an even grid (an odd last one takes the rest of its row), so the rows end flush */}
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 [&>:last-child:nth-child(odd)]:col-span-2">
             {KINDS.map((k) => {
               const KindIcon = PLAN_ICON[k];
               const on = v.kind === k;
@@ -164,9 +165,12 @@ export function LoanCalculator({ ds, open, onClose }: { ds: Dataset; open: boole
                   key={k}
                   type="button"
                   onClick={() => pickKind(k)}
-                  className={cn("inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[13px] transition-colors", on ? "border-gold/50 bg-gold-soft text-ink" : "border-line text-ink-3 hover:text-ink")}
+                  className={cn(
+                    "flex min-w-0 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-[13px] transition-colors",
+                    on ? "border-gold/50 bg-gold-soft text-ink" : "border-line text-ink-3 hover:text-ink",
+                  )}
                 >
-                  <KindIcon className="h-3.5 w-3.5" /> {t(`plans.kind.${k}`)}
+                  <KindIcon className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{t(`plans.kind.${k}`)}</span>
                 </button>
               );
             })}
@@ -301,7 +305,7 @@ export function LoanCalculator({ ds, open, onClose }: { ds: Dataset; open: boole
                           </li>
                           <li className="flex items-center justify-between gap-3 px-3 py-2">
                             <span className="text-ink-2">{t("calc.rowPayment")}</span>
-                            <AnimatedNumber smallCents value={payment} format={(n) => `−${f.amount(n)}`} className="tabular text-bad" />
+                            <AnimatedNumber smallCents value={payment} format={(n) => `${n > 0 ? "−" : ""}${f.amount(n)}`} className="tabular text-bad" />
                           </li>
                           <li className="flex items-center justify-between gap-3 px-3 py-1.5">
                             <span className="text-ink-2">{t("calc.rowInstead")}</span>

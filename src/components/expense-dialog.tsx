@@ -684,7 +684,14 @@ function ExpenseForm({
           {split ? (
             <SplitEditor parts={split} onChange={setSplit} categories={ds.categories} currency={currencySymbol} missingCategory={missingCategory} />
           ) : (
-            <div className={cn("grid grid-cols-3 gap-2 sm:grid-cols-5", errors.category && "rounded-2xl ring-1 ring-bad/50 ring-offset-4 ring-offset-[#141418]")}>
+            // three to a row (five on wider screens), all the same size, with a last row that isn't full
+            // centred under the others instead of left hanging at the start
+            <div
+              className={cn(
+                "flex flex-wrap justify-center gap-2 *:basis-[calc((100%-1rem)/3)] sm:*:basis-[calc((100%-2rem)/5)]",
+                errors.category && "rounded-2xl ring-1 ring-bad/50 ring-offset-4 ring-offset-[#141418]",
+              )}
+            >
               {categories.map((c) => {
                 const active = c.name === form.category;
                 return (

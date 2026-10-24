@@ -353,7 +353,8 @@ function PlanForm({
         )}
 
         {!isInst && (
-          <div className="flex flex-wrap gap-1.5">
+          // an even grid (an odd last one takes the rest of its row), so the rows end flush
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 [&>:last-child:nth-child(odd)]:col-span-2">
             {LOAN_KINDS.map((k) => {
               const Icon = PLAN_ICON[k];
               const on = kind === k;
@@ -364,11 +365,11 @@ function PlanForm({
                   disabled={!!plan && !on}
                   onClick={() => pickKind(k)}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[13px] transition-colors disabled:opacity-40",
+                    "flex min-w-0 items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-[13px] transition-colors disabled:opacity-40",
                     on ? "border-gold/50 bg-gold-soft text-ink" : "border-line text-ink-3 hover:text-ink",
                   )}
                 >
-                  <Icon className="h-3.5 w-3.5" /> {t(`plans.kind.${k}`)}
+                  <Icon className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{t(`plans.kind.${k}`)}</span>
                 </button>
               );
             })}
@@ -466,13 +467,17 @@ function PlanForm({
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-3">{t("plans.f.paymentsUnit")}</span>
                 </div>
                 {termChips.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  // one even row under the field, edge to edge
+                  <div className="mt-1.5 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${termChips.length}, minmax(0, 1fr))` }}>
                     {termChips.map((m) => (
                       <button
                         key={m}
                         type="button"
                         onClick={() => setCount(m)}
-                        className={cn("rounded-full border px-2 py-0.5 text-[11px] transition-colors", count === m ? "border-gold/40 bg-gold-soft text-gold-bright" : "border-line text-ink-3 hover:text-ink")}
+                        className={cn(
+                          "truncate rounded-full border px-2 py-1 text-center text-[11px] transition-colors",
+                          count === m ? "border-gold/40 bg-gold-soft text-gold-bright" : "border-line text-ink-3 hover:text-ink",
+                        )}
                       >
                         {termText(t, m)}
                       </button>
@@ -733,8 +738,10 @@ function PlanForm({
                       className="h-6 w-11 rounded-md border border-line bg-surface-2/80 px-1.5 text-right text-xs text-ink tabular-nums focus:border-gold/60 focus:outline-none"
                     />
                     <span>{t("plans.f.rateUnit")}</span>
+                    {/* phones: on a line of its own (no separator to start it); wider: after a · */}
                     <span className="basis-full pl-5 sm:basis-auto sm:pl-0">
-                      · {loss > 0 ? t("plans.f.inAYear", { amount: f.amount(round2(assetNow * (1 - loss / 100))) }) : t("plans.f.keepsValue")}
+                      <span className="hidden sm:inline">· </span>
+                      {loss > 0 ? t("plans.f.inAYear", { amount: f.amount(round2(assetNow * (1 - loss / 100))) }) : t("plans.f.keepsValue")}
                     </span>
                   </li>
                 )}
@@ -744,7 +751,10 @@ function PlanForm({
                     <span className="truncate text-ink-2">{t(kind === "mortgage" ? "plans.debtName.mortgage" : "plans.debtName.loan", { name: draft.name || t(`plans.kind.${kind}`) })}</span>
                     <span className="shrink-0 text-ink-3">{t("plans.f.debt")}</span>
                   </span>
-                  <span className="tabular shrink-0 text-bad">−{f.amount(owedNow)}</span>
+                  <span className="tabular shrink-0 text-bad">
+                    {owedNow > 0 && "−"}
+                    {f.amount(owedNow)}
+                  </span>
                 </li>
               </ul>
             </ToggleCard>

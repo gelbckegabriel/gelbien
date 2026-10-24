@@ -64,19 +64,22 @@ function AccountCard() {
             <span className="truncate text-base font-medium text-ink">{user?.name ?? t("common.demo")}</span>
             {mode === "google" ? <Badge tone="good">{t("common.connected")}</Badge> : <Badge tone="gold">{t("common.demo")}</Badge>}
           </p>
-          <p className="truncate text-sm text-ink-3">{user?.email ?? t("prof.demoMode")}</p>
+          {/* an address stays on one line; the demo note may take two */}
+          <p className={cn("text-sm text-ink-3", user?.email ? "truncate" : "line-clamp-2")}>{user?.email ?? t("prof.demoMode")}</p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* phones: an even grid — signing in across the width, the other two side by side when they fit
+          (stacked on the narrowest phones) */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] gap-2 sm:flex sm:flex-wrap sm:items-center">
         {mode === "demo" && session?.googleConfigured && (
-          <a href="/api/auth/login?returnTo=/profile" className={buttonClasses("primary", "md")}>
+          <a href="/api/auth/login?returnTo=/profile" className={cn(buttonClasses("primary", "md"), "col-span-full")}>
             <LogIn className="h-4 w-4" /> {t("prof.signIn")}
           </a>
         )}
         <GuardedLink href="/config" className={buttonClasses("secondary", "md")}>
           <Tags className="h-4 w-4" /> {t("nav.config")}
         </GuardedLink>
-        <Button variant="ghost" onClick={leave} className="ml-auto sm:ml-0">
+        <Button variant="outline" onClick={leave}>
           <LogOut className="h-4 w-4" /> {t("prof.signOut")}
         </Button>
       </div>

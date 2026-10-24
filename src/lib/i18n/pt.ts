@@ -419,6 +419,7 @@ const pt: Messages = {
   "exp.col.payment": "Pagamento",
   "exp.col.priority": "Prioridade",
   "exp.clearFilters": "Limpar filtros",
+  "exp.filters": "Filtros",
   "exp.sort.date": "Mais recentes",
   "exp.sort.amount": "Maiores primeiro",
 

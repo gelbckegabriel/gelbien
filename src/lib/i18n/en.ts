@@ -417,6 +417,7 @@ const en = {
   "exp.col.payment": "Payment",
   "exp.col.priority": "Priority",
   "exp.clearFilters": "Clear filters",
+  "exp.filters": "Filters",
   "exp.sort.date": "Newest first",
   "exp.sort.amount": "Largest first",
 

@@ -171,7 +171,10 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
                   {t("budget.income.tax")}
                   <span className="block text-xs text-ink-3">{t("budget.income.taxRate", { pct: f.pct1(taxRate) })}</span>
                 </span>
-                <span className="tabular shrink-0 whitespace-nowrap text-bad">−{f.money(gross - net)}</span>
+                <span className="tabular shrink-0 whitespace-nowrap text-bad">
+                  {gross - net > 0 && "−"}
+                  {f.money(gross - net)}
+                </span>
               </div>
             )}
           </div>
