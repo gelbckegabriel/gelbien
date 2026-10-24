@@ -190,22 +190,112 @@ input[type="date"]::-webkit-calendar-picker-indicator {
  * touch opacity and the individual transform properties (translate/scale), never layout, filters or
  * clip-paths.
  */
-/* sheets: phones' rises from the bottom while growing out of the tap; larger screens' grows from it,
-   with a touch of overshoot. The tap point is the element's transform-origin (see Sheet). */
-@keyframes sheet-up {
-  from { opacity: 0; translate: 0 56px; scale: 0.94; }
-  50% { opacity: 1; }
+/*
+ * Phones' popups open behind a curtain, like the intro's (Sheet adds the classes): two halves led by gold
+ * edges close in from the top and bottom, meet where the coin pops, and part on the new page — which is
+ * there from the moment they meet (.sheet-page-open). Closing runs it over the page, which goes as they
+ * meet (.sheet-page-close), and parts it on the app. Beats, ms — opening 260 in · 90 held · 460 parting;
+ * closing 220 · 60 · 420 (700 in all: CURTAIN_CLOSE_MS in Sheet).
+ */
+.sheet-half {
+  position: fixed;
+  inset-inline: 0;
+  z-index: 50;
+  height: 50.5%;
+  pointer-events: none;
+  transform: translateY(calc(var(--edge) * 101%));
 }
-@keyframes sheet-in {
-  0% { opacity: 0; scale: 0.86; }
-  55% { opacity: 1; scale: 1.012; }
-  100% { opacity: 1; scale: 1; }
+.sheet-half--top {
+  --edge: -1;
+  top: 0;
+  background: linear-gradient(to bottom, var(--color-bg) 55%, #15120c);
 }
-.sheet-up {
-  animation: sheet-up 480ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+.sheet-half--bottom {
+  --edge: 1;
+  bottom: 0;
+  background: linear-gradient(to top, var(--color-bg) 55%, #15120c);
 }
-.sheet-in {
-  animation: sheet-in 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+/* the gold edge leading each half in, and the seam where they meet */
+.sheet-half::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-gold) 25%, var(--color-gold-bright) 50%, var(--color-gold) 75%, transparent);
+  box-shadow: 0 0 14px 1px #d9b45f66;
+}
+.sheet-half--top::after {
+  bottom: 0;
+}
+.sheet-half--bottom::after {
+  top: 0;
+}
+.sheet-half.sheet-run-open {
+  animation: sheet-half-open 810ms both;
+}
+.sheet-half.sheet-run-close {
+  animation: sheet-half-close 700ms both;
+}
+@keyframes sheet-half-open {
+  0% { transform: translateY(calc(var(--edge) * 101%)); animation-timing-function: cubic-bezier(0.6, 0, 0.4, 1); }
+  32.1% { transform: none; animation-timing-function: linear; }
+  43.2% { transform: none; animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1); }
+  100% { transform: translateY(calc(var(--edge) * 101%)); }
+}
+@keyframes sheet-half-close {
+  0% { transform: translateY(calc(var(--edge) * 101%)); animation-timing-function: cubic-bezier(0.6, 0, 0.4, 1); }
+  31.4% { transform: none; animation-timing-function: linear; }
+  40% { transform: none; animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1); }
+  100% { transform: translateY(calc(var(--edge) * 101%)); }
+}
+/* the coin at the seam: pops as the halves meet, gone as they part */
+.sheet-coin {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 50;
+  width: 48px;
+  height: 48px;
+  margin: -24px 0 0 -24px;
+  pointer-events: none;
+  opacity: 0;
+}
+/* its glow is round, so it holds still while the coin turns in it */
+.sheet-coin::before {
+  content: "";
+  position: absolute;
+  inset: -70%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, #d9b45f55, transparent 62%);
+}
+.sheet-coin.sheet-run-open {
+  animation: sheet-coin-open 810ms both;
+}
+.sheet-coin.sheet-run-close {
+  animation: sheet-coin-close 700ms both;
+}
+@keyframes sheet-coin-open {
+  0%, 24.7% { opacity: 0; transform: scale(0) rotate(-120deg); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  37%, 43.2% { opacity: 1; transform: none; animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+  63%, 100% { opacity: 0; transform: scale(0.6); }
+}
+@keyframes sheet-coin-close {
+  0%, 22.9% { opacity: 0; transform: scale(0) rotate(-120deg); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  37.1%, 40% { opacity: 1; transform: none; animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+  62.9%, 100% { opacity: 0; transform: scale(0.6); }
+}
+.sheet-page-open {
+  animation: sheet-page-swap 1ms linear 260ms both;
+}
+.sheet-page-close {
+  animation: sheet-page-swap 1ms linear 220ms both reverse;
+}
+@keyframes sheet-page-swap {
+  from { opacity: 0; }
+}
+/* one element arriving on its own, like a .rise-in child */
+.rise-once {
+  animation: rise-in 560ms cubic-bezier(0.22, 1, 0.36, 1) var(--rise-delay, 90ms) both;
 }
 /* a soft gold wave spreading across a sheet from where it was opened: a small glow scaled up */
 @keyframes ink {
@@ -577,7 +667,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   /* their delays would keep things hidden for a moment even with the durations cut below */
   .rise-in > *,
   .rise-in > :only-child > *,
-  .rise-list > * {
+  .rise-list > *,
+  .rise-once,
+  .sheet-half,
+  .sheet-coin,
+  .sheet-page-open,
+  .sheet-page-close {
     animation: none;
   }
   .intro {

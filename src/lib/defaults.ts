@@ -89,9 +89,11 @@ export const CATEGORY_ICON_GROUPS = [
 
 export const CATEGORY_ICONS: readonly string[] = CATEGORY_ICON_GROUPS.flatMap((g) => g.icons);
 
+/** 32 — four full rows of eight in the goal picker. */
 export const GOAL_ICONS = [
-  "Target", "Car", "Motorbike", "Home", "KeyRound", "Plane", "Palmtree", "Luggage", "Mountain", "Caravan", "Ship", "Umbrella",
-  "ShieldCheck", "GraduationCap", "Baby", "Heart", "Gem", "Laptop", "Smartphone", "Camera", "Bike", "Dog", "Gift", "PiggyBank", "Rocket",
+  "Target", "Car", "Motorbike", "Home", "KeyRound", "Sofa", "Hammer", "Plane", "Palmtree", "Luggage", "Mountain", "Tent", "Caravan",
+  "Ship", "Umbrella", "ShieldCheck", "GraduationCap", "Briefcase", "Baby", "Heart", "Gem", "Watch", "Laptop", "Smartphone", "Camera",
+  "Gamepad2", "Ticket", "Bike", "Dog", "Gift", "PiggyBank", "Rocket",
 ] as const;
 
 /** Suggestions for the institution field — free text, these are just shortcuts. */

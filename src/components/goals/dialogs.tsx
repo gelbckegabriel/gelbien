@@ -126,7 +126,8 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t("goals.f.icon")}>
-            <div className="flex flex-wrap gap-1.5">
+            {/* eight to a row across the whole width, like the colours beside (under, on phones) it */}
+            <div className="grid w-full max-w-[22rem] grid-cols-8 gap-1.5">
               {GOAL_ICONS.map((name) => {
                 const Icon = ICONS[name];
                 const active = icon === name;
@@ -135,7 +136,7 @@ export function GoalDialog({ ds, open, goal, onClose }: { ds: Dataset; open: boo
                     key={name}
                     type="button"
                     onClick={() => setIcon(name)}
-                    className={cn("grid h-9 w-9 place-items-center rounded-xl border transition", active ? "border-transparent" : "border-line text-ink-3 hover:text-ink")}
+                    className={cn("grid aspect-square w-full place-items-center rounded-xl border transition", active ? "border-transparent" : "border-line text-ink-3 hover:text-ink")}
                     style={active ? { background: `${color}26`, color, boxShadow: `inset 0 0 0 1.5px ${color}` } : undefined}
                     aria-label={name}
                   >
