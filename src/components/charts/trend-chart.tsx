@@ -69,10 +69,10 @@ export function TrendChart({ ds, month, className }: { ds: Dataset; month: strin
                 ) : null
               }
             />
-            {hasIncome && <Bar dataKey="income" fill={GOOD} fillOpacity={0.85} radius={[4, 4, 0, 0]} maxBarSize={18} animationDuration={900} />}
-            <Bar dataKey="spent" fill={BAD} fillOpacity={0.85} radius={[4, 4, 0, 0]} maxBarSize={18} animationDuration={900} className="cursor-pointer" />
+            {hasIncome && <Bar isAnimationActive={false} dataKey="income" fill={GOOD} fillOpacity={0.85} radius={[4, 4, 0, 0]} maxBarSize={18} animationDuration={900} />}
+            <Bar isAnimationActive={false} dataKey="spent" fill={BAD} fillOpacity={0.85} radius={[4, 4, 0, 0]} maxBarSize={18} animationDuration={900} className="cursor-pointer" />
             {hasIncome && (
-              <Line type="monotone" dataKey="saved" stroke={GOLD} strokeWidth={2} dot={{ r: 3, fill: GOLD, stroke: INK.surface, strokeWidth: 2 }} activeDot={{ r: 5 }} animationDuration={1100} />
+              <Line isAnimationActive={false} type="monotone" dataKey="saved" stroke={GOLD} strokeWidth={2} dot={{ r: 3, fill: GOLD, stroke: INK.surface, strokeWidth: 2 }} activeDot={{ r: 5 }} animationDuration={1100} />
             )}
           </ComposedChart>
         </ResponsiveContainer>

@@ -70,7 +70,7 @@ export function ProjectionChart({ ds, month, className }: { ds: Dataset; month: 
                 ) : null
               }
             />
-            <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill="url(#proj-fill)" dot={false} activeDot={{ r: 4, stroke: INK.surface, strokeWidth: 2 }} animationDuration={1100} />
+            <Area isAnimationActive={false} type="monotone" dataKey="value" stroke={color} strokeWidth={2} fill="url(#proj-fill)" dot={false} activeDot={{ r: 4, stroke: INK.surface, strokeWidth: 2 }} animationDuration={1100} />
           </AreaChart>
         </ResponsiveContainer>
       </ChartArea>

@@ -74,7 +74,7 @@ function LoginInner() {
   const { t, locale } = useI18n();
   const setLocale = usePrefs((s) => s.setLocale);
   const setDemo = useUi((s) => s.setDemo);
-  const { data: session, isFetchedAfterMount } = useSession();
+  const { data: session, isFetchedAfterMount } = useSession(true);
 
   // Only on the server's answer: a cached "signed in" may be a login Google has since expired,
   // and the dashboard would send us straight back here.

@@ -13,18 +13,27 @@ import { ApiError, demoSource, fetchSession, googleSource } from "./sources";
 
 export type AppMode = "loading" | "google" | "demo" | "signedOut";
 
-export function useSession() {
-  // Always re-check on mount: the cookie may have changed behind our back (e.g. right after the OAuth redirect).
-  return useQuery({ queryKey: ["session"], queryFn: fetchSession, staleTime: 5 * 60_000, retry: 1, refetchOnMount: "always" });
+// When this page load started: a session answer from before it (the cached copy) isn't confirmed yet
+const LOADED_AT = Date.now();
+
+/**
+ * `recheck`: ask the server again on mount — the cookie may have changed behind our back (right after
+ * the OAuth redirect, say). Only the app's shell and the login page do; everything else that reads the
+ * data uses the answer they got. (It used to be every component: a page change mounts dozens of them,
+ * so each tap went back to the server and the new page rendered a second time when the answer came.)
+ * Coming back to the app re-checks too (refetch on window focus).
+ */
+export function useSession(recheck = false) {
+  return useQuery({ queryKey: ["session"], queryFn: fetchSession, staleTime: 5 * 60_000, retry: 1, refetchOnMount: recheck ? "always" : false });
 }
 
-export function useMode(): { mode: AppMode; session: SessionInfo | undefined } {
-  const { data, isFetchedAfterMount } = useSession();
+export function useMode(recheck = false): { mode: AppMode; session: SessionInfo | undefined } {
+  const { data, dataUpdatedAt } = useSession(recheck);
   const demo = useUi((s) => s.demo);
   if (data?.user) return { mode: "google", session: data };
   if (demo) return { mode: "demo", session: data };
   // Never redirect to /login on a cached answer — wait for the server to confirm.
-  if (!isFetchedAfterMount) return { mode: "loading", session: data };
+  if (dataUpdatedAt < LOADED_AT) return { mode: "loading", session: data };
   return { mode: "signedOut", session: data };
 }
 

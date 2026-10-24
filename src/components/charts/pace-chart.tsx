@@ -121,9 +121,9 @@ export function PaceChart({ ds, month, forecast, budget = 0, className }: { ds: 
               }
             />
             <Line type="monotone" dataKey="last" stroke={LAST} strokeWidth={1.5} dot={false} activeDot={false} isAnimationActive animationDuration={900} />
-            {hasPace && <Line type="linear" dataKey="pace" stroke={INK.secondary} strokeWidth={1.5} strokeOpacity={0.7} dot={false} activeDot={false} animationDuration={900} />}
+            {hasPace && <Line isAnimationActive={false} type="linear" dataKey="pace" stroke={INK.secondary} strokeWidth={1.5} strokeOpacity={0.7} dot={false} activeDot={false} animationDuration={900} />}
             {fc && <Area type="monotone" dataKey="band" stroke="none" fill={GOLD} fillOpacity={0.1} activeDot={false} isAnimationActive={false} />}
-            <Area
+            <Area isAnimationActive={false}
               type="monotone"
               dataKey="actual"
               stroke={GOLD}

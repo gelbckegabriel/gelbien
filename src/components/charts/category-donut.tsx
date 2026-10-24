@@ -32,7 +32,7 @@ export function CategoryDonut({ summary, className }: { summary: MonthSummary; c
         <div className="relative h-52 w-52 shrink-0">
           <ResponsiveContainer>
             <PieChart>
-              <Pie
+              <Pie isAnimationActive={false}
                 data={data}
                 dataKey="value"
                 nameKey="label"

@@ -1,21 +1,25 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useLayoutEffect, useState, ViewTransition } from "react";
-import { CoinMark } from "@/components/logo";
+import { useLayoutEffect, useRef } from "react";
 import { NAV } from "@/components/shell/nav";
 import { introRemaining } from "@/lib/motion";
-import { useUi } from "@/lib/ui-store";
 
 // The order of the pages in each layout's navigation: phones' bottom bar (then the rest), the sidebar
 const PHONE_ORDER = ["/dashboard", "/budget", "/expenses", "/goals", "/chat", "/config", "/profile", "/guide"];
 const SIDEBAR_ORDER = NAV.map((n) => n.href);
-const SIDEBAR_WIDTH = 256; // w-64
 
-// The page we're coming from; templates re-mount on every navigation
+// The page shown last, and how far down each page was when it was left
 let previous: string | null = null;
+const scrolledTo = new Map<string, number>();
+// The page on screen and how far down it is: kept by its scroll events, and read once more the moment a
+// link is clicked — before anything changes, so it's exact even if the last scroll event hasn't come yet.
+let here: { y: number } | null = null;
+if (typeof window !== "undefined") {
+  window.addEventListener("click", () => here && (here.y = window.scrollY), { capture: true });
+}
 
-/** 1: the new page is further along the nav (it comes in from the right), -1: back, 0: neither. */
+/** 1: the new page is further along the nav, -1: back, 0: neither (or the first page). */
 function direction(from: string | null, to: string, computer: boolean) {
   const order = computer ? SIDEBAR_ORDER : PHONE_ORDER;
   const a = from ? order.findIndex((p) => from.startsWith(p)) : -1;
@@ -24,63 +28,47 @@ function direction(from: string | null, to: string, computer: boolean) {
 }
 
 /**
- * How this page arrives. Between pages it's a view transition (globals.css): the new page pushes the
- * old one off to the side it's going, and a gold coin rolls along the gap between them, on the tab bar.
- * All on the compositor, and the new page is there at once — nothing waits for it (a tap mid-roll
- * finishes it, see GuardedLink). The first page (it lands as the intro opens), browsers without view
- * transitions and the welcome tour (its card floats over the page area) get a short CSS slide instead.
+ * Every page arrives through here. Next keeps recently visited pages alive in the background (hidden,
+ * with their state — cacheComponents), so going back to a tab doesn't build it again; this runs both
+ * when a page first mounts and each time it's shown again: back where you left it (or at the top the
+ * first time), sliding in a little from the side of the tab you came from. One layer, opacity and a
+ * transform on the compositor, a quarter of a second — the page is there and usable at once.
  */
-function arrival(pathname: string, touring: boolean) {
-  const computer = window.matchMedia("(min-width: 1024px)").matches;
-  const first = previous === null;
-  const dir = direction(previous, pathname, computer);
-  const css = first || touring || typeof document.startViewTransition !== "function";
-  // the band the pages move in: the whole width, or right of the sidebar
-  const left = computer ? SIDEBAR_WIDTH : 0;
-  const width = window.innerWidth - left;
-  // the coin comes in from beyond one edge and rolls (without slipping) out past the other; it rests
-  // where it ends, off screen, so nothing is left behind whatever happens to the transition
-  const size = computer ? 48 : 36;
-  const travel = dir * (width + size);
-  return {
-    css,
-    delay: first ? introRemaining() : 0,
-    from: dir ? `${dir * 40}px 0` : "0 12px",
-    push: dir * width,
-    coin: css || !dir ? null : { size, rest: dir > 0 ? left - size : left + width, travel, turn: (travel / (Math.PI * size)) * 360 },
-  };
-}
-
 export default function Template({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const touring = useUi((s) => s.tour.open);
-  const [entry] = useState(() => (typeof window === "undefined" ? null : arrival(pathname, touring)));
+  const ref = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    // read by the transition's CSS, for this page and the one it replaces
-    const root = document.documentElement.style;
-    root.setProperty("--page-push", `${entry?.push ?? 0}px`);
-    root.setProperty("--coin-travel", `${entry?.coin?.travel ?? 0}px`);
-    root.setProperty("--coin-turn", `${entry?.coin?.turn ?? 0}deg`);
+    const el = ref.current;
+    if (!el) return;
+    const first = previous === null;
+    const computer = window.matchMedia("(min-width: 1024px)").matches;
+    const dir = direction(previous, pathname, computer);
+    window.scrollTo(0, scrolledTo.get(pathname) ?? 0);
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const from = dir === 0 ? "translate(0px, 12px)" : computer ? `translate(0px, ${dir * 16}px)` : `translate(${dir * 28}px, 0px)`;
+      el.animate([{ opacity: 0, transform: from }, { opacity: 1, transform: "none" }], {
+        // the first page lands as the intro opens
+        duration: first ? 420 : 260,
+        delay: first ? introRemaining() : 0,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        fill: "backwards",
+      });
+    }
     previous = pathname;
-  }, [pathname, entry]);
+    // How far down it is, kept as it goes: once it's hidden the page is out of the layout, and the
+    // window's own reading may already have been cut short to fit what's left.
+    const mine = { y: window.scrollY };
+    here = mine;
+    const onScroll = () => (mine.y = window.scrollY);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    // hidden (another page shown) or gone: remember where it was
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      scrolledTo.set(pathname, mine.y);
+      if (here === mine) here = null;
+    };
+  }, [pathname]);
 
-  const css = entry?.css ?? true;
-  return (
-    <>
-      <ViewTransition enter={css ? "none" : "page-arrive"} exit={touring ? "none" : "page-leave"} default="none">
-        <div
-          className={css ? "page-enter" : undefined}
-          style={{ ["--page-from" as string]: entry?.from, animationDelay: entry?.delay ? `${entry.delay}ms` : undefined }}
-        >
-          {children}
-        </div>
-      </ViewTransition>
-      {entry?.coin && (
-        <span aria-hidden className="page-coin" style={{ left: entry.coin.rest, width: entry.coin.size, height: entry.coin.size }}>
-          <CoinMark className="relative h-full w-full" />
-        </span>
-      )}
-    </>
-  );
+  return <div ref={ref}>{children}</div>;
 }

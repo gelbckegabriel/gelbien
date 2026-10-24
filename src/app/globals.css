@@ -49,7 +49,12 @@
   --animate-float: float 6s ease-in-out infinite;
   --animate-pop-in: pop-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-pop-in-up: pop-in-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-in: fade-in 320ms ease-out both;
 
+  /* deferred content (charts) arriving under a page that's already shown */
+  @keyframes fade-in {
+    from { opacity: 0; }
+  }
   @keyframes shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
@@ -312,127 +317,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: radial-gradient(circle, #d9b45f50, #d9b45f1f 45%, transparent 70%);
   animation: ink 950ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-/* pages arriving from the direction of the nav (see (app)/template.tsx): the first one, and every one
-   where the browser has no view transitions */
-@keyframes page-in {
-  from { opacity: 0; translate: var(--page-from, 0 12px); }
+/* a tab's icon pops as it becomes the current one (the phone's tab bar — see BottomNav) */
+.tab-pop {
+  animation: tab-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.page-enter {
-  animation: page-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
-}
-
-/*
- * Changing pages: a view transition (the <ViewTransition> in (app)/template.tsx). The new page pushes
- * the old one off to the side it's going (--page-push, from the template) while a gold coin rolls along
- * the gap between them, on top of the tab bar, and hops over the + on its way. The push and the roll
- * share one clock and one curve: moving from the first frame, so the tap answers at once, then easing
- * out like a flicked coin slowing down.
- * Only the pages and the coin take part: the root isn't captured, so the bars, the tour and anything
- * else floating stay live and tappable underneath, and what moves is clipped to the band between the
- * bars (phones: with a notch for the + that rises out of the tab bar — the coin rolls behind it).
- */
-/* The clip is in viewport units, not %: React shrinks ::view-transition to 0×0 when the rest of the page
-   isn't changing (its own way of letting taps through), and percentages would shrink with it. */
-:root {
-  view-transition-name: none;
-  --vt-time: 720ms;
-  /* coin-hop's keyframes are timed to this curve: change one, re-time the other */
-  --vt-ease: cubic-bezier(0.4, 0.55, 0.2, 1);
-}
-::view-transition {
-  pointer-events: none;
-  --vt-top: calc(env(safe-area-inset-top) + 4rem + 1px);
-  --vt-bottom: calc(100dvh - env(safe-area-inset-bottom) - 4rem - 1px);
-  clip-path: polygon(
-    0 var(--vt-top),
-    100vw var(--vt-top),
-    100vw var(--vt-bottom),
-    calc(50vw + 36px) var(--vt-bottom),
-    calc(50vw + 36px) calc(var(--vt-bottom) - 16px),
-    calc(50vw - 36px) calc(var(--vt-bottom) - 16px),
-    calc(50vw - 36px) var(--vt-bottom),
-    0 var(--vt-bottom)
-  );
-}
-@media (min-width: 1024px) {
-  /* right of the sidebar, under the top bar */
-  ::view-transition {
-    clip-path: polygon(16rem calc(4rem + 1px), 100vw calc(4rem + 1px), 100vw 100dvh, 16rem 100dvh);
-  }
-}
-::view-transition-old(.page-leave) {
-  animation: vt-push-out var(--vt-time) var(--vt-ease) both;
-}
-::view-transition-new(.page-arrive) {
-  animation: vt-push-in var(--vt-time) var(--vt-ease) both;
-}
-@keyframes vt-push-out {
-  to { translate: calc(var(--page-push, 0px) * -1) 0; opacity: 0; }
-}
-@keyframes vt-push-in {
-  from { translate: var(--page-push, 0px) 0; opacity: 0.35; }
-}
-/* The coin rests where its roll ends, off screen; the transition rolls its picture in from the far side.
-   Turning it by its travel over its circumference keeps it rolling, not sliding. */
-.page-coin {
-  position: fixed;
-  bottom: calc(env(safe-area-inset-bottom) + 4rem + 2px);
-  pointer-events: none;
-  view-transition-name: page-coin;
-}
-/* its glow is round, so it holds still while the coin turns inside it */
-.page-coin::before {
-  content: "";
-  position: absolute;
-  inset: -55%;
-  border-radius: 9999px;
-  background: radial-gradient(circle, #d9b45f4d, transparent 62%);
-}
-@media (min-width: 1024px) {
-  .page-coin {
-    bottom: 14px;
-  }
-}
-::view-transition-group(page-coin) {
-  z-index: 2;
-  animation: none;
-}
-::view-transition-old(page-coin) {
-  display: none;
-}
-::view-transition-new(page-coin) {
-  animation: coin-roll var(--vt-time) var(--vt-ease) both;
-}
-@keyframes coin-roll {
-  from { translate: var(--coin-travel, 0px) 0; rotate: var(--coin-turn, 0deg); }
-}
-/* phones: the + rises out of the middle of the tab bar, so the coin hops it — taking off just before it
-   (19% of the way through the curve's time), over it at the middle of its roll (25.8%), down past it,
-   and a little bounce. `transform` stacks on the roll's own translate/rotate. */
-@media (max-width: 1023.98px) {
-  ::view-transition-new(page-coin) {
-    animation:
-      coin-roll var(--vt-time) var(--vt-ease) both,
-      coin-hop var(--vt-time) linear both;
-  }
-}
-@keyframes coin-hop {
-  0%, 18.5% { transform: none; animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1); }
-  25.8% { transform: translateY(-30px); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
-  32.5% { transform: none; animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1); }
-  35.8% { transform: translateY(-8px); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
-  39%, 100% { transform: none; }
-}
-/* the computer's floating + sits over the page area: kept above the moving pages (and the coin), as it is */
-::view-transition-group(app-fab) {
-  z-index: 3;
-  animation: none;
-}
-::view-transition-old(app-fab) {
-  display: none;
-}
-::view-transition-new(app-fab) {
-  animation: none;
+@keyframes tab-pop {
+  from { transform: translateY(4px) scale(0.55) rotate(-12deg); }
 }
 
 /*
@@ -677,11 +567,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
   .intro {
     display: none !important;
-  }
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
   }
 
   *,

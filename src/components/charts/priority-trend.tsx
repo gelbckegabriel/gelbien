@@ -127,7 +127,7 @@ export function PriorityTrend({ ds, month, className }: { ds: Dataset; month: st
                   }}
                 />
                 {STACK.map((k, i) => (
-                  <Bar
+                  <Bar isAnimationActive={false}
                     key={k}
                     dataKey={k}
                     stackId="priority"

@@ -22,7 +22,7 @@ import { buttonClasses } from "../ui/button";
 import { Skeleton } from "../ui/misc";
 import { WelcomeTour } from "../welcome-tour";
 import { MonthPicker } from "./month-picker";
-import { BottomNav, DesktopFab, RouteWarmup, Sidebar, TapThroughTransitions } from "./nav";
+import { BottomNav, DesktopFab, RouteWarmup, Sidebar } from "./nav";
 import { LoadError, WriteBlocked } from "./load-error";
 import { GuardedLink, UnsavedDialog } from "./unsaved";
 import { AccountMenu, guideHref } from "./user-chip";
@@ -73,7 +73,7 @@ function TopBar() {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
         {/* the smallest phones (under 360px) need the room; the dashboard is in the bottom bar anyway */}
-        <GuardedLink href="/dashboard" className="lg:hidden max-[359px]:hidden" aria-label="Gelbien">
+        <GuardedLink href="/dashboard" scroll={false} className="lg:hidden max-[359px]:hidden" aria-label="Gelbien">
           <LogoMark />
         </GuardedLink>
         <MonthPicker className="mx-auto lg:mx-0" />
@@ -88,7 +88,7 @@ function TopBar() {
             <SyncIndicator />
             <HelpButton />
           </div>
-          <GuardedLink href="/chat" className="grid h-9 w-9 place-items-center rounded-xl text-ink-3 transition hover:bg-white/5 hover:text-ink lg:hidden" aria-label={t("nav.chat")}>
+          <GuardedLink href="/chat" scroll={false} className="grid h-9 w-9 place-items-center rounded-xl text-ink-3 transition hover:bg-white/5 hover:text-ink lg:hidden" aria-label={t("nav.chat")}>
             <MessageCircle className="h-[18px] w-[18px]" />
           </GuardedLink>
           <div className="lg:hidden">
@@ -270,7 +270,8 @@ function ContentSkeleton() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const hydrated = useHydrated();
   const router = useRouter();
-  const { mode } = useMode();
+  // the one place that asks the server again when the app starts (see useSession)
+  const { mode } = useMode(true);
   const ds = useDataset();
   const refresh = useRefresh();
   const pathname = usePathname();
@@ -321,7 +322,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       <BottomNav />
       <RouteWarmup />
-      <TapThroughTransitions />
       {ready && (
         <>
           <DesktopFab />

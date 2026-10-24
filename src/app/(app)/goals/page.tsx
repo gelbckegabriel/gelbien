@@ -11,6 +11,7 @@ import { Simulator } from "@/components/goals/simulator";
 import { LoanCalculator } from "@/components/plans/loan-calculator";
 import { Button } from "@/components/ui/button";
 import { Card, FillGrid, PageHeader, Stagger } from "@/components/ui/card";
+import { Deferred } from "@/components/ui/deferred";
 import { EmptyState } from "@/components/ui/misc";
 import { useDataset } from "@/lib/data/hooks";
 import { goalPlanFor } from "@/lib/goals";
@@ -114,16 +115,19 @@ function Goals() {
                 />
               ))}
             </FillGrid>
-            <PlanCard ds={ds} />
+            {/* under the goals: drawn once the page is up (see Deferred) */}
+            <Deferred estimate={220}>
+              <PlanCard ds={ds} />
+            </Deferred>
           </>
         )}
 
         {/* The account list sets the row height; the chart stretches to match. */}
         <div className="grid gap-4 lg:grid-cols-12">
-          <div className="lg:col-span-7 xl:col-span-8">
+          <Deferred className="lg:col-span-7 xl:col-span-8" estimate={340}>
             <NetWorthCard ds={ds} className="h-full" />
-          </div>
-          <div className="lg:col-span-5 xl:col-span-4">
+          </Deferred>
+          <Deferred className="lg:col-span-5 xl:col-span-4" estimate={340}>
             <AccountsCard
               ds={ds}
               className="h-full"
@@ -131,7 +135,7 @@ function Goals() {
               onEdit={(id) => open({ kind: "account", account: ds.accounts.find((a) => a.id === id) ?? null })}
               onCheckIn={() => open({ kind: "checkin" })}
             />
-          </div>
+          </Deferred>
         </div>
       </Stagger>
 

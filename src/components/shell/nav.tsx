@@ -1,17 +1,16 @@
 "use client";
 
 import { BookOpen, LayoutDashboard, ListOrdered, MessageCircle, PiggyBank, Plus, Tags, Target, UserRound } from "lucide-react";
-import { motion } from "motion/react";
-import { useLinkStatus } from "next/link";
+import { motion, useReducedMotion } from "motion/react";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { askToLeave, hasUnsaved } from "@/lib/unsaved";
-import { activeTransition, skipActiveTransition } from "@/lib/view-transition";
 import { useIntroDelay } from "@/lib/motion";
 import { useUi } from "@/lib/ui-store";
 import { cn } from "@/lib/utils";
-import { Logo } from "../logo";
+import { CoinMark, Logo } from "../logo";
 import { Burst } from "../ui/burst";
 import { Button } from "../ui/button";
 import { GuardedLink } from "./unsaved";
@@ -63,22 +62,6 @@ function NavIcon({ icon: Icon, active, className }: { icon: typeof LayoutDashboa
   );
 }
 
-/**
- * A page's tab in the phone's bottom bar. Lit as soon as it's tapped (useLinkStatus): when the page
- * still has to load — a slow network, the app just woken up — the tap shows it registered.
- */
-function TabItem({ item, active, label }: { item: (typeof NAV)[number]; active: boolean; label: string }) {
-  const { pending } = useLinkStatus();
-  const lit = active || pending;
-  return (
-    <>
-      {pending && !active && <span aria-hidden className="absolute -top-px h-0.5 w-8 animate-pulse rounded-full bg-gold/70" />}
-      <NavIcon icon={item.icon} active={active} className={cn("h-5 w-5 transition-colors", lit ? "text-gold" : "text-ink-3")} />
-      <span className={cn("text-[10px] font-medium transition-colors", lit ? "text-ink" : "text-ink-3")}>{label}</span>
-    </>
-  );
-}
-
 /** The same in the sidebar */
 function SidebarItem({ item, active, label }: { item: (typeof NAV)[number]; active: boolean; label: string }) {
   const { pending } = useLinkStatus();
@@ -126,35 +109,6 @@ function introEntrance(intro: number, className: string, after = 120) {
   return intro > 0 ? { className, style: { ["--intro-delay" as string]: `${intro + after}ms` } } : { className: undefined, style: undefined };
 }
 
-/**
- * Taps on links while a page change is still under way. React's events are off while it commits, and with
- * a view transition that lasts until the browser has captured the old page — a link tapped then never
- * reaches the router, and the browser loads the page from scratch (a white flash and a full reload).
- * So those taps are caught first: the transition finishes at once and the app navigates, as the link
- * would have (asking about unsaved edits the same way).
- */
-export function TapThroughTransitions() {
-  const router = useRouter();
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (!activeTransition() || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[href]") : null;
-      if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download")) return;
-      const url = new URL(a.href, location.href);
-      if (url.origin !== location.origin) return;
-      e.preventDefault();
-      e.stopPropagation();
-      skipActiveTransition();
-      const href = url.pathname + url.search + url.hash;
-      if (url.pathname !== location.pathname && hasUnsaved()) askToLeave(() => router.push(href));
-      else router.push(href);
-    };
-    window.addEventListener("click", onClick, { capture: true });
-    return () => window.removeEventListener("click", onClick, { capture: true });
-  }, [router]);
-  return null;
-}
-
 export function Sidebar() {
   const path = usePathname();
   const { t } = useI18n();
@@ -180,6 +134,8 @@ export function Sidebar() {
             <GuardedLink
               key={item.href}
               href={item.href}
+              // each page keeps its place (see template)
+              scroll={false}
               className={cn(
                 "relative flex h-11 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition-colors",
                 active ? "text-ink" : "text-ink-3 hover:bg-white/[0.03] hover:text-ink-2",
@@ -204,22 +160,121 @@ export function Sidebar() {
   );
 }
 
-// Phones: Dashboard, Budget, +, Expenses, Goals — Chat moves to the top bar.
+// Phones: Dashboard, Budget, +, Expenses, Goals — Chat moves to the top bar. Five equal columns.
 const MOBILE = [NAV[0], NAV[1], null, NAV[3], NAV[2]] as const;
+const columnOf = (href: string | null) => (href ? MOBILE.findIndex((i) => i?.href === href) : -1);
+const COIN = 22; // px
+const GLIDE = "cubic-bezier(0.4, 0.55, 0.2, 1)";
 
+/** When (0–1 of the time) the GLIDE curve has covered `p` of the way — so the coin hops the + as it gets there. */
+function timeAt(p: number) {
+  const [x1, y1, x2, y2] = [0.4, 0.55, 0.2, 1];
+  const at = (u: number, a: number, b: number) => 3 * (1 - u) ** 2 * u * a + 3 * (1 - u) * u ** 2 * b + u ** 3;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (at(mid, y1, y2) < p) lo = mid;
+    else hi = mid;
+  }
+  return at((lo + hi) / 2, x1, x2);
+}
+
+/**
+ * A coin rolls along the top of the tab bar from the tab you left to the one you picked — turning as
+ * far as it travels, hopping the + on the way across. Three nested layers (along, up, around), each a
+ * Web Animation of its own transform, so it runs on the compositor even while the new page renders.
+ */
+function rollCoin(mover: HTMLElement, from: number, to: number) {
+  const hopper = mover.firstElementChild as HTMLElement;
+  const spinner = hopper.firstElementChild as HTMLElement;
+  const steps = Math.abs(to - from);
+  const duration = 320 + steps * 60;
+  const travel = steps * mover.getBoundingClientRect().width;
+  mover.animate(
+    [
+      { transform: `translateX(${from * 100}%)`, opacity: 0 },
+      { opacity: 1, offset: 0.12 },
+      { opacity: 1, offset: 0.78 },
+      { transform: `translateX(${to * 100}%)`, opacity: 0 },
+    ],
+    { duration, easing: GLIDE },
+  );
+  spinner.animate([{ transform: "rotate(0deg)" }, { transform: `rotate(${Math.sign(to - from) * (travel / (Math.PI * COIN)) * 360}deg)` }], { duration, easing: GLIDE });
+  if (Math.min(from, to) < 2 && Math.max(from, to) > 2) {
+    const t = timeAt((2 - from) / (to - from));
+    hopper.animate(
+      [
+        { transform: "none", offset: 0 },
+        { transform: "none", offset: Math.max(0, t - 0.14), easing: "cubic-bezier(0.2, 0.6, 0.4, 1)" },
+        { transform: "translateY(-24px)", offset: t, easing: "cubic-bezier(0.6, 0, 0.8, 0.4)" },
+        { transform: "none", offset: Math.min(1, t + 0.14) },
+        { transform: "none", offset: 1 },
+      ],
+      { duration },
+    );
+  }
+}
+
+/**
+ * The phone's tab bar, made to keep up with a thumb. A tab lights the moment it's touched — before its
+ * page has even arrived — and the page opens on release. The gold bar and its light glide over to it
+ * (a CSS transition) while the coin rolls across: both on the compositor, smooth while the page renders.
+ * Tapping the tab you're on takes its page back to the top. Pages keep their place between visits (they
+ * stay alive in the background, see template), hence scroll={false}.
+ */
 export function BottomNav() {
   const path = usePathname();
+  const router = useRouter();
   const { t } = useI18n();
+  const reduce = useReducedMotion();
   const { add, icon, burst } = useAddExpense();
   const intro = useIntroDelay();
   const entrance = introEntrance(intro, "intro-lift");
   const pop = introEntrance(intro, "intro-pop");
+  // the tab under the finger shows as current at once (only while still on the page it was pressed from)
+  const [pressed, setPressed] = useState<{ href: string; from: string } | null>(null);
+  const routeTab = MOBILE.find((i) => i && path.startsWith(i.href))?.href ?? null;
+  const current = pressed && pressed.from === path ? pressed.href : routeTab;
+  const col = columnOf(current);
+
+  const coin = useRef<HTMLSpanElement>(null);
+  const lastCol = useRef(col);
+  useEffect(() => {
+    const from = lastCol.current;
+    lastCol.current = col;
+    if (coin.current && !reduce && from >= 0 && col >= 0 && from !== col) rollCoin(coin.current, from, col);
+  }, [col, reduce]);
+
   return (
     <nav
       className={cn("fixed inset-x-0 bottom-0 z-40 border-t border-line bg-[#0c0c0f]/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden", entrance.className)}
       style={entrance.style}
     >
-      <div className="mx-auto grid h-16 max-w-lg grid-cols-5 items-center px-2">
+      <div className="relative mx-auto grid h-16 max-w-lg grid-cols-5 items-center px-2">
+        {/* the columns, for what moves between them */}
+        <div aria-hidden className="pointer-events-none absolute inset-y-0 inset-x-2">
+          {/* the current tab's gold bar, with a soft light falling from it */}
+          <span
+            className={cn("absolute inset-y-0 left-0 w-1/5 transition-[transform,opacity] duration-[380ms] ease-[cubic-bezier(0.22,1,0.36,1)]", col < 0 && "opacity-0")}
+            style={{ transform: `translateX(${Math.max(col, 0) * 100}%)` }}
+          >
+            <span className="absolute inset-x-1 -top-px h-14 bg-[radial-gradient(55%_75%_at_50%_0%,#d9b45f2b,transparent)]" />
+            <span className="absolute -top-px left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-gold" />
+          </span>
+          {/* the coin, resting out of sight between runs */}
+          <span ref={coin} className="absolute left-0 z-10 flex w-1/5 justify-center opacity-0" style={{ top: -COIN / 2 }}>
+            <span className="block">
+              {/* its glow is round, so it holds still while the coin turns */}
+              <span
+                className="relative block before:absolute before:-inset-2 before:rounded-full before:bg-[radial-gradient(circle,#d9b45f59,transparent_65%)]"
+                style={{ width: COIN, height: COIN }}
+              >
+                <CoinMark className="relative h-full w-full" />
+              </span>
+            </span>
+          </span>
+        </div>
         {MOBILE.map((item) => {
           if (!item) {
             return (
@@ -238,23 +293,41 @@ export function BottomNav() {
               </div>
             );
           }
-          const active = path.startsWith(item.href);
+          const on = item.href === current;
+          const here = item.href === routeTab;
           return (
-            <GuardedLink key={item.href} href={item.href} className="relative flex flex-col items-center gap-1 py-1.5">
-              {/* the current tab's gold bar, with a soft light falling from it — both glide to the next tab */}
-              {active && (
-                <>
-                  <motion.span
-                    layoutId="bottom-glow"
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-1 -top-px h-14 bg-[radial-gradient(55%_75%_at_50%_0%,#d9b45f2b,transparent)]"
-                    transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                  />
-                  <motion.span layoutId="bottom-active" className="absolute -top-px h-0.5 w-8 rounded-full bg-gold" transition={{ type: "spring", stiffness: 500, damping: 40 }} />
-                </>
-              )}
-              <TabItem item={item} active={active} label={t(item.label)} />
-            </GuardedLink>
+            <Link
+              key={item.href}
+              href={item.href}
+              scroll={false}
+              aria-current={here ? "page" : undefined}
+              className="relative flex flex-col items-center gap-1 py-1.5"
+              onPointerDown={(e) => {
+                if (e.button === 0 && !here && !hasUnsaved()) setPressed({ href: item.href, from: path });
+              }}
+              onPointerCancel={() => setPressed(null)}
+              // released somewhere else: no tap after all
+              onPointerUp={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) setPressed(null);
+              }}
+              onClick={(e) => {
+                if (!here) return;
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+              }}
+              onNavigate={(e) => {
+                if (!hasUnsaved()) return;
+                e.preventDefault();
+                setPressed(null);
+                askToLeave(() => router.push(item.href, { scroll: false }));
+              }}
+            >
+              <span key={on ? "on" : "off"} className={cn("grid place-items-center", on && !reduce && "tab-pop")}>
+                <item.icon className={cn("h-5 w-5 transition-colors duration-200", on ? "text-gold" : "text-ink-3")} />
+              </span>
+              <span className={cn("text-[10px] font-medium transition-colors duration-200", on ? "text-ink" : "text-ink-3")}>{t(item.label)}</span>
+            </Link>
           );
         })}
       </div>
@@ -277,9 +350,8 @@ export function DesktopFab() {
       whileHover={{ scale: 1.08 }}
       whileTap={{ scale: 0.88 }}
       transition={{ type: "spring", stiffness: 400, damping: 22 }}
-      // named so a page changing underneath doesn't cover it (see app-fab in globals.css)
       className={cn(
-        "gold-fill fixed bottom-8 right-8 z-30 hidden h-14 w-14 place-items-center rounded-2xl text-[#1b1406] shadow-[0_12px_32px_-8px_#d9b45fb0] [view-transition-name:app-fab] lg:grid",
+        "gold-fill fixed bottom-8 right-8 z-30 hidden h-14 w-14 place-items-center rounded-2xl text-[#1b1406] shadow-[0_12px_32px_-8px_#d9b45fb0] lg:grid",
         pop.className,
       )}
       style={pop.style}

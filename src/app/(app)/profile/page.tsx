@@ -102,7 +102,7 @@ function PreferencesCard() {
     if (!silent) toast.success(t("prof.savedPrefs"));
   };
   const saveAmounts = () => saveSettings({ savingsGoal: round2(parseAmount(goal)) });
-  useUnsavedChanges(dirty, { save: saveAmounts });
+  useUnsavedChanges(dirty, { save: saveAmounts, discard: () => setGoal(String(ds.settings.savingsGoal || "")) });
 
   return (
     <Card>

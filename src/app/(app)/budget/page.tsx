@@ -10,6 +10,7 @@ import { CategoryIcon } from "@/components/icons";
 import { GuardedLink } from "@/components/shell/unsaved";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, PageHeader, Stagger } from "@/components/ui/card";
+import { Deferred } from "@/components/ui/deferred";
 import { Field, MoneyInput, Segmented } from "@/components/ui/form";
 import { AnimatedNumber, Badge, EmptyState, Progress, STATUS_TONE } from "@/components/ui/misc";
 import { SaveBar } from "@/components/ui/save-bar";
@@ -58,8 +59,13 @@ export default function BudgetPage() {
   return (
     <Stagger className="space-y-4">
       <BudgetEditor key={version} ds={ds} month={month} />
-      <Subscriptions ds={ds} month={month} />
-      <Commitments ds={ds} />
+      {/* under the editor: drawn once the page is up (see Deferred) */}
+      <Deferred estimate={420}>
+        <Subscriptions ds={ds} month={month} />
+      </Deferred>
+      <Deferred estimate={320}>
+        <Commitments ds={ds} />
+      </Deferred>
     </Stagger>
   );
 }
@@ -107,7 +113,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
     }
     toast.success(t("budget.saved"));
   };
-  useUnsavedChanges(dirty, { save, monthScoped: true });
+  useUnsavedChanges(dirty, { save, discard: () => setDraft(initial), monthScoped: true });
 
   const useDefault = () => {
     mutate.mutate({ op: "saveBudget", month, lines: [], income: null, clearIncome: true });

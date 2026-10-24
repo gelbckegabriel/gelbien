@@ -176,7 +176,13 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
     }
     toast.success(t("cfg.saved"));
   };
-  useUnsavedChanges(dirty, { save });
+  useUnsavedChanges(dirty, {
+    save,
+    discard: () => {
+      setCats(initialCats);
+      setPayments(initialPayments);
+    },
+  });
 
   const addPayment = () => {
     const v = newPayment.trim();

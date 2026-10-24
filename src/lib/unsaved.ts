@@ -6,6 +6,11 @@ import { create } from "zustand";
 export interface UnsavedGuard {
   /** Persist the edits. Return false to stay put (e.g. validation failed). */
   save: () => boolean | void;
+  /**
+   * Drop the edits. Pages stay alive in the background after you leave them (Next's Activity), so
+   * "discard" has to put the form back as it was — leaving alone would keep the edits for the return.
+   */
+  discard?: () => void;
   /** The draft belongs to the selected month, so switching months would drop it too. */
   monthScoped?: boolean;
 }

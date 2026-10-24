@@ -205,7 +205,7 @@ export function NetWorthCard({ ds, className }: { ds: Dataset; className?: strin
                   );
                 }}
               />
-              <Area type="monotone" dataKey="total" stroke={GOLD} strokeWidth={2.25} fill="url(#nw-fill)" dot={{ r: 3, fill: GOLD, stroke: INK.surface, strokeWidth: 2 }} activeDot={{ r: 5 }} animationDuration={1000} />
+              <Area isAnimationActive={false} type="monotone" dataKey="total" stroke={GOLD} strokeWidth={2.25} fill="url(#nw-fill)" dot={{ r: 3, fill: GOLD, stroke: INK.surface, strokeWidth: 2 }} activeDot={{ r: 5 }} animationDuration={1000} />
             </AreaChart>
           </ResponsiveContainer>
         </ChartArea>

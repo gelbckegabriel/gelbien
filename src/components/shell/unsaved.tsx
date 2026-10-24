@@ -15,7 +15,6 @@ export function GuardedLink({ href, onNavigate, ...props }: Omit<React.Component
     <Link
       href={href}
       onNavigate={(e) => {
-        // (a tap while a page change is still under way never gets here: see TapThroughTransitions)
         onNavigate?.(e);
         if (href === path || !hasUnsaved()) return;
         e.preventDefault();
@@ -33,6 +32,7 @@ export function UnsavedDialog() {
 
   const stay = () => useUnsaved.setState({ pending: null });
   const leave = () => {
+    guard?.current.discard?.();
     useUnsaved.setState({ guard: null, pending: null });
     pending?.();
   };
