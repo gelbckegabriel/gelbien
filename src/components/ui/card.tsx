@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, type HTMLMotionProps } from "motion/react";
+import { useIntroDelay } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 // Cards cascade onto every page, each rising into place with a soft spring. A whole `transform` (not
@@ -60,8 +61,11 @@ export function FillGrid({ className, children }: { className?: string; children
 
 /** Page wrapper that staggers its direct Card children in. */
 export function Stagger({ className, children, ...props }: HTMLMotionProps<"div">) {
+  // the app's first screen holds its cards until the intro opens, then cascades in as it does
+  const intro = useIntroDelay();
+  const variants = intro ? { ...stagger, show: { transition: { ...stagger.show.transition, delayChildren: stagger.show.transition.delayChildren + intro / 1000 } } } : stagger;
   return (
-    <motion.div variants={stagger} initial="hidden" animate="show" className={className} {...props}>
+    <motion.div variants={variants} initial="hidden" animate="show" className={className} {...props}>
       {children}
     </motion.div>
   );
@@ -74,7 +78,13 @@ export function PageHeader({ title, subtitle, action }: { title: React.ReactNode
         <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-ink-3">{subtitle}</p>}
       </div>
-      {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
+      {/* phones: two or more actions fill the width in tidy rows — the ones that fit share a row, one
+          that doesn't (a long label, another language) takes its own — instead of wrapping unevenly */}
+      {action && (
+        <div className="flex flex-wrap items-center gap-2 max-sm:has-[>:nth-child(2)]:w-full max-sm:has-[>:nth-child(2)]:*:grow">
+          {action}
+        </div>
+      )}
     </div>
   );
 }

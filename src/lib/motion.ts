@@ -7,6 +7,7 @@
  * `animate-pop-in` / `rise-in` / `rise-list` utilities in globals.css.
  */
 import type { Transition, Variants } from "motion/react";
+import { useState } from "react";
 
 export const EASE_OUT = [0.22, 1, 0.36, 1] as const;
 export const SPRING: Transition = { type: "spring", stiffness: 420, damping: 32 };
@@ -97,4 +98,24 @@ export function coverRadius(p: { x: number; y: number }) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   return Math.ceil(Math.max(Math.hypot(p.x, p.y), Math.hypot(vw - p.x, p.y), Math.hypot(p.x, vh - p.y), Math.hypot(vw - p.x, vh - p.y)));
+}
+
+// ---- the intro (see .intro in globals.css): what it reveals waits for it to open ----
+
+/**
+ * How long (ms) until the intro parts, read from its own animation so the CSS stays the one source of
+ * the timing — 0 when it isn't playing (a reload, "reduce motion") or has already opened.
+ */
+export function introRemaining() {
+  if (typeof document === "undefined" || document.documentElement.dataset.intro !== "play") return 0;
+  const parting = document.querySelector(".intro__half")?.getAnimations()[0];
+  if (!parting) return 0;
+  const delay = Number(parting.effect?.getTiming().delay ?? 0);
+  return Math.max(0, delay - Number(parting.currentTime ?? delay));
+}
+
+/** introRemaining() as it was when this mounted: an entrance delayed by it lands as the intro opens. */
+export function useIntroDelay() {
+  const [ms] = useState(introRemaining);
+  return ms;
 }

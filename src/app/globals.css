@@ -222,12 +222,323 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: radial-gradient(circle, #d9b45f50, #d9b45f1f 45%, transparent 70%);
   animation: ink 950ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-/* pages arriving from the direction of the nav (see (app)/template.tsx) */
+/* pages arriving from the direction of the nav (see (app)/template.tsx): the first one, and every one
+   where the browser has no view transitions */
 @keyframes page-in {
   from { opacity: 0; translate: var(--page-from, 0 12px); }
 }
 .page-enter {
   animation: page-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/*
+ * Changing pages: a view transition (the <ViewTransition> in (app)/template.tsx). The new page pushes
+ * the old one off to the side it's going (--page-push, from the template) while a gold coin rolls along
+ * the gap between them, on top of the tab bar, and hops over the + on its way. The push and the roll
+ * share one clock and one curve: moving from the first frame, so the tap answers at once, then easing
+ * out like a flicked coin slowing down.
+ * Only the pages and the coin take part: the root isn't captured, so the bars, the tour and anything
+ * else floating stay live and tappable underneath, and what moves is clipped to the band between the
+ * bars (phones: with a notch for the + that rises out of the tab bar — the coin rolls behind it).
+ */
+/* The clip is in viewport units, not %: React shrinks ::view-transition to 0×0 when the rest of the page
+   isn't changing (its own way of letting taps through), and percentages would shrink with it. */
+:root {
+  view-transition-name: none;
+  --vt-time: 720ms;
+  /* coin-hop's keyframes are timed to this curve: change one, re-time the other */
+  --vt-ease: cubic-bezier(0.4, 0.55, 0.2, 1);
+}
+::view-transition {
+  pointer-events: none;
+  --vt-top: calc(env(safe-area-inset-top) + 4rem + 1px);
+  --vt-bottom: calc(100dvh - env(safe-area-inset-bottom) - 4rem - 1px);
+  clip-path: polygon(
+    0 var(--vt-top),
+    100vw var(--vt-top),
+    100vw var(--vt-bottom),
+    calc(50vw + 36px) var(--vt-bottom),
+    calc(50vw + 36px) calc(var(--vt-bottom) - 16px),
+    calc(50vw - 36px) calc(var(--vt-bottom) - 16px),
+    calc(50vw - 36px) var(--vt-bottom),
+    0 var(--vt-bottom)
+  );
+}
+@media (min-width: 1024px) {
+  /* right of the sidebar, under the top bar */
+  ::view-transition {
+    clip-path: polygon(16rem calc(4rem + 1px), 100vw calc(4rem + 1px), 100vw 100dvh, 16rem 100dvh);
+  }
+}
+::view-transition-old(.page-leave) {
+  animation: vt-push-out var(--vt-time) var(--vt-ease) both;
+}
+::view-transition-new(.page-arrive) {
+  animation: vt-push-in var(--vt-time) var(--vt-ease) both;
+}
+@keyframes vt-push-out {
+  to { translate: calc(var(--page-push, 0px) * -1) 0; opacity: 0; }
+}
+@keyframes vt-push-in {
+  from { translate: var(--page-push, 0px) 0; opacity: 0.35; }
+}
+/* The coin rests where its roll ends, off screen; the transition rolls its picture in from the far side.
+   Turning it by its travel over its circumference keeps it rolling, not sliding. */
+.page-coin {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 4rem + 2px);
+  pointer-events: none;
+  view-transition-name: page-coin;
+}
+/* its glow is round, so it holds still while the coin turns inside it */
+.page-coin::before {
+  content: "";
+  position: absolute;
+  inset: -55%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, #d9b45f4d, transparent 62%);
+}
+@media (min-width: 1024px) {
+  .page-coin {
+    bottom: 14px;
+  }
+}
+::view-transition-group(page-coin) {
+  z-index: 2;
+  animation: none;
+}
+::view-transition-old(page-coin) {
+  display: none;
+}
+::view-transition-new(page-coin) {
+  animation: coin-roll var(--vt-time) var(--vt-ease) both;
+}
+@keyframes coin-roll {
+  from { translate: var(--coin-travel, 0px) 0; rotate: var(--coin-turn, 0deg); }
+}
+/* phones: the + rises out of the middle of the tab bar, so the coin hops it — taking off just before it
+   (19% of the way through the curve's time), over it at the middle of its roll (25.8%), down past it,
+   and a little bounce. `transform` stacks on the roll's own translate/rotate. */
+@media (max-width: 1023.98px) {
+  ::view-transition-new(page-coin) {
+    animation:
+      coin-roll var(--vt-time) var(--vt-ease) both,
+      coin-hop var(--vt-time) linear both;
+  }
+}
+@keyframes coin-hop {
+  0%, 18.5% { transform: none; animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1); }
+  25.8% { transform: translateY(-30px); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  32.5% { transform: none; animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1); }
+  35.8% { transform: translateY(-8px); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  39%, 100% { transform: none; }
+}
+/* the computer's floating + sits over the page area: kept above the moving pages (and the coin), as it is */
+::view-transition-group(app-fab) {
+  z-index: 3;
+  animation: none;
+}
+::view-transition-old(app-fab) {
+  display: none;
+}
+::view-transition-new(app-fab) {
+  animation: none;
+}
+
+/*
+ * The intro: once per launch (the root layout's inline script sets data-intro). All CSS, so it starts
+ * with the first paint and never waits on — or holds up — the app loading behind it. The coin flips in
+ * as its edge draws itself, fills, has its G struck, catches a glint; the name rises letter by letter;
+ * then the screen parts along a gold seam. introRemaining() (lib/motion.ts) reads the parting's delay
+ * from .intro__half, so the bars and the first page arrive just as it opens.
+ */
+.intro {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  place-items: center;
+  animation: intro-done 0s linear 2.1s forwards;
+}
+[data-intro="play"] .intro {
+  display: grid;
+}
+.intro__half {
+  position: absolute;
+  inset-inline: 0;
+  height: 50.5%;
+  background: var(--color-bg);
+  animation: intro-part 700ms cubic-bezier(0.76, 0, 0.24, 1) 1350ms forwards;
+}
+.intro__half--top {
+  top: 0;
+  --dir: -1;
+}
+.intro__half--bottom {
+  bottom: 0;
+  --dir: 1;
+}
+/* the seam: a gold hairline on each half's edge, lit just before they part */
+.intro__half::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-gold) 25%, var(--color-gold-bright) 50%, var(--color-gold) 75%, transparent);
+  box-shadow: 0 0 14px 1px #d9b45f66;
+  opacity: 0;
+  animation: intro-fade 260ms ease-out 1180ms forwards;
+}
+.intro__half--top::after {
+  bottom: 0;
+}
+.intro__half--bottom::after {
+  top: 0;
+}
+.intro__art {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 1.1rem;
+  animation: intro-art-out 300ms cubic-bezier(0.4, 0, 1, 1) 1150ms forwards;
+}
+/* a soft gold bloom behind the coin */
+.intro__art::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(min(34vw, 132px) / 2);
+  width: 360px;
+  height: 360px;
+  margin: -180px 0 0 -180px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, #d9b45f30, transparent 65%);
+  opacity: 0;
+  scale: 0.4;
+  animation: intro-bloom 900ms cubic-bezier(0.16, 1, 0.3, 1) 250ms forwards;
+}
+.intro__coin {
+  position: relative;
+  width: min(34vw, 132px);
+  height: min(34vw, 132px);
+  overflow: visible;
+  animation: intro-flip 1000ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.intro__fill {
+  fill: var(--color-gold);
+  stroke: var(--color-gold);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  opacity: 0;
+  animation: intro-fade 420ms ease-out 380ms forwards;
+}
+.intro__edge {
+  fill: none;
+  stroke: var(--color-gold);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: intro-draw 650ms cubic-bezier(0.65, 0, 0.35, 1) 60ms forwards;
+}
+.intro__rim {
+  fill: none;
+  stroke: #131316;
+  stroke-opacity: 0.3;
+  stroke-width: 1;
+  opacity: 0;
+  animation: intro-fade 300ms ease-out 620ms forwards;
+}
+.intro__g {
+  fill: none;
+  stroke: #131316;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: intro-draw 480ms cubic-bezier(0.65, 0, 0.35, 1) 640ms forwards;
+}
+.intro__glint {
+  opacity: 0;
+  animation: intro-glint 620ms cubic-bezier(0.4, 0, 0.2, 1) 980ms forwards;
+}
+.intro__word {
+  display: flex;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.intro__word span {
+  display: inline-block;
+  background: linear-gradient(180deg, var(--color-gold-bright), var(--color-gold) 55%, var(--color-gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  opacity: 0;
+  translate: 0 0.5em;
+  animation: intro-letter 560ms cubic-bezier(0.16, 1, 0.3, 1) calc(700ms + var(--i, 0) * 40ms) forwards;
+}
+@keyframes intro-flip {
+  from { opacity: 0; transform: perspective(700px) rotateY(-150deg) scale(0.6); }
+  35% { opacity: 1; }
+}
+@keyframes intro-draw {
+  from { opacity: 1; stroke-dashoffset: 1; }
+  to { opacity: 1; stroke-dashoffset: 0; }
+}
+@keyframes intro-fade {
+  to { opacity: 1; }
+}
+@keyframes intro-glint {
+  0% { opacity: 0; transform: translateX(0); }
+  25%, 70% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(64px); }
+}
+@keyframes intro-letter {
+  to { opacity: 1; translate: none; }
+}
+@keyframes intro-bloom {
+  to { opacity: 1; scale: 1; }
+}
+@keyframes intro-art-out {
+  to { opacity: 0; scale: 0.94; }
+}
+@keyframes intro-part {
+  to { transform: translateY(calc(var(--dir) * 101%)); visibility: hidden; }
+}
+@keyframes intro-done {
+  to { visibility: hidden; }
+}
+/* what the intro reveals makes its entrance as it parts: the bars from their edges, then the + pops in
+   (--intro-delay comes from useIntroDelay) */
+.intro-drop {
+  animation: intro-drop 700ms cubic-bezier(0.16, 1, 0.3, 1) var(--intro-delay, 0ms) backwards;
+}
+.intro-lift {
+  animation: intro-lift 700ms cubic-bezier(0.16, 1, 0.3, 1) var(--intro-delay, 0ms) backwards;
+}
+.intro-slide {
+  animation: intro-slide 700ms cubic-bezier(0.16, 1, 0.3, 1) var(--intro-delay, 0ms) backwards;
+}
+.intro-pop {
+  animation: intro-pop 650ms cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--intro-delay, 0ms) + 260ms) backwards;
+}
+@keyframes intro-drop {
+  from { opacity: 0; translate: 0 -100%; }
+}
+@keyframes intro-lift {
+  from { opacity: 0; translate: 0 100%; }
+}
+@keyframes intro-slide {
+  from { opacity: 0; translate: -100% 0; }
+}
+@keyframes intro-pop {
+  from { scale: 0; rotate: -120deg; }
 }
 
 /*
@@ -268,6 +579,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .rise-in > :only-child > *,
   .rise-list > * {
     animation: none;
+  }
+  .intro {
+    display: none !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 
   *,

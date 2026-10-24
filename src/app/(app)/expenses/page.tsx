@@ -114,7 +114,7 @@ function Expenses() {
         subtitle={t("exp.summary", { count: rows.length, total: f.money(total) })}
         action={
           <>
-            <Button size="sm" variant="ghost" onClick={() => downloadFile(`gelbien-${scope === "all" ? "all" : month}.csv`, toCsv(rows), "text/csv;charset=utf-8")}>
+            <Button size="sm" variant="outline" onClick={() => downloadFile(`gelbien-${scope === "all" ? "all" : month}.csv`, toCsv(rows), "text/csv;charset=utf-8")}>
               <Download className="h-4 w-4" /> {t("exp.exportCsv")}
             </Button>
             <Button size="sm" variant="primary" onClick={() => openExpense()}>

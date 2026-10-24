@@ -142,7 +142,7 @@ function BudgetEditor({ ds, month }: { ds: Dataset; month: string }) {
         subtitle={t("budget.subtitle", { month: f.monthLong(month) })}
         action={
           <>
-            <Button size="sm" variant="ghost" onClick={copyPrev}>
+            <Button size="sm" variant="outline" onClick={copyPrev}>
               <Copy className="h-4 w-4" /> {t("budget.copyPrev")}
             </Button>
             <Button size="sm" variant="outline" onClick={suggest}>

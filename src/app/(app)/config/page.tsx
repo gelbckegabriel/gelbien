@@ -195,7 +195,7 @@ function ConfigEditor({ ds, onTranslate }: { ds: Dataset; onTranslate: () => voi
         action={
           <>
             {/* works on the saved categories, so pending edits must be saved first */}
-            <Button variant="ghost" size="sm" onClick={onTranslate} disabled={dirty} title={dirty ? t("cfg.translateDirty") : undefined}>
+            <Button variant="outline" size="sm" onClick={onTranslate} disabled={dirty} title={dirty ? t("cfg.translateDirty") : undefined}>
               <Languages className="h-4 w-4" /> {t("cfg.translate")}
             </Button>
             <Button variant="outline" size="sm" onClick={addCategory}>

@@ -66,11 +66,11 @@ function Goals() {
         action={
           <>
             {/* a mortgage or a loan, tried before taking it on (a home or a car being saved for, say) */}
-            <Button size="sm" variant="ghost" onClick={() => open({ kind: "loan" })}>
+            <Button size="sm" variant="outline" onClick={() => open({ kind: "loan" })}>
               <Calculator className="h-4 w-4" /> {t("calc.open")}
             </Button>
             {hasAccounts && (
-              <Button size="sm" variant="ghost" onClick={() => open({ kind: "checkin" })}>
+              <Button size="sm" variant="outline" onClick={() => open({ kind: "checkin" })}>
                 <ClipboardCheck className="h-4 w-4" /> {t("ci.button")}
               </Button>
             )}

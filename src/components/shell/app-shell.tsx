@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useDataset, useMode, useRefresh } from "@/lib/data/hooks";
 import { receiptFromTransfer } from "@/lib/files";
 import { LOCALES, useI18n, usePrefs } from "@/lib/i18n";
+import { useIntroDelay } from "@/lib/motion";
 import type { Locale } from "@/lib/types";
 import { useUi } from "@/lib/ui-store";
 import { useHydrated } from "@/lib/use-media";
@@ -21,7 +22,7 @@ import { buttonClasses } from "../ui/button";
 import { Skeleton } from "../ui/misc";
 import { WelcomeTour } from "../welcome-tour";
 import { MonthPicker } from "./month-picker";
-import { BottomNav, DesktopFab, Sidebar } from "./nav";
+import { BottomNav, DesktopFab, RouteWarmup, Sidebar } from "./nav";
 import { LoadError, WriteBlocked } from "./load-error";
 import { GuardedLink, UnsavedDialog } from "./unsaved";
 import { AccountMenu, guideHref } from "./user-chip";
@@ -64,8 +65,12 @@ function HelpButton() {
 function TopBar() {
   const { mode } = useMode();
   const { t } = useI18n();
+  const intro = useIntroDelay();
   return (
-    <header className="sticky top-0 z-20 border-b border-line/60 bg-bg/80 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header
+      className={cn("sticky top-0 z-20 border-b border-line/60 bg-bg/80 pt-[env(safe-area-inset-top)] backdrop-blur-md", intro > 0 && "intro-drop")}
+      style={intro > 0 ? { ["--intro-delay" as string]: `${intro + 120}ms` } : undefined}
+    >
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
         {/* the smallest phones (under 360px) need the room; the dashboard is in the bottom bar anyway */}
         <GuardedLink href="/dashboard" className="lg:hidden max-[359px]:hidden" aria-label="Gelbien">
@@ -315,6 +320,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <BottomNav />
+      <RouteWarmup />
       {ready && (
         <>
           <DesktopFab />

@@ -15,6 +15,17 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
+/** Just the coin, no tile (the page-change coin rolls on its own). */
+export function CoinMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="11 11 42 42" className={className} aria-hidden>
+      <polygon points={MARK.coin} fill={BRAND.gold} stroke={BRAND.gold} strokeWidth="2" strokeLinejoin="round" />
+      <polygon points={MARK.rim} fill="none" stroke={BRAND.ink} strokeOpacity="0.3" strokeWidth="1" />
+      <path d={MARK.g} fill="none" stroke={BRAND.ink} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
