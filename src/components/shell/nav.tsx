@@ -217,11 +217,37 @@ function rollCoin(mover: HTMLElement, from: number, to: number) {
 }
 
 /**
+ * A tab's icon. It pops when its tab becomes the current one — a Web Animation on the same element: the
+ * element under the finger must never be swapped mid-tap (iOS then drops the tap; see BottomNav).
+ */
+function TabIcon({ icon: Icon, on, still }: { icon: typeof LayoutDashboard; on: boolean; still: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const was = useRef(on);
+  useEffect(() => {
+    if (on && !was.current && !still) {
+      ref.current?.animate([{ transform: "translateY(4px) scale(0.55) rotate(-12deg)" }, { transform: "none" }], {
+        duration: 520,
+        easing: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      });
+    }
+    was.current = on;
+  }, [on, still]);
+  return (
+    <span ref={ref} className="grid place-items-center">
+      <Icon className={cn("h-5 w-5 transition-colors duration-200", on ? "text-gold" : "text-ink-3")} />
+    </span>
+  );
+}
+
+/**
  * The phone's tab bar, made to keep up with a thumb. A tab lights the moment it's touched — before its
- * page has even arrived — and the page opens on release. The gold bar and its light glide over to it
- * (a CSS transition) while the coin rolls across: both on the compositor, smooth while the page renders.
- * Tapping the tab you're on takes its page back to the top. Pages keep their place between visits (they
- * stay alive in the background, see template), hence scroll={false}.
+ * page has even arrived — and its page opens as the finger lifts: sent from the release itself, not from
+ * the click the browser makes of it afterwards, which iOS can drop (that click is then ignored, so
+ * nothing opens twice; the keyboard still works through it). The gold bar and its light glide over (a CSS
+ * transition) while the coin rolls across: both on the compositor, smooth while the page renders.
+ * Tapping the tab you're on takes its page back to the top — or, if you'd just tapped another one whose
+ * page hasn't come yet, stays here instead. Pages keep their place between visits (they stay alive in
+ * the background, see template), hence scroll={false}.
  */
 export function BottomNav() {
   const path = usePathname();
@@ -232,11 +258,28 @@ export function BottomNav() {
   const intro = useIntroDelay();
   const entrance = introEntrance(intro, "intro-lift");
   const pop = introEntrance(intro, "intro-pop");
-  // the tab under the finger shows as current at once (only while still on the page it was pressed from)
-  const [pressed, setPressed] = useState<{ href: string; from: string } | null>(null);
+  // The tab under the finger shows as current at once. A press only stands for the page it was made on:
+  // once the page changes, the route says what's current again.
+  const [pressed, setPressed] = useState<string | null>(null);
+  const [pressedOn, setPressedOn] = useState(path);
+  if (pressedOn !== path) {
+    setPressedOn(path);
+    setPressed(null);
+  }
   const routeTab = MOBILE.find((i) => i && path.startsWith(i.href))?.href ?? null;
-  const current = pressed && pressed.from === path ? pressed.href : routeTab;
+  const current = pressed ?? routeTab;
   const col = columnOf(current);
+  // the press being made: on which tab, and whether another tab's page was already on its way then
+  const down = useRef<{ href: string; elsewhere: boolean } | null>(null);
+  // the page a tap has sent for and that hasn't come yet (a ref: a second tap can come before a re-render)
+  const pending = useRef<string | null>(null);
+  useEffect(() => {
+    pending.current = null;
+  }, [path]);
+  // a tap already sent on release: the click the browser makes of it next mustn't send it again
+  const sent = useRef<string | null>(null);
+  const go = (href: string) => router.push(href, { scroll: false });
+  const toTop = () => window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
 
   const coin = useRef<HTMLSpanElement>(null);
   const lastCol = useRef(col);
@@ -303,29 +346,53 @@ export function BottomNav() {
               aria-current={here ? "page" : undefined}
               className="relative flex flex-col items-center gap-1 py-1.5"
               onPointerDown={(e) => {
-                if (e.button === 0 && !here && !hasUnsaved()) setPressed({ href: item.href, from: path });
+                sent.current = null;
+                // unsaved edits: the click asks first (onNavigate), nothing is sent on release
+                if (e.button !== 0 || hasUnsaved()) {
+                  down.current = null;
+                  return;
+                }
+                down.current = { href: item.href, elsewhere: pending.current !== null && pending.current !== routeTab };
+                setPressed(item.href);
               }}
-              onPointerCancel={() => setPressed(null)}
-              // released somewhere else: no tap after all
+              onPointerCancel={() => {
+                down.current = null;
+                setPressed(null);
+              }}
               onPointerUp={(e) => {
+                const press = down.current;
+                down.current = null;
+                if (press?.href !== item.href) return;
                 const r = e.currentTarget.getBoundingClientRect();
-                if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) setPressed(null);
+                // released somewhere else: no tap after all
+                if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) {
+                  setPressed(null);
+                  return;
+                }
+                sent.current = item.href;
+                if (here && !press.elsewhere) toTop();
+                else {
+                  pending.current = item.href;
+                  go(item.href);
+                }
               }}
               onClick={(e) => {
-                if (!here) return;
-                e.preventDefault();
-                window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+                if (sent.current === item.href) {
+                  sent.current = null;
+                  e.preventDefault();
+                } else if (here) {
+                  e.preventDefault();
+                  toTop();
+                }
               }}
               onNavigate={(e) => {
                 if (!hasUnsaved()) return;
                 e.preventDefault();
                 setPressed(null);
-                askToLeave(() => router.push(item.href, { scroll: false }));
+                askToLeave(() => go(item.href));
               }}
             >
-              <span key={on ? "on" : "off"} className={cn("grid place-items-center", on && !reduce && "tab-pop")}>
-                <item.icon className={cn("h-5 w-5 transition-colors duration-200", on ? "text-gold" : "text-ink-3")} />
-              </span>
+              <TabIcon icon={item.icon} on={on} still={!!reduce} />
               <span className={cn("text-[10px] font-medium transition-colors duration-200", on ? "text-ink" : "text-ink-3")}>{t(item.label)}</span>
             </Link>
           );

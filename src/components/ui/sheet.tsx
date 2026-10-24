@@ -44,7 +44,7 @@ export function Sheet(props: SheetProps) {
 
 // How long the closing curtain runs (.sheet-run-close in globals.css: in, held at the seam, parted) —
 // the popup stays mounted until it's done.
-const CURTAIN_CLOSE_MS = 700;
+const CURTAIN_CLOSE_MS = 420;
 
 function SheetLayer({ onOpenChange, title, description, children, footer, className, wide }: SheetProps) {
   const mobile = useMediaQuery("(max-width: 639px)");
@@ -225,11 +225,11 @@ function SheetLayer({ onOpenChange, title, description, children, footer, classN
                 {!description && <Dialog.Description className="sr-only">{title}</Dialog.Description>}
               </div>
               <div className={cn("relative z-10 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pt-4", footer ? "pb-5" : "pb-[calc(env(safe-area-inset-bottom)+1.25rem)]")}>
-                {description && <Dialog.Description className={cn("mb-4 text-sm text-ink-3 [--rise-delay:300ms]", !settled && "rise-once")}>{description}</Dialog.Description>}
-                <div className={cn("[--rise-delay:340ms]", !settled && "rise-in")}>{children}</div>
+                {description && <Dialog.Description className={cn("mb-4 text-sm text-ink-3 [--rise-delay:190ms]", !settled && "rise-once")}>{description}</Dialog.Description>}
+                <div className={cn("[--rise-delay:220ms]", !settled && "rise-in")}>{children}</div>
               </div>
               {footer && (
-                <div className={cn("relative z-10 border-t border-line px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 [--rise-delay:430ms]", !settled && "rise-in")}>
+                <div className={cn("relative z-10 border-t border-line px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 [--rise-delay:300ms]", !settled && "rise-in")}>
                   {footer}
                 </div>
               )}

@@ -199,8 +199,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
  * Phones' popups open behind a curtain, like the intro's (Sheet adds the classes): two halves led by gold
  * edges close in from the top and bottom, meet where the coin pops, and part on the new page — which is
  * there from the moment they meet (.sheet-page-open). Closing runs it over the page, which goes as they
- * meet (.sheet-page-close), and parts it on the app. Beats, ms — opening 260 in · 90 held · 460 parting;
- * closing 220 · 60 · 420 (700 in all: CURTAIN_CLOSE_MS in Sheet).
+ * meet (.sheet-page-close), and parts it on the app. Quick, since it runs for every popup (each new
+ * expense): beats, ms — opening 150 in · 40 held · 280 parting (470); closing 130 · 30 · 260 (420 in all:
+ * CURTAIN_CLOSE_MS in Sheet). The keyframe percentages below are these beats.
  */
 .sheet-half {
   position: fixed;
@@ -236,21 +237,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   top: 0;
 }
 .sheet-half.sheet-run-open {
-  animation: sheet-half-open 810ms both;
+  animation: sheet-half-open 470ms both;
 }
 .sheet-half.sheet-run-close {
-  animation: sheet-half-close 700ms both;
+  animation: sheet-half-close 420ms both;
 }
 @keyframes sheet-half-open {
   0% { transform: translateY(calc(var(--edge) * 101%)); animation-timing-function: cubic-bezier(0.6, 0, 0.4, 1); }
-  32.1% { transform: none; animation-timing-function: linear; }
-  43.2% { transform: none; animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1); }
+  31.9% { transform: none; animation-timing-function: linear; }
+  40.4% { transform: none; animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1); }
   100% { transform: translateY(calc(var(--edge) * 101%)); }
 }
 @keyframes sheet-half-close {
   0% { transform: translateY(calc(var(--edge) * 101%)); animation-timing-function: cubic-bezier(0.6, 0, 0.4, 1); }
-  31.4% { transform: none; animation-timing-function: linear; }
-  40% { transform: none; animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1); }
+  31% { transform: none; animation-timing-function: linear; }
+  38.1% { transform: none; animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1); }
   100% { transform: translateY(calc(var(--edge) * 101%)); }
 }
 /* the coin at the seam: pops as the halves meet, gone as they part */
@@ -274,26 +275,26 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: radial-gradient(circle, #d9b45f55, transparent 62%);
 }
 .sheet-coin.sheet-run-open {
-  animation: sheet-coin-open 810ms both;
+  animation: sheet-coin-open 470ms both;
 }
 .sheet-coin.sheet-run-close {
-  animation: sheet-coin-close 700ms both;
+  animation: sheet-coin-close 420ms both;
 }
 @keyframes sheet-coin-open {
-  0%, 24.7% { opacity: 0; transform: scale(0) rotate(-120deg); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-  37%, 43.2% { opacity: 1; transform: none; animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
-  63%, 100% { opacity: 0; transform: scale(0.6); }
+  0%, 21.3% { opacity: 0; transform: scale(0) rotate(-120deg); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  38.3%, 40.4% { opacity: 1; transform: none; animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+  63.8%, 100% { opacity: 0; transform: scale(0.6); }
 }
 @keyframes sheet-coin-close {
-  0%, 22.9% { opacity: 0; transform: scale(0) rotate(-120deg); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-  37.1%, 40% { opacity: 1; transform: none; animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
-  62.9%, 100% { opacity: 0; transform: scale(0.6); }
+  0%, 19% { opacity: 0; transform: scale(0) rotate(-120deg); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  36.9%, 38.1% { opacity: 1; transform: none; animation-timing-function: cubic-bezier(0.4, 0, 1, 1); }
+  61.9%, 100% { opacity: 0; transform: scale(0.6); }
 }
 .sheet-page-open {
-  animation: sheet-page-swap 1ms linear 260ms both;
+  animation: sheet-page-swap 1ms linear 150ms both;
 }
 .sheet-page-close {
-  animation: sheet-page-swap 1ms linear 220ms both reverse;
+  animation: sheet-page-swap 1ms linear 130ms both reverse;
 }
 @keyframes sheet-page-swap {
   from { opacity: 0; }
@@ -317,14 +318,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: radial-gradient(circle, #d9b45f50, #d9b45f1f 45%, transparent 70%);
   animation: ink 950ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-/* a tab's icon pops as it becomes the current one (the phone's tab bar — see BottomNav) */
-.tab-pop {
-  animation: tab-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes tab-pop {
-  from { transform: translateY(4px) scale(0.55) rotate(-12deg); }
-}
-
 /*
  * The intro: once per launch (the root layout's inline script sets data-intro). All CSS, so it starts
  * with the first paint and never waits on — or holds up — the app loading behind it. The coin flips in
